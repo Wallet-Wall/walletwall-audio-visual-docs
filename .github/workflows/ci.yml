@@ -1,0 +1,69 @@
+name: CI
+
+# Verifies the audiovisual docs pipeline: types, tests, byte-for-byte spec
+# regeneration, publishability validation, contract integrity, and a
+# dependency audit. Read-only and credential-free by design: it never renders
+# with a live voice, never contacts YouTube, and is safe on fork PRs.
+# Canonical reads come from the blob-verified fixture mirror; live staleness
+# and brand-drift checks need a WalletWall checkout (WALLETWALL_SOURCE_ROOT).
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Committed specs regenerate byte-for-byte
+        run: npm run plan:check
+
+      - name: Validate specs
+        run: npm run validate
+
+      - name: Contracts and fixture mirror
+        run: npm run contracts:check
+
+      - name: Freshness report (informational)
+        run: |
+          set +e
+          node scripts/freshness.ts | tee -a "$GITHUB_STEP_SUMMARY"
+          code=${PIPESTATUS[0]}
+          if [ "$code" = "2" ]; then echo "::warning::A video needs re-rendering or a new revision (see summary)."; exit 0; fi
+          exit "$code"
+
+      - name: Dependency audit
+        run: npm audit --audit-level=moderate

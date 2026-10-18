@@ -1,0 +1,46 @@
+{
+  "name": "walletwall-audio-visual-docs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deterministic audiovisual documentation for WalletWall: authoritative docs -> typed VideoSpec -> validation -> deterministic Remotion render -> dry-run YouTube manifest.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Wallet-Wall/walletwall-audio-visual-docs.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "plan": "node scripts/plan.ts",
+    "plan:check": "node scripts/plan.ts --check",
+    "validate": "node scripts/validate.ts",
+    "studio": "node scripts/prepare-assets.ts && remotion studio src/remotion/index.ts --public-dir=dist/public",
+    "render": "node scripts/render.ts",
+    "render:stills": "node scripts/render.ts --stills",
+    "publish:dry-run": "node scripts/publish-dry-run.ts",
+    "freshness": "node scripts/freshness.ts",
+    "contracts:check": "node scripts/contracts-check.ts",
+    "pipeline": "node scripts/pipeline.ts",
+    "check": "npm run typecheck && npm test && npm run plan:check && npm run validate"
+  },
+  "dependencies": {
+    "@fontsource-variable/manrope": "5.2.8",
+    "@fontsource-variable/sora": "5.2.8",
+    "@fontsource/ibm-plex-mono": "5.2.7",
+    "@remotion/bundler": "4.0.532",
+    "@remotion/cli": "4.0.532",
+    "@remotion/renderer": "4.0.532",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "remotion": "4.0.532"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.0",
+    "@types/react": "19.2.18",
+    "typescript": "6.0.3"
+  }
+}

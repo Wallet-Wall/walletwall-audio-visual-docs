@@ -1,0 +1,36 @@
+{
+  "schema": "walletwall.copy-templates/v1",
+  "note": "Brand copy is version-controlled. A planner may choose a template id; it can never write ident, CTA, docs-reference, outro, or end-screen copy itself.",
+  "templates": {
+    "ident.v1": {
+      "role": "IDENT",
+      "narration": null,
+      "onScreen": "WalletWall",
+      "durationMs": 2000
+    },
+    "cta.like-subscribe.v1": {
+      "role": "CTA",
+      "narration": "If this was useful, like the video and subscribe for more WalletWall architecture and data deep dives.",
+      "onScreen": "Like and subscribe for more WalletWall deep dives",
+      "durationMs": null
+    },
+    "docs-reference.v1": {
+      "role": "DOCS_REFERENCE",
+      "narration": "The full page is in the WalletWall docs. The link is in the description.",
+      "onScreen": "Read the canonical page",
+      "durationMs": null
+    },
+    "outro.v1": {
+      "role": "OUTRO",
+      "narration": null,
+      "onScreen": "walletwall.org",
+      "durationMs": 3000
+    },
+    "end-screen.v1": {
+      "role": "END_SCREEN",
+      "narration": null,
+      "onScreen": "Next on the route",
+      "durationMs": 12000
+    }
+  }
+}

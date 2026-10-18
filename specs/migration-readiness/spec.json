@@ -1,0 +1,1224 @@
+{
+  "schema": "walletwall.video-spec/v1",
+  "id": "migration-readiness",
+  "revision": 1,
+  "locale": "en-US",
+  "title": {
+    "topic": "How WalletWall Measures Migration Readiness"
+  },
+  "videoClass": "QUICK",
+  "series": null,
+  "source": {
+    "docPath": "docs/concepts/migration-readiness.mdx",
+    "docUrl": "https://docs.walletwall.org/concepts/migration-readiness",
+    "blob": "f8c294eecaef6142ab947ce16d8664a8bec743c0",
+    "contentHash": "958c4a37fe87e103f4d633e0d696bdb5354b603a77932362f45e3aff51e3b1ff",
+    "normalizerVersion": "walletwall-mdx-normalizer/2",
+    "snapshotPath": "video/specs/migration-readiness/source.snapshot.json"
+  },
+  "planner": {
+    "provider": "fixture",
+    "contract": "walletwall.storyboard/v1",
+    "storyboardHash": "d440d053b6634b005e446812d57fc8d478b9a3c02faafc8639d976e88e884fdb"
+  },
+  "claims": [
+    {
+      "id": "c-qes",
+      "type": "DOC_DIRECT",
+      "statement": "The Quantum Exposure Score answers how urgent the risk is.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "migration-readiness",
+          "quote": "Where the Quantum Exposure Score answers how urgent is the risk"
+        }
+      ]
+    },
+    {
+      "id": "c-mr",
+      "type": "DOC_DIRECT",
+      "statement": "Migration Readiness answers how feasible it is to move safely, and what should be done first.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "migration-readiness",
+          "quote": "Migration Readiness answers how feasible is it to move safely, and what should be done first."
+        }
+      ]
+    },
+    {
+      "id": "c-recommend-step",
+      "type": "DOC_DIRECT",
+      "statement": "Migration Readiness is the recommend step in WalletWall's workflow.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "migration-readiness",
+          "quote": "Migration Readiness is the recommend step in WalletWall's workflow."
+        }
+      ]
+    },
+    {
+      "id": "c-no-second-score",
+      "type": "DOC_DIRECT",
+      "statement": "Migration Readiness does not introduce a second score.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "migration-readiness",
+          "quote": "It does not introduce a second score."
+        }
+      ]
+    },
+    {
+      "id": "c-one-path",
+      "type": "DOC_DIRECT",
+      "statement": "It recommends one path and places the wallet in a shared risk tier.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "migration-readiness",
+          "quote": "to recommend one path and place the wallet in a shared risk tier."
+        }
+      ]
+    },
+    {
+      "id": "c-four-tiers",
+      "type": "DOC_DIRECT",
+      "statement": "Every assessment normalizes into one of four tiers.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "the-shared-risk-tiers",
+          "quote": "Every assessment normalizes into one of four tiers."
+        }
+      ]
+    },
+    {
+      "id": "c-ascending",
+      "type": "DOC_DIRECT",
+      "statement": "The tiers are ordered by ascending prioritization: Monitor, Review, Migrate, Vault Candidate.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "the-shared-risk-tiers",
+          "quote": "in ascending order of prioritization - Monitor, Review, Migrate, and Vault Candidate"
+        }
+      ]
+    },
+    {
+      "id": "c-tier-monitor",
+      "type": "DOC_DIRECT",
+      "statement": "Monitor means low urgency, with nothing to act on yet.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "the-shared-risk-tiers",
+          "quote": "Monitor (low urgency)"
+        },
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "the-shared-risk-tiers",
+          "quote": "Low urgency — nothing to act on yet."
+        }
+      ]
+    },
+    {
+      "id": "c-recheck",
+      "type": "DOC_DIRECT",
+      "statement": "Monitor is re-checked on a schedule.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "the-shared-risk-tiers",
+          "quote": "Monitor is re-checked on a schedule."
+        }
+      ]
+    },
+    {
+      "id": "c-tier-review",
+      "type": "DOC_DIRECT",
+      "statement": "Review means the wallet is worth a closer look and a plan.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "the-shared-risk-tiers",
+          "quote": "Review (worth a closer look)"
+        },
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "the-shared-risk-tiers",
+          "quote": "Worth a closer look and a plan."
+        }
+      ]
+    },
+    {
+      "id": "c-tier-migrate",
+      "type": "DOC_DIRECT",
+      "statement": "Migrate means prioritize concrete action.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "the-shared-risk-tiers",
+          "quote": "Migrate (prioritize action)"
+        },
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "the-shared-risk-tiers",
+          "quote": "Prioritize concrete action."
+        }
+      ]
+    },
+    {
+      "id": "c-tier-vault",
+      "type": "DOC_DIRECT",
+      "statement": "Vault Candidate surfaces a research path and is always conditional.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "the-shared-risk-tiers",
+          "quote": "Vault Candidate (conditional research path)"
+        },
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "the-shared-risk-tiers",
+          "quote": "Research path surfaced — conditional."
+        },
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "how-recommendations-should-be-interpreted",
+          "quote": "\"Vault Candidate\" is always conditional."
+        }
+      ]
+    },
+    {
+      "id": "c-signals",
+      "type": "DOC_DIRECT",
+      "statement": "Migration Readiness reuses existing wallet signals: value at risk, signature exposure, dormancy, and wallet structure.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "migration-readiness",
+          "quote": "It reuses existing wallet signals — value at risk, signature exposure, dormancy, and wallet structure"
+        }
+      ]
+    },
+    {
+      "id": "c-interp-no-new-measurement",
+      "type": "INTERPRETATION",
+      "statement": "Migration Readiness adds no new measurement; it reorganizes existing signals into one recommended path.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "migration-readiness",
+          "quote": "It does not introduce a second score."
+        },
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "migration-readiness",
+          "quote": "It reuses existing wallet signals"
+        },
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "migration-readiness",
+          "quote": "to recommend one path"
+        }
+      ]
+    },
+    {
+      "id": "c-bands",
+      "type": "DOC_DIRECT",
+      "statement": "Tiers are prioritization bands, not verdicts.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "how-recommendations-should-be-interpreted",
+          "quote": "Tiers are prioritization bands, not verdicts."
+        }
+      ]
+    },
+    {
+      "id": "c-migrate-queue",
+      "type": "DOC_DIRECT",
+      "statement": "Migrate means near the top of the migration queue, not unsafe today.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "the-shared-risk-tiers",
+          "quote": "\"Migrate\" means near the top of the migration queue, not unsafe today."
+        }
+      ]
+    },
+    {
+      "id": "c-starting-points",
+      "type": "DOC_DIRECT",
+      "statement": "Recommendations are starting points; the right migration depends on operational context WalletWall cannot see.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "how-recommendations-should-be-interpreted",
+          "quote": "Recommendations are starting points."
+        },
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "how-recommendations-should-be-interpreted",
+          "quote": "depends on operational context WalletWall cannot see (signer availability, governance, and internal controls)."
+        }
+      ]
+    },
+    {
+      "id": "c-placeholder",
+      "type": "DOC_DIRECT",
+      "statement": "The Vault Simulator's on-chain verifier is an architectural placeholder.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "why-the-vault-candidate-tier-is-conditional",
+          "quote": "The on-chain verifier in the Vault Simulator is an architectural placeholder, not production-grade cryptographic verification."
+        }
+      ]
+    },
+    {
+      "id": "c-testnet",
+      "type": "DOC_DIRECT",
+      "statement": "The Vault Simulator is testnet-only on Ethereum Sepolia; mainnet writes are blocked.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "why-the-vault-candidate-tier-is-conditional",
+          "quote": "The Vault Simulator is testnet-only (Ethereum Sepolia); mainnet writes are blocked."
+        }
+      ]
+    },
+    {
+      "id": "c-research-not-funds",
+      "type": "DOC_DIRECT",
+      "statement": "Vault Candidate is a research path, not a recommendation to move funds.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "why-the-vault-candidate-tier-is-conditional",
+          "quote": "This is why \"Vault Candidate\" is conditional and research-oriented rather than a recommendation to move funds."
+        }
+      ]
+    },
+    {
+      "id": "c-takeaway",
+      "type": "DOC_DERIVED",
+      "statement": "A tier is a place in the migration queue, not a verdict.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "how-recommendations-should-be-interpreted",
+          "quote": "Tiers are prioritization bands, not verdicts."
+        },
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "the-shared-risk-tiers",
+          "quote": "near the top of the migration queue"
+        }
+      ]
+    },
+    {
+      "id": "c-read-only",
+      "type": "DOC_DIRECT",
+      "statement": "Migration-readiness scanning is read-only: no wallet connection, no private keys, no signing, no transactions.",
+      "evidence": [
+        {
+          "kind": "DOC_SPAN",
+          "sectionId": "read-only--no-key-storage-disclaimer",
+          "quote": "Migration-readiness scanning is read-only: no wallet connection, no private keys, no seed phrases, no signing, no transactions."
+        }
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "id": "brand-mark",
+      "kind": "BRAND_MARK",
+      "path": "video/assets/brand/walletwall-brick-wallet.png",
+      "sha256": "91926a2eebc1777194ecf491049b8a7af3cf0892b09b363c5b2a17cd17d5dbad",
+      "justification": "The WalletWall brick-wallet mark (reviewed and supplied by the maintainer), used only by the ident and outro templates."
+    }
+  ],
+  "segments": [
+    {
+      "id": "hook",
+      "role": "HOOK",
+      "transitionIn": {
+        "type": "CUT"
+      },
+      "narration": [
+        {
+          "id": "hook.l1",
+          "text": "WalletWall's Quantum Exposure Score answers a question: how urgent is the risk?",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-qes"
+          ]
+        },
+        {
+          "id": "hook.l2",
+          "text": "Migration Readiness answers what comes next: how feasible is it to move safely, and what should be done first?",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-mr"
+          ]
+        }
+      ],
+      "scene": {
+        "type": "CARD",
+        "plane": "SURFACE",
+        "eyebrowSectionId": "migration-readiness",
+        "layout": "STACK",
+        "heading": {
+          "id": "hook-heading",
+          "text": "How urgent is the risk? What should be done first?",
+          "claimIds": [
+            "c-qes",
+            "c-mr"
+          ]
+        },
+        "body": [
+          {
+            "id": "hook-b1",
+            "text": "Quantum Exposure Score: how urgent is the risk",
+            "claimIds": [
+              "c-qes"
+            ],
+            "revealCue": "hook.l1"
+          },
+          {
+            "id": "hook-b2",
+            "text": "Migration Readiness: how feasible is it to move safely",
+            "claimIds": [
+              "c-mr"
+            ],
+            "revealCue": "hook.l2"
+          }
+        ]
+      },
+      "wallaby": [
+        {
+          "action": "HOP",
+          "target": "card:heading",
+          "cue": "hook.l1",
+          "expression": "CURIOUS"
+        },
+        {
+          "action": "INSPECT",
+          "target": "card:body:hook-b1",
+          "cue": "hook.l1",
+          "delayMs": 1400
+        },
+        {
+          "action": "INSPECT",
+          "target": "card:body:hook-b2",
+          "cue": "hook.l2"
+        }
+      ],
+      "sonic": []
+    },
+    {
+      "id": "ident",
+      "role": "IDENT",
+      "transitionIn": {
+        "type": "CUT"
+      },
+      "narration": [],
+      "scene": null,
+      "templateId": "ident.v1",
+      "wallaby": [],
+      "sonic": []
+    },
+    {
+      "id": "question",
+      "role": "QUESTION",
+      "transitionIn": {
+        "type": "CUT"
+      },
+      "narration": [
+        {
+          "id": "question.l1",
+          "text": "Migration Readiness is the recommend step in WalletWall's workflow.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-recommend-step"
+          ]
+        },
+        {
+          "id": "question.l2",
+          "text": "It does not introduce a second score.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-no-second-score"
+          ]
+        },
+        {
+          "id": "question.l3",
+          "text": "It recommends one path, and places the wallet in a shared risk tier.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-one-path"
+          ]
+        }
+      ],
+      "scene": {
+        "type": "CARD",
+        "plane": "SURFACE",
+        "eyebrowSectionId": "migration-readiness",
+        "layout": "STACK",
+        "heading": {
+          "id": "question-heading",
+          "text": "The recommend step",
+          "claimIds": [
+            "c-recommend-step"
+          ]
+        },
+        "body": [
+          {
+            "id": "question-b1",
+            "text": "No second score",
+            "claimIds": [
+              "c-no-second-score"
+            ],
+            "revealCue": "question.l2"
+          },
+          {
+            "id": "question-b2",
+            "text": "One recommended path, one shared risk tier",
+            "claimIds": [
+              "c-one-path"
+            ],
+            "revealCue": "question.l3"
+          }
+        ]
+      },
+      "wallaby": [
+        {
+          "action": "LAND",
+          "target": "card:heading",
+          "cue": "question.l1"
+        },
+        {
+          "action": "REVEAL",
+          "target": "card:body:question-b1",
+          "cue": "question.l2"
+        },
+        {
+          "action": "REVEAL",
+          "target": "card:body:question-b2",
+          "cue": "question.l3"
+        },
+        {
+          "action": "DIMENSION_JUMP",
+          "cue": "question.l3"
+        }
+      ],
+      "sonic": []
+    },
+    {
+      "id": "tiers",
+      "role": "EXPLANATION",
+      "transitionIn": {
+        "type": "SECTION_SHIFT"
+      },
+      "narration": [
+        {
+          "id": "tiers.l1",
+          "text": "Every assessment normalizes into one of four tiers, in ascending order of prioritization.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-four-tiers",
+            "c-ascending"
+          ]
+        },
+        {
+          "id": "tiers.l2",
+          "text": "Monitor is low urgency: nothing to act on yet, so the wallet is re-checked on a schedule.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-tier-monitor",
+            "c-recheck"
+          ]
+        },
+        {
+          "id": "tiers.l3",
+          "text": "Review means a closer look, and a plan.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-tier-review"
+          ]
+        },
+        {
+          "id": "tiers.l4",
+          "text": "Migrate means prioritizing concrete action.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-tier-migrate"
+          ]
+        },
+        {
+          "id": "tiers.l5",
+          "text": "And Vault Candidate surfaces a research path. It is always conditional.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-tier-vault"
+          ]
+        }
+      ],
+      "scene": {
+        "type": "GRAPH",
+        "plane": "SURFACE",
+        "eyebrowSectionId": "the-shared-risk-tiers",
+        "layout": "ASCENDING_ROUTE",
+        "orderingClaimId": "c-ascending",
+        "caption": {
+          "id": "tiers-caption",
+          "text": "Every assessment lands in one of four tiers",
+          "claimIds": [
+            "c-four-tiers"
+          ]
+        },
+        "nodes": [
+          {
+            "id": "monitor",
+            "text": "Monitor",
+            "claimIds": [
+              "c-tier-monitor"
+            ],
+            "detail": {
+              "id": "monitor-detail",
+              "text": "Low urgency — nothing to act on yet.",
+              "claimIds": [
+                "c-tier-monitor"
+              ],
+              "revealCue": "tiers.l2"
+            }
+          },
+          {
+            "id": "review",
+            "text": "Review",
+            "claimIds": [
+              "c-tier-review"
+            ],
+            "detail": {
+              "id": "review-detail",
+              "text": "Worth a closer look and a plan.",
+              "claimIds": [
+                "c-tier-review"
+              ],
+              "revealCue": "tiers.l3"
+            }
+          },
+          {
+            "id": "migrate",
+            "text": "Migrate",
+            "claimIds": [
+              "c-tier-migrate"
+            ],
+            "detail": {
+              "id": "migrate-detail",
+              "text": "Prioritize concrete action.",
+              "claimIds": [
+                "c-tier-migrate"
+              ],
+              "revealCue": "tiers.l4"
+            }
+          },
+          {
+            "id": "vault-candidate",
+            "text": "Vault Candidate",
+            "claimIds": [
+              "c-tier-vault"
+            ],
+            "detail": {
+              "id": "vault-candidate-detail",
+              "text": "Research path surfaced — conditional.",
+              "claimIds": [
+                "c-tier-vault"
+              ],
+              "revealCue": "tiers.l5"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "monitor",
+            "to": "monitor",
+            "claimIds": [
+              "c-recheck"
+            ],
+            "revealCue": "tiers.l2"
+          },
+          {
+            "from": "monitor",
+            "to": "review",
+            "claimIds": [
+              "c-ascending"
+            ],
+            "revealCue": "tiers.l3"
+          },
+          {
+            "from": "review",
+            "to": "migrate",
+            "claimIds": [
+              "c-ascending"
+            ],
+            "revealCue": "tiers.l4"
+          },
+          {
+            "from": "migrate",
+            "to": "vault-candidate",
+            "claimIds": [
+              "c-ascending"
+            ],
+            "revealCue": "tiers.l5"
+          }
+        ]
+      },
+      "wallaby": [
+        {
+          "action": "LAND",
+          "target": "node:monitor",
+          "cue": "tiers.l1"
+        },
+        {
+          "action": "TRACE",
+          "target": "edge:monitor->monitor",
+          "cue": "tiers.l2"
+        },
+        {
+          "action": "TRACE",
+          "target": "edge:monitor->review",
+          "cue": "tiers.l3"
+        },
+        {
+          "action": "TRACE",
+          "target": "edge:review->migrate",
+          "cue": "tiers.l4"
+        },
+        {
+          "action": "TRACE",
+          "target": "edge:migrate->vault-candidate",
+          "cue": "tiers.l5"
+        },
+        {
+          "action": "INSPECT",
+          "target": "node:vault-candidate",
+          "cue": "tiers.l5",
+          "delayMs": 1500,
+          "expression": "CAUTIOUS"
+        },
+        {
+          "action": "PUSH_THROUGH",
+          "cue": "tiers.l5"
+        }
+      ],
+      "sonic": []
+    },
+    {
+      "id": "signals",
+      "role": "EXPLANATION",
+      "transitionIn": {
+        "type": "DEPTH_ENTER",
+        "reason": "RESULT_TO_EVIDENCE"
+      },
+      "narration": [
+        {
+          "id": "signals.l1",
+          "text": "Underneath, the tier reuses signals the wallet already has: value at risk, signature exposure, dormancy, and wallet structure.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-signals"
+          ]
+        },
+        {
+          "id": "signals.l2",
+          "text": "In other words, Migration Readiness adds no new measurement. It reorganizes existing signals into one recommended path.",
+          "role": "INTERPRETATION",
+          "claimIds": [
+            "c-interp-no-new-measurement"
+          ]
+        }
+      ],
+      "scene": {
+        "type": "GRAPH",
+        "plane": "DEPTH",
+        "eyebrowSectionId": "migration-readiness",
+        "layout": "LAYERED",
+        "caption": {
+          "id": "signals-caption",
+          "text": "Beneath the tier: existing wallet signals",
+          "claimIds": [
+            "c-signals"
+          ]
+        },
+        "nodes": [
+          {
+            "id": "tier",
+            "text": "Shared risk tier",
+            "claimIds": [
+              "c-one-path"
+            ],
+            "layer": "UPPER",
+            "detail": {
+              "id": "tier-detail",
+              "text": "One recommended path",
+              "claimIds": [
+                "c-one-path"
+              ]
+            }
+          },
+          {
+            "id": "value-at-risk",
+            "text": "Value at risk",
+            "claimIds": [
+              "c-signals"
+            ],
+            "layer": "LOWER",
+            "revealCue": "signals.l1"
+          },
+          {
+            "id": "signature-exposure",
+            "text": "Signature exposure",
+            "claimIds": [
+              "c-signals"
+            ],
+            "layer": "LOWER",
+            "revealCue": "signals.l1"
+          },
+          {
+            "id": "dormancy",
+            "text": "Dormancy",
+            "claimIds": [
+              "c-signals"
+            ],
+            "layer": "LOWER",
+            "revealCue": "signals.l1"
+          },
+          {
+            "id": "wallet-structure",
+            "text": "Wallet structure",
+            "claimIds": [
+              "c-signals"
+            ],
+            "layer": "LOWER",
+            "revealCue": "signals.l1"
+          }
+        ],
+        "edges": [
+          {
+            "from": "value-at-risk",
+            "to": "tier",
+            "claimIds": [
+              "c-signals"
+            ],
+            "revealCue": "signals.l2"
+          },
+          {
+            "from": "signature-exposure",
+            "to": "tier",
+            "claimIds": [
+              "c-signals"
+            ],
+            "revealCue": "signals.l2"
+          },
+          {
+            "from": "dormancy",
+            "to": "tier",
+            "claimIds": [
+              "c-signals"
+            ],
+            "revealCue": "signals.l2"
+          },
+          {
+            "from": "wallet-structure",
+            "to": "tier",
+            "claimIds": [
+              "c-signals"
+            ],
+            "revealCue": "signals.l2"
+          }
+        ]
+      },
+      "wallaby": [
+        {
+          "action": "LAND",
+          "target": "node:value-at-risk",
+          "cue": "signals.l1"
+        },
+        {
+          "action": "INSPECT",
+          "target": "node:wallet-structure",
+          "cue": "signals.l1",
+          "delayMs": 2400
+        },
+        {
+          "action": "TRACE",
+          "target": "edge:signature-exposure->tier",
+          "cue": "signals.l2",
+          "delayMs": 600
+        }
+      ],
+      "sonic": [
+        {
+          "event": "EVIDENCE_CONFIRMED",
+          "cue": "signals.l2"
+        }
+      ]
+    },
+    {
+      "id": "reading",
+      "role": "IMPLICATION",
+      "transitionIn": {
+        "type": "DEPTH_EXIT"
+      },
+      "narration": [
+        {
+          "id": "reading.l1",
+          "text": "So how should a tier be read? Tiers are prioritization bands, not verdicts.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-bands"
+          ]
+        },
+        {
+          "id": "reading.l2",
+          "text": "Migrate means near the top of the migration queue, not unsafe today.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-migrate-queue"
+          ]
+        },
+        {
+          "id": "reading.l3",
+          "text": "Recommendations are starting points. The right migration depends on context WalletWall cannot see: signer availability, governance, and internal controls.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-starting-points"
+          ]
+        }
+      ],
+      "scene": {
+        "type": "CARD",
+        "plane": "SURFACE",
+        "eyebrowSectionId": "how-recommendations-should-be-interpreted",
+        "layout": "SPLIT",
+        "heading": {
+          "id": "reading-heading",
+          "text": "Prioritization bands, not verdicts",
+          "claimIds": [
+            "c-bands"
+          ]
+        },
+        "body": [
+          {
+            "id": "reading-band",
+            "text": "A prioritization band: near the top of the migration queue",
+            "claimIds": [
+              "c-bands",
+              "c-migrate-queue"
+            ],
+            "revealCue": "reading.l2"
+          },
+          {
+            "id": "reading-verdict",
+            "text": "Not a verdict: not unsafe today",
+            "claimIds": [
+              "c-bands",
+              "c-migrate-queue"
+            ],
+            "revealCue": "reading.l2"
+          }
+        ]
+      },
+      "wallaby": [
+        {
+          "action": "LAND",
+          "target": "card:heading",
+          "cue": "reading.l1"
+        },
+        {
+          "action": "COMPARE",
+          "target": "card:body:reading-band",
+          "secondaryTarget": "card:body:reading-verdict",
+          "cue": "reading.l2"
+        },
+        {
+          "action": "PERCH",
+          "target": "card:top",
+          "cue": "reading.l3",
+          "expression": "CAUTIOUS"
+        }
+      ],
+      "sonic": []
+    },
+    {
+      "id": "vault-conditional",
+      "role": "IMPLICATION",
+      "transitionIn": {
+        "type": "CUT"
+      },
+      "narration": [
+        {
+          "id": "vault.l1",
+          "text": "Why is Vault Candidate always conditional?",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-tier-vault"
+          ]
+        },
+        {
+          "id": "vault.l2",
+          "text": "The on-chain verifier in the Vault Simulator is an architectural placeholder, not production-grade cryptographic verification.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-placeholder"
+          ]
+        },
+        {
+          "id": "vault.l3",
+          "text": "The simulator is testnet-only, on Ethereum Sepolia, and mainnet writes are blocked.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-testnet"
+          ]
+        },
+        {
+          "id": "vault.l4",
+          "text": "So the tier points to a research path, not a recommendation to move funds.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-research-not-funds"
+          ]
+        }
+      ],
+      "scene": {
+        "type": "CARD",
+        "plane": "SURFACE",
+        "eyebrowSectionId": "why-the-vault-candidate-tier-is-conditional",
+        "layout": "STACK",
+        "heading": {
+          "id": "vault-heading",
+          "text": "Why Vault Candidate is conditional",
+          "claimIds": [
+            "c-research-not-funds"
+          ]
+        },
+        "body": [
+          {
+            "id": "vault-placeholder",
+            "text": "The Vault Simulator verifier is an architectural placeholder",
+            "claimIds": [
+              "c-placeholder"
+            ],
+            "revealCue": "vault.l2"
+          },
+          {
+            "id": "vault-testnet",
+            "text": "Testnet-only (Ethereum Sepolia); mainnet writes are blocked",
+            "claimIds": [
+              "c-testnet"
+            ],
+            "revealCue": "vault.l3"
+          },
+          {
+            "id": "vault-research",
+            "text": "A research path, not a recommendation to move funds",
+            "claimIds": [
+              "c-research-not-funds"
+            ],
+            "revealCue": "vault.l4"
+          }
+        ]
+      },
+      "wallaby": [
+        {
+          "action": "LAND",
+          "target": "card:heading",
+          "cue": "vault.l1",
+          "expression": "CURIOUS"
+        },
+        {
+          "action": "INSPECT",
+          "target": "card:body:vault-placeholder",
+          "cue": "vault.l2",
+          "expression": "SKEPTICAL"
+        },
+        {
+          "action": "INSPECT",
+          "target": "card:body:vault-testnet",
+          "cue": "vault.l3",
+          "expression": "CAUTIOUS"
+        },
+        {
+          "action": "RESOLVE",
+          "target": "card:body:vault-research",
+          "cue": "vault.l4"
+        }
+      ],
+      "sonic": []
+    },
+    {
+      "id": "takeaway",
+      "role": "TAKEAWAY",
+      "transitionIn": {
+        "type": "CUT"
+      },
+      "narration": [
+        {
+          "id": "takeaway.l1",
+          "text": "So: Quantum Exposure says how urgent. Migration Readiness says how feasible, and what comes first.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-qes",
+            "c-mr"
+          ]
+        },
+        {
+          "id": "takeaway.l2",
+          "text": "A tier is a place in the migration queue, not a verdict.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-takeaway"
+          ]
+        },
+        {
+          "id": "takeaway.l3",
+          "text": "And the scan stays read-only: no wallet connection, no private keys, no signing, no transactions.",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-read-only"
+          ]
+        }
+      ],
+      "scene": {
+        "type": "TAKEAWAY",
+        "plane": "SURFACE",
+        "eyebrowSectionId": "migration-readiness",
+        "statement": {
+          "id": "takeaway-statement",
+          "text": "A tier is a place in the migration queue, not a verdict.",
+          "claimIds": [
+            "c-takeaway"
+          ],
+          "revealCue": "takeaway.l2"
+        },
+        "support": [
+          {
+            "id": "takeaway-urgency",
+            "text": "Quantum Exposure: how urgent. Migration Readiness: how feasible, and what first.",
+            "claimIds": [
+              "c-qes",
+              "c-mr"
+            ],
+            "revealCue": "takeaway.l1"
+          },
+          {
+            "id": "takeaway-read-only",
+            "text": "Read-only: no wallet connection, no private keys, no signing, no transactions.",
+            "claimIds": [
+              "c-read-only"
+            ],
+            "revealCue": "takeaway.l3"
+          }
+        ]
+      },
+      "wallaby": [
+        {
+          "action": "HOP",
+          "target": "takeaway:statement",
+          "cue": "takeaway.l1"
+        },
+        {
+          "action": "PERCH",
+          "target": "takeaway:statement",
+          "cue": "takeaway.l2"
+        },
+        {
+          "action": "RESOLVE",
+          "target": "takeaway:statement",
+          "cue": "takeaway.l3"
+        }
+      ],
+      "sonic": []
+    },
+    {
+      "id": "cta",
+      "role": "CTA",
+      "transitionIn": {
+        "type": "CUT"
+      },
+      "narration": [
+        {
+          "id": "cta.line",
+          "text": "If this was useful, like the video and subscribe for more WalletWall architecture and data deep dives.",
+          "role": "TEMPLATE",
+          "claimIds": [],
+          "templateId": "cta.like-subscribe.v1"
+        }
+      ],
+      "scene": null,
+      "templateId": "cta.like-subscribe.v1",
+      "wallaby": [],
+      "sonic": []
+    },
+    {
+      "id": "docs-reference",
+      "role": "DOCS_REFERENCE",
+      "transitionIn": {
+        "type": "CUT"
+      },
+      "narration": [
+        {
+          "id": "docs-reference.line",
+          "text": "The full page is in the WalletWall docs. The link is in the description.",
+          "role": "TEMPLATE",
+          "claimIds": [],
+          "templateId": "docs-reference.v1"
+        }
+      ],
+      "scene": null,
+      "templateId": "docs-reference.v1",
+      "wallaby": [],
+      "sonic": []
+    },
+    {
+      "id": "outro",
+      "role": "OUTRO",
+      "transitionIn": {
+        "type": "CUT"
+      },
+      "narration": [],
+      "scene": null,
+      "templateId": "outro.v1",
+      "wallaby": [],
+      "sonic": []
+    },
+    {
+      "id": "end-screen",
+      "role": "END_SCREEN",
+      "transitionIn": {
+        "type": "CUT"
+      },
+      "narration": [],
+      "scene": null,
+      "templateId": "end-screen.v1",
+      "wallaby": [],
+      "sonic": []
+    }
+  ],
+  "audio": {
+    "voiceIdentityId": "walletwallaby-v1",
+    "pronunciationDictionaryId": "walletwall-lexicon-v1",
+    "sonicIdentityId": "walletwall-ident-v1",
+    "musicBedId": null
+  },
+  "output": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "captions": "SIDECAR"
+  }
+}

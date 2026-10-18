@@ -86,9 +86,70 @@ WalletWallrus remains WalletWall's engineering and repository identity; WalletWa
 
 Remotion is licensed separately from this repository: free for individuals and companies of up to three people; larger organizations need a [company license](https://www.remotion.dev/license).
 
+## Run it
+
+Node.js 24 is required (the TypeScript sources run under Node's type stripping; there is no build step). No API keys, `.env` file, or WalletWall account are needed.
+
+```bash
+npm ci
+npm run check                                  # typecheck + tests + plan:check + validate
+npm run render:stills migration-readiness      # review stills, with and without WalletWallaby
+npm run pipeline migration-readiness           # every gate, then stills, MP4, and the dry-run publish manifest
+```
+
+| Command | What it does |
+|---|---|
+| `npm test` | Unit, invariant, and adversarial positive-control tests. |
+| `npm run typecheck` | `tsc --noEmit` over sources, scripts, and tests. |
+| `npm run plan` / `plan:check` | Regenerate (or verify, byte for byte) `specs/<id>/spec.json` and its source snapshot from the storyboard. |
+| `npm run validate` | Validate every committed spec against its canonical doc; writes `dist/<id>/validation.json`. |
+| `npm run freshness` | Classify how the doc changed since the spec was planned (exit 2 = re-render or a new revision needed). |
+| `npm run contracts:check` | Verify the fixture mirror; with a WalletWall checkout, also the brand contract and the withheld `.mintignore`. |
+| `npm run render:stills` | Settled frame of every segment and transition, plus characterless variants. |
+| `npm run render` | Full MP4 into `dist/<id>/<id>.r<revision>.mp4` plus `render.json`. |
+| `npm run publish:dry-run` | Captions (VTT/SRT), semantic cue sheet, provenance, media QA, and the YouTube publish manifest; dry-run receipt only. |
+| `npm run studio` | Remotion Studio preview of the committed spec. |
+
+The first render downloads Remotion's pinned headless Chrome. Everything generated goes to `dist/`, which is never committed.
+
+### Canonical sources
+
+The docs stay in the WalletWall docs; this repository reads them by identity. Spec paths use the WalletWall workspace namespace: `video/…` is this repository, everything else (`docs/…`) is the canonical tree. Point `WALLETWALL_SOURCE_ROOT` at a WalletWall checkout to plan, validate, and check freshness against the live docs. Without it, the pipeline reads `fixtures/canonical/`: byte-identical copies of the few public files the tests need, each verified against its git blob id on every read.
+
+## Layout
+
+```text
+config/             the version-controlled language: copy templates and policy, voice identity,
+                    pronunciation, sonic identity, playlists, release plan, YouTube defaults, video registry
+contracts/          brand values copied from the canonical WalletWall source, with their blob ids
+fixtures/storyboards/  the planner contract (hand-authored until an LLM adapter exists)
+fixtures/canonical/ blob-bound copies of public canonical files (see MANIFEST.json)
+assets/brand/       reviewed brand marks the renderer may show
+specs/<id>/         committed VideoSpec + the normalized source snapshot it was planned against
+manifests/          committed lineage (YouTube ids and version history, once uploads exist)
+src/spec            VideoSpec types and closed vocabularies
+src/source          MDX normalizer, docs-site publish status, the canonical-source gateway
+src/planner         StoryboardProvider interface, fixture provider, deterministic assembler
+src/validation      the publishability gate (codes in src/core/issues.ts)
+src/layout          scene geometry shared by the validator and the renderer
+src/timeline        renderer-neutral timing
+src/audio           voice-provider interface, pronunciation, captions, semantic cue sheet
+src/character       WalletWallaby rig and choreography
+src/staleness       docs-change classification and freshness
+src/publish         titles, upload-provider interface, publish manifest, lineage, release order
+src/remotion        the only Remotion-aware code (composition, scenes, figure)
+```
+
+## Adding a video
+
+1. Add the page to `config/videos.json` and write `fixtures/storyboards/<id>.storyboard.json`: claims as verbatim spans of the page; scenes, beats, and transitions from the closed vocabularies.
+2. With `WALLETWALL_SOURCE_ROOT` set, `npm run plan`, then `npm run validate` until it passes.
+3. `npm run render:stills <id>` and review every still, including the characterless ones.
+4. `npm run pipeline <id>`.
+
 ## Status
 
-The pipeline is being extracted from the WalletWall application repository on the `feat/bootstrap-video-pipeline` branch, with behaviour preserved and proven by re-rendering the same video. Until that lands, `main` holds the repository charter only.
+v1, extracted from the WalletWall application repository with behaviour preserved: the extracted pipeline re-renders the same video byte for byte (see [docs/EXTRACTION.md](docs/EXTRACTION.md)). Ready now: the spec, normalizer, validator, layout, timeline, captions, cue sheet, choreography, renderer, staleness, lineage, and read-only CI. Fixture or dry run only: the storyboard planner (hand-authored), narration (silent, estimated timing), sonic assets (unassigned), and YouTube upload (dry-run receipt).
 
 ## License
 

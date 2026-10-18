@@ -1,0 +1,8 @@
+name: WalletWall Audio-Visual Docs CodeQL configuration
+
+queries:
+  - uses: security-extended
+
+paths-ignore:
+  - dist/**
+  - node_modules/**

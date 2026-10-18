@@ -1,0 +1,50 @@
+{
+  "schema": "walletwall.brand-contract/v1",
+  "note": "Brand values the video pipeline renders with, copied from the canonical WalletWall source files named in \"sources\". Video code reads brand values only from this file. `npm run contracts:check` re-reads the canonical files from a WalletWall checkout (WALLETWALL_SOURCE_ROOT) and fails on any value drift.",
+  "sources": {
+    "src/theme.js": {
+      "blob": "a86cc89cb91240ea79eebb66ec27d33bfdc2b701"
+    },
+    "src/constants.js": {
+      "blob": "0a58a05cdac1bbe58eaf1a2ed97354105417785c"
+    },
+    "src/index.css": {
+      "blob": "29e6b737bce49fd93e0e62fcd9283363b6935327"
+    }
+  },
+  "theme": {
+    "COLORS.brand.terracotta": "#BF4E32",
+    "COLORS.brand.tan": "#C9A47A",
+    "COLORS.brand.ink": "rgba(30,26,20,0.88)",
+    "COLORS.status.riskDark": "#8B3120",
+    "VAULT.ink": "rgba(30,26,20,{alpha})",
+    "VAULT.accentWash": "rgba(191,78,50,{alpha})"
+  },
+  "constants": {
+    "DOCS_URL": "https://docs.walletwall.org"
+  },
+  "cssRoot": {
+    "--ww-bg": "#F2ECDF",
+    "--ww-surface": "#F8F2E4",
+    "--ww-card-bg": "rgba(248,242,228,0.82)",
+    "--ww-card-border": "rgba(139,49,32,0.16)",
+    "--ww-inner-border": "rgba(30,26,20,0.07)",
+    "--ww-ink": "rgba(30,26,20,0.88)",
+    "--ww-muted-text": "rgba(30,26,20,0.66)",
+    "--ww-accent": "#BF4E32",
+    "--ww-accent-dark": "#8B3120",
+    "--ww-tan": "#C9A47A",
+    "--ww-charcoal": "#2B2B2E",
+    "--ww-deep-slate": "#3A3D41",
+    "--ww-warm-stone": "#D8D3C8",
+    "--ww-cream": "#F5F1E8",
+    "--ww-charcoal-border": "rgba(43,43,46,0.22)",
+    "--ww-charcoal-rail": "rgba(43,43,46,0.28)",
+    "--ww-stone": "#e9d3ad",
+    "--ww-stone-low": "#b99568",
+    "--ww-mortar": "#f5ead4",
+    "--ww-brick": "#b94a31",
+    "--ww-radius-panel": "2px",
+    "--ww-radius-badge": "1px"
+  }
+}

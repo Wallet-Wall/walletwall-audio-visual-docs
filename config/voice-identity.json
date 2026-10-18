@@ -1,0 +1,27 @@
+{
+  "schema": "walletwall.voice-identity/v1",
+  "id": "walletwallaby-v1",
+  "character": "WalletWallaby",
+  "direction": {
+    "summary": "Calm adult expedition guide: warm, grounded, precise, evidence-first.",
+    "register": "medium-to-low",
+    "qualities": ["warm", "grounded", "precise technical diction", "conversational", "measured pacing", "comfortable pauses", "slight field-documentary character"],
+    "avoid": ["salesy", "cartoonish", "hyperactive", "imitating any real, identifiable person", "ethnicized accent or caricature"]
+  },
+  "pacing": {
+    "targetWpm": 145,
+    "maxWpm": 165,
+    "linePauseMs": 350,
+    "sentencePauseMs": 220,
+    "commaPauseMs": 90
+  },
+  "providerBindings": {
+    "note": "Provider-specific settings live here, never in a VideoSpec. Credentials are read from the environment at synthesis time only and are never written to manifests.",
+    "elevenlabs": {
+      "voiceIdEnv": "WALLETWALLABY_ELEVENLABS_VOICE_ID",
+      "apiKeyEnv": "ELEVENLABS_API_KEY",
+      "modelId": null,
+      "status": "NOT_CONFIGURED"
+    }
+  }
+}

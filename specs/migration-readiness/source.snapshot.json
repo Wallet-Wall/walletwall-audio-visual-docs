@@ -1,0 +1,352 @@
+{
+  "schema": "walletwall.normalized-source/v1",
+  "normalizerVersion": "walletwall-mdx-normalizer/2",
+  "docPath": "docs/concepts/migration-readiness.mdx",
+  "title": "Migration Readiness",
+  "description": "How WalletWall turns wallet exposure into a recommended path — the shared Monitor / Review / Migrate / Vault Candidate tiers, how to interpret them, and what actions each suggests.",
+  "sections": [
+    {
+      "id": "migration-readiness",
+      "heading": "Migration Readiness",
+      "depth": 1,
+      "parentId": "intro",
+      "blocks": [
+        {
+          "kind": "PARAGRAPH",
+          "text": "Migration Readiness is the recommend step in WalletWall's workflow. Where the Quantum Exposure Score answers how urgent is the risk, Migration Readiness answers how feasible is it to move safely, and what should be done first."
+        },
+        {
+          "kind": "PARAGRAPH",
+          "text": "It does not introduce a second score. It reuses existing wallet signals — value at risk, signature exposure, dormancy, and wallet structure — to recommend one path and place the wallet in a shared risk tier."
+        },
+        {
+          "kind": "CALLOUT",
+          "variant": "NOTE",
+          "text": "Keep three ideas distinct in all copy: Quantum Exposure = how urgent the wallet-level risk is. Migration Readiness = how feasible it is to move safely (this page). Stablecoin Vault = the flagship readiness journey and destination (vault.walletwall.org / /stablecoin-vault). The Vault Simulator (/vault) is the Sepolia testnet rehearsal detail, surfaced only from the Testnet Rehearsal outcome."
+        }
+      ]
+    },
+    {
+      "id": "the-shared-risk-tiers",
+      "heading": "The shared risk tiers",
+      "depth": 2,
+      "parentId": "migration-readiness",
+      "blocks": [
+        {
+          "kind": "PARAGRAPH",
+          "text": "Every assessment normalizes into one of four tiers. These are the common language across modules and reports."
+        },
+        {
+          "kind": "TABLE",
+          "header": [
+            "Tier",
+            "Meaning",
+            "What it suggests"
+          ],
+          "rows": [
+            [
+              "Monitor",
+              "Low urgency — nothing to act on yet.",
+              "Keep watching signature exposure; re-check on schedule. No migration action needed."
+            ],
+            [
+              "Review",
+              "Worth a closer look and a plan.",
+              "Review the wallet and plan a migration approach — e.g. moving long-term holdings to a fresh wallet or splitting concentration."
+            ],
+            [
+              "Migrate",
+              "Prioritize concrete action.",
+              "Begin a real migration path: distribute signing across a multisig with an upgrade path, or coordinate a signer-led treasury plan."
+            ],
+            [
+              "Vault Candidate",
+              "Research path surfaced — conditional.",
+              "Review the WalletWall Vault research prototype as one experimental option. Monitor only in the private app."
+            ]
+          ]
+        },
+        {
+          "kind": "DIAGRAM",
+          "language": "mermaid",
+          "diagramType": "stateDiagram-v2",
+          "title": "The four shared risk tiers as prioritization bands",
+          "description": "Every assessment normalizes into one of four shared risk tiers, used as the common language across modules and reports, in ascending order of prioritization - Monitor, Review, Migrate, and Vault Candidate. Monitor is re-checked on a schedule. Vault Candidate is always a conditional research path, never a deployable recovery flow.",
+          "nodes": [
+            {
+              "id": "Monitor",
+              "label": "Monitor (low urgency)"
+            },
+            {
+              "id": "Review",
+              "label": "Review (worth a closer look)"
+            },
+            {
+              "id": "Migrate",
+              "label": "Migrate (prioritize action)"
+            },
+            {
+              "id": "VaultCandidate",
+              "label": "Vault Candidate (conditional research path)"
+            }
+          ],
+          "edges": [
+            {
+              "from": "Monitor",
+              "to": "Monitor",
+              "op": "-->",
+              "label": "re-check on schedule"
+            },
+            {
+              "from": "Monitor",
+              "to": "Review",
+              "op": "-->",
+              "label": ""
+            },
+            {
+              "from": "Review",
+              "to": "Migrate",
+              "op": "-->",
+              "label": ""
+            },
+            {
+              "from": "Migrate",
+              "to": "VaultCandidate",
+              "op": "-->",
+              "label": ""
+            }
+          ],
+          "notes": [
+            "Conditional research path only — never a deployable recovery flow."
+          ]
+        },
+        {
+          "kind": "PARAGRAPH",
+          "text": "Tiers are prioritization bands, not verdicts — \"Migrate\" means near the top of the migration queue, not unsafe today. \"Vault Candidate\" is always conditional; see below."
+        }
+      ]
+    },
+    {
+      "id": "how-recommendations-should-be-interpreted",
+      "heading": "How recommendations should be interpreted",
+      "depth": 2,
+      "parentId": "migration-readiness",
+      "blocks": [
+        {
+          "kind": "LIST",
+          "items": [
+            "Tiers are prioritization bands, not verdicts. \"Migrate\" means near the top of your migration queue, not unsafe today.",
+            "Recommendations are starting points. They suggest a direction; the right migration for a given wallet depends on operational context WalletWall cannot see (signer availability, governance, and internal controls).",
+            "Confidence matters. A recommendation made from partial or stale data carries caveats. Treat low-confidence recommendations as prompts to gather more information, not as final answers.",
+            "\"Vault Candidate\" is always conditional. It is surfaced as a research path, never as a deployable recovery flow."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tier-by-tier-actions",
+      "heading": "Tier-by-tier actions",
+      "depth": 2,
+      "parentId": "migration-readiness",
+      "blocks": []
+    },
+    {
+      "id": "tier-by-tier-actions/monitor",
+      "heading": "Monitor",
+      "depth": 3,
+      "parentId": "tier-by-tier-actions",
+      "blocks": [
+        {
+          "kind": "PARAGRAPH",
+          "text": "Low exposure or low value at risk; often a wallet whose public key may not yet be revealed."
+        },
+        {
+          "kind": "LIST",
+          "items": [
+            "Action: Keep monitoring. No migration step is needed yet.",
+            "Re-check when value, activity, or exposure changes."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tier-by-tier-actions/review",
+      "heading": "Review",
+      "depth": 3,
+      "parentId": "tier-by-tier-actions",
+      "blocks": [
+        {
+          "kind": "PARAGRAPH",
+          "text": "Moderate-to-high exposure with meaningful value, or growing concentration."
+        },
+        {
+          "kind": "LIST",
+          "items": [
+            "Action: Review the wallet and plan an approach. Candidate paths:",
+            "fresh-wallet — move long-term holdings to a fresh wallet to reduce public-key exposure.",
+            "split-wallet — split holdings across wallets to reduce single-address concentration."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tier-by-tier-actions/migrate",
+      "heading": "Migrate",
+      "depth": 3,
+      "parentId": "tier-by-tier-actions",
+      "blocks": [
+        {
+          "kind": "PARAGRAPH",
+          "text": "High exposure or \"Migration priority\" — high value in a classical EOA with a feasible path."
+        },
+        {
+          "kind": "LIST",
+          "items": [
+            "Action: Begin a concrete migration. Candidate paths:",
+            "multisig — distribute signing across a multisig (e.g. Safe) with an upgrade path.",
+            "treasury-custody — coordinate a signer-led treasury migration path with the wallet's signers."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tier-by-tier-actions/vault-candidate",
+      "heading": "Vault Candidate",
+      "depth": 3,
+      "parentId": "tier-by-tier-actions",
+      "blocks": [
+        {
+          "kind": "PARAGRAPH",
+          "text": "Long-horizon, high-value, quantum-exposed wallets where experimental migration approaches are relevant."
+        },
+        {
+          "kind": "LIST",
+          "items": [
+            "Action: Review the WalletWall Vault research prototype as one option, alongside the disclosure below. This never enables recovery flows, private key handling, seed phrase inputs, wallet writes, or mainnet interactions."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "why-the-vault-candidate-tier-is-conditional",
+      "heading": "Why the Vault Candidate tier is conditional",
+      "depth": 2,
+      "parentId": "migration-readiness",
+      "blocks": [
+        {
+          "kind": "PARAGRAPH",
+          "text": "The Stablecoin Vault is a research prototype — the flagship vault readiness journey at vault.walletwall.org / /stablecoin-vault. It surfaces a four-outcome readiness recommendation (Monitor / Prepare / Testnet Rehearsal / Not Enough Data) and, for the Testnet Rehearsal outcome, opens the Vault Simulator (/vault) — a hybrid classical + post-quantum authorization rehearsal on Ethereum Sepolia."
+        },
+        {
+          "kind": "PARAGRAPH",
+          "text": "The tier is surfaced as a research path because:"
+        },
+        {
+          "kind": "LIST",
+          "items": [
+            "The on-chain verifier in the Vault Simulator is an architectural placeholder, not production-grade cryptographic verification.",
+            "The Vault Simulator is testnet-only (Ethereum Sepolia); mainnet writes are blocked.",
+            "The Stablecoin Vault readiness journey is an informational, non-custodial assessment — it recommends a direction, not a deployable product today."
+          ]
+        },
+        {
+          "kind": "PARAGRAPH",
+          "text": "This is why \"Vault Candidate\" is conditional and research-oriented rather than a recommendation to move funds. See Stablecoin Vault & Vault Simulator for full detail."
+        }
+      ]
+    },
+    {
+      "id": "read-only--no-key-storage-disclaimer",
+      "heading": "Read-only / no key-storage disclaimer",
+      "depth": 2,
+      "parentId": "migration-readiness",
+      "blocks": [
+        {
+          "kind": "CALLOUT",
+          "variant": "WARNING",
+          "text": "WalletWall does not store keys and does not write to any wallet. Migration-readiness scanning is read-only: no wallet connection, no private keys, no seed phrases, no signing, no transactions. Recovery flows are not implemented yet. Recommendations are informational guidance for planning, not actions performed on your behalf, and not investment advice. The WalletWall Vault is a research prototype and must not be used for real funds."
+        },
+        {
+          "kind": "PARAGRAPH",
+          "text": "The full non-custodial boundary — including the contract/guardian/passkey/MPC recovery model and the experimental post-quantum verifier status — is defined in the canonical Key Management & Recovery Model."
+        }
+      ]
+    },
+    {
+      "id": "see-it-move",
+      "heading": "See it move",
+      "depth": 2,
+      "parentId": "migration-readiness",
+      "blocks": [
+        {
+          "kind": "PARAGRAPH",
+          "text": "Reading the tiers tells you what they are. WallRoom lets you change one condition in a controlled synthetic world and watch which dependency moves and why the migration conclusion follows — including the case where the honest answer is UNKNOWN. It runs on invented data and assesses no real vault."
+        }
+      ]
+    },
+    {
+      "id": "related",
+      "heading": "Related",
+      "depth": 2,
+      "parentId": "migration-readiness",
+      "blocks": [
+        {
+          "kind": "CARD",
+          "title": "WallRoom",
+          "text": "Change one condition in a synthetic world and see what moves.",
+          "href": "/wallroom"
+        },
+        {
+          "kind": "CARD",
+          "title": "Scoring Methodology",
+          "text": "Factors, tiers, and a worked example.",
+          "href": "/concepts/scoring-methodology"
+        },
+        {
+          "kind": "CARD",
+          "title": "Quantum Intelligence",
+          "text": "The deriveMigrationReadiness() recommender and path definitions.",
+          "href": "/features/quantum-intelligence"
+        },
+        {
+          "kind": "CARD",
+          "title": "Stablecoin Vault & Vault Simulator",
+          "text": "The flagship readiness journey and the Sepolia testnet rehearsal detail.",
+          "href": "/features/vault"
+        }
+      ]
+    }
+  ],
+  "links": [
+    "#why-the-vault-candidate-tier-is-conditional",
+    "/concepts/scoring-methodology",
+    "/features/quantum-intelligence",
+    "/features/vault",
+    "/security/key-management-recovery-model",
+    "/wallroom"
+  ],
+  "images": [],
+  "domains": [
+    "VAULT"
+  ],
+  "hashes": {
+    "content": "958c4a37fe87e103f4d633e0d696bdb5354b603a77932362f45e3aff51e3b1ff",
+    "raw": "aeaf22d3c671af446596998ed741354a7ca4e44890fa60539f7fa1a56772dfe8",
+    "links": "8c91031b9b5a4ef0678ca60e076aa0d3db63fb362fc3fd944bb6a18ad4f56be6",
+    "images": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "sections": {
+      "migration-readiness": "46f49b033918c1b9a87d875f4d78d17c10bb89448fe03eed0e7fa02661a2cd57",
+      "the-shared-risk-tiers": "ba12127a6928fe495fcf327791512394a0e04b609acd6d15f01a422b92fca1fc",
+      "how-recommendations-should-be-interpreted": "632d9f7cc10ab930592bfd3caa33254b92cb7a3d28ac7f5da494709b437d0332",
+      "tier-by-tier-actions": "2d1340bdd946f7e8d9bc052cde96b8070200dce02703b4efe5b9c2c1cd954bbe",
+      "tier-by-tier-actions/monitor": "531be326eedfe6ed578d2ca7f9daff52af76e7506334a41b1b5b32e07ed80e02",
+      "tier-by-tier-actions/review": "1186c607c755a85d5e20fa39ade8e41faa44c78e52e5e41c3733be6d17d0e20a",
+      "tier-by-tier-actions/migrate": "5b965653af1706c1780ee39f2f4e1f943e615f80d7a72ed62e4f7b6e05afaa9a",
+      "tier-by-tier-actions/vault-candidate": "ab82598ed97214c88e1de3215ac35b13a47b0c8133d29ac8e9e76dc732c9ff6f",
+      "why-the-vault-candidate-tier-is-conditional": "1a5117c3c950ec71c38d93df2f8f05912191eae44f626b4429d884dce3294705",
+      "read-only--no-key-storage-disclaimer": "fc2931696ddfb39cbb355778104dd223a137bfffa70eb6a2dce8d87a06c67b33",
+      "see-it-move": "2a8827c6f1c8b30782bb6e67d49cf2e473ced9f55bbacae382a4a5dc70709f33",
+      "related": "c3db7bee34a3fd7640cac601eb24617d69cbd9a887ca1b58a2be47e1305fbe64"
+    }
+  }
+}

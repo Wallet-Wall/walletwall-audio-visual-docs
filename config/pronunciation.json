@@ -1,0 +1,19 @@
+{
+  "schema": "walletwall.pronunciation/v1",
+  "id": "walletwall-lexicon-v1",
+  "note": "Provider-neutral lexicon. `spoken` is a plain-text alias any TTS can read; `ipa` is optional for providers that accept phonemes. Captions always use display text, never aliases.",
+  "entries": [
+    { "term": "WalletWallaby", "spoken": "Wallet Wallaby", "ipa": "ˈwɒlɪt ˈwɒləbi" },
+    { "term": "WalletWall", "spoken": "Wallet Wall", "ipa": "ˈwɒlɪt wɔːl" },
+    { "term": "BigQuery", "spoken": "Big Query", "ipa": null },
+    { "term": "ERC-20", "spoken": "E R C twenty", "ipa": null },
+    { "term": "USDC", "spoken": "U S D C", "ipa": null },
+    { "term": "Etherscan", "spoken": "Ether scan", "ipa": "ˈiːθər skæn" },
+    { "term": "Alchemy", "spoken": "Alchemy", "ipa": "ˈælkəmi" },
+    { "term": "provenance", "spoken": "provenance", "ipa": "ˈprɒvənəns" },
+    { "term": "Sepolia", "spoken": "seh POH lee uh", "ipa": "səˈpoʊliə" },
+    { "term": "multisig", "spoken": "multi sig", "ipa": null },
+    { "term": "EOA", "spoken": "E O A", "ipa": null },
+    { "term": "Dune", "spoken": "Dune", "ipa": "djuːn" }
+  ]
+}

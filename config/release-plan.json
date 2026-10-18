@@ -1,0 +1,68 @@
+{
+  "schema": "walletwall.release-plan/v1",
+  "note": "Release order is computed, not hard-coded: prerequisites first (dependsOn), then the weighted score. Scores are an initial proposal (1-5) for the owner to adjust; docs order is deliberately ignored.",
+  "weights": {
+    "audienceUsefulness": 3,
+    "productImportance": 2,
+    "docsStability": 2,
+    "visualTeachability": 1
+  },
+  "candidates": [
+    {
+      "videoId": "what-is-walletwall",
+      "docPath": "docs/concepts/what-is-walletwall.mdx",
+      "playlistId": "walletwall-architecture",
+      "status": "PLANNED",
+      "dependsOn": [],
+      "scores": { "audienceUsefulness": 5, "productImportance": 5, "docsStability": 4, "visualTeachability": 3 }
+    },
+    {
+      "videoId": "migration-readiness",
+      "docPath": "docs/concepts/migration-readiness.mdx",
+      "playlistId": "walletwall-vault",
+      "status": "SPEC_READY",
+      "dependsOn": ["what-is-walletwall"],
+      "scores": { "audienceUsefulness": 5, "productImportance": 5, "docsStability": 4, "visualTeachability": 5 }
+    },
+    {
+      "videoId": "holder-wall",
+      "docPath": "docs/features/holder-wall.mdx",
+      "playlistId": "walletwall-whale-watcher",
+      "status": "PLANNED",
+      "dependsOn": ["what-is-walletwall"],
+      "scores": { "audienceUsefulness": 4, "productImportance": 4, "docsStability": 3, "visualTeachability": 5 }
+    },
+    {
+      "videoId": "independent-authority",
+      "docPath": "docs/architecture/independent-authority.mdx",
+      "playlistId": "walletwall-architecture",
+      "status": "PLANNED",
+      "dependsOn": ["what-is-walletwall"],
+      "scores": { "audienceUsefulness": 4, "productImportance": 4, "docsStability": 3, "visualTeachability": 4 }
+    },
+    {
+      "videoId": "quantum-exposure-clock",
+      "docPath": "docs/concepts/quantum-exposure-clock.mdx",
+      "playlistId": "walletwall-quantum",
+      "status": "PLANNED",
+      "dependsOn": ["migration-readiness"],
+      "scores": { "audienceUsefulness": 4, "productImportance": 4, "docsStability": 3, "visualTeachability": 4 }
+    },
+    {
+      "videoId": "whale-watcher",
+      "docPath": "docs/features/whale-watcher.mdx",
+      "playlistId": "walletwall-whale-watcher",
+      "status": "PLANNED",
+      "dependsOn": ["holder-wall"],
+      "scores": { "audienceUsefulness": 3, "productImportance": 3, "docsStability": 3, "visualTeachability": 4 }
+    },
+    {
+      "videoId": "data-quality",
+      "docPath": "docs/architecture/data-quality.mdx",
+      "playlistId": "walletwall-data-foundations",
+      "status": "PLANNED",
+      "dependsOn": ["independent-authority"],
+      "scores": { "audienceUsefulness": 3, "productImportance": 3, "docsStability": 2, "visualTeachability": 3 }
+    }
+  ]
+}

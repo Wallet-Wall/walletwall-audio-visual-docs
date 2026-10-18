@@ -1,0 +1,14 @@
+{
+  "schema": "walletwall.source-domains/v1",
+  "note": "Maps docs.json navigation tabs/groups to topic domains. Domains gate domain-specific semantics, e.g. quantum sonic events are only valid for QUANTUM sources.",
+  "navigationGroups": {
+    "Quantum Intelligence": ["QUANTUM"],
+    "Vault & Proof Readiness": ["VAULT"],
+    "Stablecoin Vault Readiness": ["VAULT"],
+    "Vault Assurance": ["VAULT"],
+    "Proof Readiness": ["VAULT", "ARCHITECTURE"],
+    "Architecture & Evidence": ["ARCHITECTURE"],
+    "Data, Dune & Architecture": ["DATA_FOUNDATION", "ARCHITECTURE"],
+    "Security": ["ARCHITECTURE"]
+  }
+}
