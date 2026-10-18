@@ -1,10 +1,11 @@
 // Node-side orchestration helpers shared by the CLI scripts.
 
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import { estimateTrack } from '../audio/voice-provider.ts';
 import { DIST_ROOT, loadPipelineConfig, readJson, VIDEO_PREFIX, VIDEO_ROOT, videoWorkspacePath } from '../config/load.ts';
 import type { PipelineConfig } from '../config/types.ts';
+import { readContainedFile, realPathOrNull } from '../core/contained-read.ts';
 import { contentAddress, sha256Hex } from '../core/hash.ts';
 import { assembleSpec } from '../planner/assemble.ts';
 import { FixtureStoryboardProvider } from '../planner/fixture-provider.ts';
@@ -90,15 +91,17 @@ export function resolveWorkspacePath(workspacePath: string): string | null {
   if (!workspacePath.startsWith(VIDEO_PREFIX)) return canonicalPath(workspacePath);
   const abs = path.resolve(VIDEO_ROOT, workspacePath.slice(VIDEO_PREFIX.length));
   if (!contained(VIDEO_ROOT, abs)) return null;
-  if (existsSync(abs) && !contained(realpathSync(VIDEO_ROOT), realpathSync(abs))) return null;
+  const real = realPathOrNull(abs);
+  if (real !== null && !contained(realpathSync(VIDEO_ROOT), real)) return null;
   return abs;
 }
 
 /** Bytes of a workspace file, or null. Canonical reads go through the verified canonical gateway. */
 export function readWorkspaceFile(workspacePath: string): Buffer | null {
   const abs = resolveWorkspacePath(workspacePath);
-  if (!abs || !existsSync(abs) || !statSync(abs).isFile()) return null;
-  return workspacePath.startsWith(VIDEO_PREFIX) ? readFileSync(abs) : canonicalBytes(workspacePath);
+  if (!abs) return null;
+  if (!workspacePath.startsWith(VIDEO_PREFIX)) return canonicalBytes(workspacePath);
+  return readContainedFile(abs, (real) => contained(realpathSync(VIDEO_ROOT), real));
 }
 
 const TEXT_ARTIFACT = /\.(json|md|mdx|txt|csv|tsv|ya?ml|sql|log)$/i;

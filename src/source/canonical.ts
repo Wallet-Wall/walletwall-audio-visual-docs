@@ -9,9 +9,10 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { FIXTURE_SOURCE_ROOT, readJson, SOURCE_IS_FIXTURE, SOURCE_ROOT } from '../config/load.ts';
+import { readContainedFile, realPathOrNull } from '../core/contained-read.ts';
 import { sha256Hex } from '../core/hash.ts';
 import { isSafeRepoPath } from '../validation/paths.ts';
 
@@ -60,19 +61,20 @@ export function canonicalPath(rel: string): string | null {
   if (!isSafeRepoPath(rel)) return null;
   const abs = path.resolve(SOURCE_ROOT, rel);
   if (!within(SOURCE_ROOT, abs)) return null;
-  if (existsSync(abs) && !within(realpathSync(SOURCE_ROOT), realpathSync(abs))) return null;
+  const real = realPathOrNull(abs);
+  if (real !== null && !within(realpathSync(SOURCE_ROOT), real)) return null;
   return abs;
 }
 
 /** Bytes of a canonical file, or null when it does not exist. Fixture reads are verified and throw on drift. */
 export function canonicalBytes(rel: string): Buffer | null {
   const abs = canonicalPath(rel);
-  if (!abs || !existsSync(abs) || !statSync(abs).isFile()) return null;
-  if (!SOURCE_IS_FIXTURE) return readFileSync(abs);
-  const files = canonicalManifest().files;
-  const entry = Object.hasOwn(files, rel) ? files[rel] : undefined;
-  if (!entry) return null;
-  const bytes = readFileSync(abs);
+  if (!abs) return null;
+  const files = SOURCE_IS_FIXTURE ? canonicalManifest().files : null;
+  const entry = files && Object.hasOwn(files, rel) ? files[rel] : undefined;
+  if (files && !entry) return null;
+  const bytes = readContainedFile(abs, (real) => within(realpathSync(SOURCE_ROOT), real));
+  if (!bytes || !entry) return bytes;
   if (bytes.length !== entry.bytes || sha256Hex(bytes) !== entry.sha256 || gitBlobId(bytes) !== entry.blob) {
     throw new Error(`canonical fixture ${rel} no longer matches its recorded blob ${entry.blob}`);
   }

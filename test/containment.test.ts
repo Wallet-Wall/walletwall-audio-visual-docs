@@ -11,6 +11,7 @@ import { describe, test, type TestContext } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { VIDEO_ROOT } from '../src/config/load.ts';
 import { readWorkspaceFile, resolveWorkspacePath } from '../src/pipeline/context.ts';
+import { readContainedFile } from '../src/core/contained-read.ts';
 import { canonicalBytes } from '../src/source/canonical.ts';
 
 /** A directory link that works without elevation on Windows (junction) and everywhere else (symlink). */
@@ -51,6 +52,19 @@ describe('workspace path containment', () => {
     } finally {
       rmSync(link, { force: true, recursive: false });
       rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  test('a contained read opens once and refuses anything but a contained regular file', () => {
+    const dir = outsideDir();
+    try {
+      const file = path.join(dir, 'secret.txt');
+      assert.equal(readContainedFile(file, () => true)?.toString(), 'outside the workspace', 'control: a contained regular file reads');
+      assert.equal(readContainedFile(file, () => false), null, 'the containment verdict is enforced on the opened file');
+      assert.equal(readContainedFile(dir, () => true), null, 'a directory is not a file');
+      assert.equal(readContainedFile(path.join(dir, 'missing.txt'), () => true), null, 'nothing there');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 
