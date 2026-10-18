@@ -187,11 +187,12 @@ describe('repository rules', () => {
   test('no workflow and no pipeline code can reach a live YouTube upload', () => {
     // No credential can reach a job: no secret and no repository variable is referenced anywhere.
     for (const { file, text } of workflows()) assert.ok(!/\b(?:secrets|vars)\./.test(text), `${file} references a secret or a repository variable`);
-    // Nothing names a YouTube or Google OAuth endpoint.
-    const endpoints = /youtube\.googleapis\.com|googleapis\.com\/(?:upload\/)?youtube|accounts\.google\.com\/o\/oauth2|oauth2\.googleapis\.com/i;
+    // Nothing names a YouTube or Google OAuth endpoint (a plain substring search over the text).
+    const endpoints = ['youtube.googleapis.com', 'googleapis.com/youtube', 'googleapis.com/upload/youtube', 'accounts.google.com/o/oauth2', 'oauth2.googleapis.com'];
+    const named = (text: string): string[] => endpoints.filter((e) => text.toLowerCase().includes(e));
     const pipeline = sources.filter((f) => !f.includes(`${path.sep}test${path.sep}`));
-    for (const file of pipeline) assert.ok(!endpoints.test(readFileSync(file, 'utf8')), `${path.relative(VIDEO_ROOT, file)} names a YouTube or OAuth endpoint`);
-    for (const { file, text } of workflows()) assert.ok(!endpoints.test(text), `${file} names a YouTube or OAuth endpoint`);
+    for (const file of pipeline) assert.deepEqual(named(readFileSync(file, 'utf8')), [], `${path.relative(VIDEO_ROOT, file)} names a YouTube or OAuth endpoint`);
+    for (const { file, text } of workflows()) assert.deepEqual(named(text), [], `${file} names a YouTube or OAuth endpoint`);
     // The credential-free dry-run provider is the only upload provider, and nothing can state a live receipt.
     const providers = pipeline.flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/class\s+(\w+)\s+implements\s+UploadProvider\b/g)].map((m) => m[1]));
     assert.deepEqual(providers, ['DryRunUploadProvider']);

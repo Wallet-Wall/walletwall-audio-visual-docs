@@ -13,7 +13,7 @@
 
 import { appendFileSync } from 'node:fs';
 import { loadRegistry, distDir } from '../src/pipeline/context.ts';
-import { checkPublicOutput, currentPublicState, writeReviewBundle, type PublicOutputReport } from '../src/publish/public-output.ts';
+import { checkPublicOutput, currentPublicState, markdownSummary, writeReviewBundle } from '../src/publish/public-output.ts';
 
 const args = process.argv.slice(2);
 const KNOWN = ['--dir=', '--stills=', '--require-render', '--bundle=', '--summary='];
@@ -34,25 +34,6 @@ for (const f of report.findings) console.log(`  ${f.code} ${f.path} — ${f.mess
 const bundle = value('--bundle=');
 if (report.ok && bundle) writeReviewBundle(result, bundle);
 const summaryFile = value('--summary=');
-if (summaryFile) appendFileSync(summaryFile, markdown(report, Boolean(bundle && report.ok)));
+if (summaryFile) appendFileSync(summaryFile, markdownSummary(report, Boolean(bundle && report.ok)));
 console.log(`[public:check] ${videoId}: ${report.ok ? 'PASS' : 'FAIL'} (${report.files.length} files verified, ${report.findings.length} findings)${report.ok && bundle ? '; review bundle written' : ''}`);
 process.exitCode = report.ok ? 0 : 1;
-
-function markdown(r: PublicOutputReport, bundled: boolean): string {
-  const s = r.summary;
-  const rows = [
-    ['Title', s.title ?? '(none)'],
-    ['Initial privacy', s.privacyStatus ?? '(none)'],
-    ['Chapters', String(s.chapters)],
-    ['Captions (WebVTT sha256)', s.captionsSha256 ? `\`${s.captionsSha256.slice(0, 16)}…\`` : '(none)'],
-    ['Narration', s.narrationProviderId ?? '(none)'],
-    ['Spec hash', `\`${s.specHash.slice(0, 16)}…\``],
-    ['Node / lockfile', `${s.node} / \`${s.lockfileSha256.slice(0, 16)}…\``],
-    ['Render', s.render ? `\`${s.render.sha256.slice(0, 16)}…\` (${s.render.motionEngine})` : 'none (dry run without a render)'],
-    ...s.stills.map((x) => [`Stills (${x.engine})`, `${x.stills} stills, ${x.characterlessTwins} characterless twins (${x.onCanvasTwins} with WalletWallaby on canvas)`]),
-    ['Files verified', String(r.files.length)],
-    ['Review bundle', bundled ? 'written' : 'not written'],
-  ];
-  const findings = r.findings.map((f) => `- \`${f.code}\` \`${f.path}\` — ${f.message}`);
-  return [`### Public output: ${r.ok ? 'PASS' : 'FAIL'} (${r.videoId})`, '', '| Check | Result |', '|---|---|', ...rows.map(([k, v]) => `| ${k} | ${v!.replace(/\|/g, '\\|')} |`), '', ...(findings.length ? ['**Findings**', '', ...findings, ''] : []), 'CI can prove publication readiness; it cannot publish. Nothing here was uploaded to YouTube.', ''].join('\n');
-}

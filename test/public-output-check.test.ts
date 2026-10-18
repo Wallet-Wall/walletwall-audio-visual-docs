@@ -29,7 +29,7 @@ import { planRustMotion } from '../src/motion/rust-adapter.ts';
 import { loadCommittedSpec, validationContextFor } from '../src/pipeline/context.ts';
 import { loadSnapshot, synthesize } from '../src/pipeline/render-input.ts';
 import { buildPublishManifest, checkPublishManifest } from '../src/publish/manifest.ts';
-import { checkPublicOutput, compareStillSets, currentPublicState, writeReviewBundle, type PublicOutputCode, type PublicState } from '../src/publish/public-output.ts';
+import { checkPublicOutput, compareStillSets, currentPublicState, markdownSummary, writeReviewBundle, type PublicOutputCode, type PublicState } from '../src/publish/public-output.ts';
 import { DryRunUploadProvider } from '../src/publish/upload-provider.ts';
 import { loadDocsSite } from '../src/source/load.ts';
 import { buildTimeline, msToFrame } from '../src/timeline/timeline.ts';
@@ -656,6 +656,15 @@ describe('review bundle', () => {
     const bundle = freshDir('bundle-dirty');
     writeFileSync(path.join(bundle, 'stale.png'), png(6));
     assert.throws(() => writeReviewBundle(result, bundle), /not empty/);
+  });
+});
+
+describe('the Markdown summary', () => {
+  test('escapes backslashes and pipes and keeps each table row on one line', () => {
+    const { report } = checkPublicOutput(clean, state, {});
+    const tricky = { ...report, summary: { ...report.summary, title: 'a\\|b | c\nd' } };
+    const row = markdownSummary(tricky, false).split('\n').find((l) => l.startsWith('| Title |'));
+    assert.equal(row, '| Title | a\\\\\\|b \\| c d |');
   });
 });
 

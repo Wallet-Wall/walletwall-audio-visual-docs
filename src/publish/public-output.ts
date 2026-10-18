@@ -21,6 +21,7 @@ import { planMotion, sampleWallaby } from '../character/walletwallaby/motion.ts'
 import { loadPipelineConfig, readJson, VIDEO_ROOT } from '../config/load.ts';
 import type { CopyTemplates, YoutubeChannelConfig } from '../config/types.ts';
 import { canonicalJson, prettyJson } from '../core/canonical-json.ts';
+import { readContainedFile, realPathOrNull } from '../core/contained-read.ts';
 import { contentAddress, sha256Hex } from '../core/hash.ts';
 import { IssueCollector, type ValidationIssue, type ValidationReport } from '../core/issues.ts';
 import { buildIdentity, type BuildIdentity } from '../manifest/build-identity.ts';
@@ -311,6 +312,14 @@ function mp4MetadataBoxes(bytes: Buffer): Buffer[] | null {
 /** Printable runs long enough to be a path; shorter runs in binary data are noise. */
 const printableRuns = (bytes: Buffer): string[] => bytes.toString('latin1').match(/[\x20-\x7e]{8,}/g) ?? [];
 
+function lstatOrNull(abs: string): ReturnType<typeof lstatSync> | null {
+  try {
+    return lstatSync(abs);
+  } catch {
+    return null;
+  }
+}
+
 // ── The check ───────────────────────────────────────────────────────────────────────────────────────
 
 export interface VerifiedFile {
@@ -388,18 +397,23 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
     if (alsoPaths) scanForPaths(where, text);
   };
 
-  /** A regular file (never a link: a link could pull anything on this machine into the bundle). */
+  /**
+   * A regular file, read without a check-then-read race (src/core/contained-read.ts: one open, then
+   * everything through the handle). Its real path must be exactly the requested name in its own
+   * directory, so a link, to anywhere or to another file of the package, is refused, not followed:
+   * a link could pull anything on this machine into the review bundle.
+   */
   const readFile = (abs: string, bundlePath: string, required = true): Buffer | null => {
-    if (!existsSync(abs)) {
-      if (required) fail('ARTIFACT_MISSING', bundlePath);
+    const home = realPathOrNull(path.dirname(abs));
+    const bytes = home ? readContainedFile(abs, (real) => real === path.join(home, path.basename(abs))) : null;
+    if (!bytes) {
+      // Refused or absent; lstat only words the finding.
+      const st = lstatOrNull(abs);
+      if (!st) {
+        if (required) fail('ARTIFACT_MISSING', bundlePath);
+      } else fail('ARTIFACT_INVALID', bundlePath, st.isSymbolicLink() ? 'is a link' : 'is not a regular file');
       return null;
     }
-    const st = lstatSync(abs);
-    if (!st.isFile()) {
-      fail('ARTIFACT_INVALID', bundlePath, st.isSymbolicLink() ? 'is a link' : 'is not a regular file');
-      return null;
-    }
-    const bytes = readFileSync(abs);
     files.push({ path: bundlePath, sha256: sha256Hex(bytes), bytes: bytes.length });
     sources.set(bundlePath, abs);
     return bytes;
@@ -719,6 +733,41 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
   return { report, sources };
 }
 
+/**
+ * A Markdown summary of a report, for $GITHUB_STEP_SUMMARY. Table cells escape backslashes before
+ * pipes and fold newlines, so no value can break out of its cell or its row.
+ */
+export function markdownSummary(r: PublicOutputReport, bundled: boolean): string {
+  const cell = (v: string): string => v.replace(/[\\|]/g, (c) => `\\${c}`).replace(/\s*\r?\n\s*/g, ' ');
+  const s = r.summary;
+  const short = (hash: string) => `\`${hash.slice(0, 16)}…\``;
+  const rows: [string, string][] = [
+    ['Title', s.title ?? '(none)'],
+    ['Initial privacy', s.privacyStatus ?? '(none)'],
+    ['Chapters', String(s.chapters)],
+    ['Captions (WebVTT sha256)', s.captionsSha256 ? short(s.captionsSha256) : '(none)'],
+    ['Narration', s.narrationProviderId ?? '(none)'],
+    ['Spec hash', short(s.specHash)],
+    ['Node / lockfile', `${s.node} / ${short(s.lockfileSha256)}`],
+    ['Render', s.render ? `${short(s.render.sha256)} (${s.render.motionEngine})` : 'none (dry run without a render)'],
+    ...s.stills.map((x): [string, string] => [`Stills (${x.engine})`, `${x.stills} stills, ${x.characterlessTwins} characterless twins (${x.onCanvasTwins} with WalletWallaby on canvas)`]),
+    ['Files verified', String(r.files.length)],
+    ['Review bundle', bundled ? 'written' : 'not written'],
+  ];
+  const findings = r.findings.map((f) => `- \`${f.code}\` \`${f.path}\` — ${f.message}`);
+  return [
+    `### Public output: ${r.ok ? 'PASS' : 'FAIL'} (${r.videoId})`,
+    '',
+    '| Check | Result |',
+    '|---|---|',
+    ...rows.map(([k, v]) => `| ${cell(k)} | ${cell(v)} |`),
+    '',
+    ...(findings.length ? ['**Findings**', '', ...findings, ''] : []),
+    'CI can prove publication readiness; it cannot publish. Nothing here was uploaded to YouTube.',
+    '',
+  ].join('\n');
+}
+
 // ── Repeat-render determinism ───────────────────────────────────────────────────────────────────────
 
 export interface StillsComparison {
@@ -758,21 +807,31 @@ export function compareStillSets(a: string, b: string): StillsComparison {
   for (const f of la.filter((x) => !lb.includes(x))) differences.push(`${f}: only in the first render`);
   for (const f of lb.filter((x) => !la.includes(x))) differences.push(`${f}: only in the second render`);
   const stills = Array.isArray(sa.info.stills) ? sa.info.stills : [];
+  // Each PNG is read once; everything below compares those bytes.
+  const read = (file: string): Buffer | null => {
+    try {
+      return readFileSync(file);
+    } catch {
+      return null;
+    }
+  };
+  const bytes = new Map<string, Buffer | null>();
   for (const [label, dir, info] of [['first', a, sa.info], ['second', b, sb.info]] as const) {
     for (const s of Array.isArray(info.stills) ? info.stills : []) {
       if (typeof s.file !== 'string' || !STILL_FILE.test(s.file)) {
         differences.push(`${label}: stills.json lists ${JSON.stringify(s.file)}`);
         continue;
       }
-      const file = path.join(dir, s.file);
-      if (!existsSync(file) || sha256Hex(readFileSync(file)) !== s.sha256) differences.push(`${s.file}: the ${label} render's bytes are not the ones its stills.json names`);
+      const png = read(path.join(dir, s.file));
+      bytes.set(`${label}/${s.file}`, png);
+      if (!png || sha256Hex(png) !== s.sha256) differences.push(`${s.file}: the ${label} render's bytes are not the ones its stills.json names`);
     }
   }
   for (const s of stills) {
     if (typeof s.file !== 'string' || !STILL_FILE.test(s.file)) continue;
-    const fa = path.join(a, s.file);
-    const fb = path.join(b, s.file);
-    if (existsSync(fa) && existsSync(fb) && !readFileSync(fa).equals(readFileSync(fb))) differences.push(`${s.file}: PNG bytes differ (${sha256Hex(readFileSync(fa)).slice(0, 12)} vs ${sha256Hex(readFileSync(fb)).slice(0, 12)})`);
+    const pa = bytes.get(`first/${s.file}`);
+    const pb = bytes.get(`second/${s.file}`);
+    if (pa && pb && !pa.equals(pb)) differences.push(`${s.file}: PNG bytes differ (${sha256Hex(pa).slice(0, 12)} vs ${sha256Hex(pb).slice(0, 12)})`);
   }
   return { identical: differences.length === 0 && stills.length > 0, stills: stills.length, differences: stills.length === 0 && differences.length === 0 ? ['the first render lists no stills'] : differences };
 }
