@@ -3,7 +3,7 @@
 // clips and motion plan are computed once from the spec, then sampled per frame.
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { AbsoluteFill, cancelRender, continueRender, delayRender, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, cancelRender, continueRender, delayRender, Img, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import { buildCaptions } from '../audio/captions.ts';
 import { TOKENS, withAlpha } from '../brand/tokens.ts';
 import { choreograph, layoutsFor, mouthAt, type Clip } from '../character/walletwallaby/choreography.ts';
@@ -20,6 +20,8 @@ import type { DocsVideoProps } from './props.ts';
 import { SceneView } from './scenes/SceneView.tsx';
 import type { SceneState } from './scenes/common.tsx';
 import { rectStyle, textStyle } from './style.ts';
+import { MaterialContext } from './material.tsx';
+import { WallabyBlender } from './wallaby/WallabyBlender.tsx';
 import { WallabyRive } from './wallaby/WallabyRive.tsx';
 
 interface Model {
@@ -127,21 +129,32 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
   };
 
   const wallaby = sampleWithEngine(model.engine, model.motion, frame, ms, mouthAt(timeline, ms));
+  // A staged depth reveal draws the whole frame (surfaces and character) for its range; the flat transition steps aside.
+  const reveal = props.overlays.characterless ? undefined : props.depthReveals?.find((r) => frame >= r.range.first && frame <= r.range.last);
   const cue = props.overlays.captions ? model.captions.find((c) => ms >= c.startMs && ms < c.endMs) : undefined;
   const section = seg.scene ? props.headings[seg.scene.eyebrowSectionId] : undefined;
 
   return (
+    <MaterialContext.Provider value={props.material}>
     <AbsoluteFill style={{ backgroundColor: TOKENS.paper, overflow: 'hidden' }}>
       {inTransition && prev ? <AbsoluteFill style={styles.exit}>{renderSegment(prev, prev.endMs - 1)}</AbsoluteFill> : null}
       <AbsoluteFill style={inTransition ? styles.enter : undefined}>{renderSegment(seg, ms)}</AbsoluteFill>
 
       {seg.scene && !inTransition ? (
-        <div style={{ ...rectStyle(PROVENANCE_CHIP), ...textStyle('chip', true), color: TOKENS.inkMuted, textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ ...rectStyle(PROVENANCE_CHIP), ...textStyle('chip', true), color: props.material.flat.text.muted, textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {`${props.spec.source.docPath.replace(/^docs\//, '')}${section ? ` § ${section}` : ''}`}
         </div>
       ) : null}
 
-      {props.overlays.characterless ? null : <WallabyRive states={[wallaby]} opacity={wallaby.opacity} />}
+      {reveal ? (
+        <AbsoluteFill style={{ backgroundColor: TOKENS.paper }}>
+          <Img src={staticFile(`${reveal.dir}/f${String(frame).padStart(5, '0')}.png`)} style={{ position: 'absolute', left: 0, top: 0, width: 1920, height: 1080 }} />
+        </AbsoluteFill>
+      ) : props.overlays.characterless ? null : props.characterRenderer ? (
+        <WallabyBlender frame={frame} visible={wallaby.visible} opacity={wallaby.opacity} source={props.characterRenderer} />
+      ) : (
+        <WallabyRive states={[wallaby]} opacity={wallaby.opacity} />
+      )}
 
       {cue ? (
         <div style={{ position: 'absolute', left: 260, width: 1400, top: 948, display: 'flex', justifyContent: 'center' }}>
@@ -163,5 +176,6 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
         </>
       ) : null}
     </AbsoluteFill>
+    </MaterialContext.Provider>
   );
 };

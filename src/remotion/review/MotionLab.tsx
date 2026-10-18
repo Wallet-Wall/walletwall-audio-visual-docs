@@ -4,14 +4,21 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { AbsoluteFill, cancelRender, continueRender, delayRender, useCurrentFrame, useVideoConfig } from 'remotion';
+import visualJson from '../../../config/blender-visual.json';
+import { resolveVisual, type RawVisual } from '../../blender/visual-core.ts';
 import { FONTS, TOKENS } from '../../brand/tokens.ts';
 import { sampleWallaby } from '../../character/walletwallaby/motion.ts';
 import { GROUND_Y } from '../../layout/geometry.ts';
 import { loadBrandFonts } from '../fonts.ts';
+import { MaterialContext } from '../material.tsx';
+import { Formation, Ground } from '../scenes/terrain-art.tsx';
 import { WallabyRive } from '../wallaby/WallabyRive.tsx';
 import { LAB_PLATFORMS, labPlan } from './motion-lab-scene.ts';
 
-export const MotionLab: React.FC = () => {
+const MATERIAL = resolveVisual(visualJson as unknown as RawVisual);
+
+/** `characterless` draws the terrain alone (the design test; the narrow-perch review composites Blender's body over it). */
+export const MotionLab: React.FC<{ characterless?: boolean }> = ({ characterless = false }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const [fontHandle] = useState(() => delayRender('Loading WalletWall fonts'));
@@ -24,15 +31,18 @@ export const MotionLab: React.FC = () => {
   const ms = (frame * 1000) / fps;
   const state = sampleWallaby(plan, ms);
   return (
+    <MaterialContext.Provider value={MATERIAL}>
     <AbsoluteFill style={{ backgroundColor: TOKENS.paper }}>
-      <div style={{ position: 'absolute', left: 0, top: GROUND_Y, width: 1920, height: 1080 - GROUND_Y, background: TOKENS.stoneLow, borderTop: `2px solid ${TOKENS.charcoalRail}` }} />
+      <Ground />
+      {/* Both lab supports are bare physical supports (no content on them), so both are cut as terrain: the tall ledge and the narrow perch. */}
       {LAB_PLATFORMS.map((p) => (
-        <div key={p.id} style={{ position: 'absolute', left: p.rect.x, top: p.rect.y, width: p.rect.w, height: p.rect.h, background: TOKENS.stone, border: `2px solid ${TOKENS.charcoalBorder}`, boxSizing: 'border-box' }} />
+        <Formation key={p.id} kind="ledge" id={p.id} rect={p.rect} />
       ))}
-      <WallabyRive states={[state]} opacity={state.opacity} />
+      {characterless ? null : <WallabyRive states={[state]} opacity={state.opacity} />}
       <div style={{ position: 'absolute', left: 60, top: 980, fontFamily: FONTS.mono, fontSize: 24, color: TOKENS.inkMuted }}>
         {`${(ms / 1000).toFixed(2)} s · ${state.visible ? `${state.motion.action} · ${state.motion.phase}` : 'hidden'}`}
       </div>
     </AbsoluteFill>
+    </MaterialContext.Provider>
   );
 };

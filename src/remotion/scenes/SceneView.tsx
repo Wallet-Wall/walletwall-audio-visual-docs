@@ -8,7 +8,9 @@ import type { Point } from '../../layout/geometry.ts';
 import { EYEBROW_RECT, SUMMIT_LEDGE, type Route } from '../../layout/scene-layout.ts';
 import type { CardScene, GraphScene, SceneSpec, TakeawayScene, UiScene, VideoSpec } from '../../spec/types.ts';
 import { rectStyle, settle, textStyle } from '../style.ts';
-import { Attention, BrickMarker, dipStyle, Ground, Masonry, Platform, regionFor, TextAt, type SceneState } from './common.tsx';
+import { useMaterial } from '../material.tsx';
+import { Attention, BrickMarker, dipStyle, Platform, regionFor, TextAt, type SceneState } from './common.tsx';
+import { Formation, Ground, RockSlab } from './terrain-art.tsx';
 
 export const SceneView: React.FC<{ scene: SceneSpec; state: SceneState; spec: VideoSpec }> = ({ scene, state, spec }) => {
   const eyebrow = regionFor(state.layout, 'eyebrow');
@@ -68,7 +70,9 @@ function routePath(route: Route): string {
   return `M ${a.x} ${a.y} Q ${mid.x} ${mid.y - 24} ${b.x} ${b.y}`;
 }
 
-const Routes: React.FC<{ routes: Route[]; state: SceneState }> = ({ routes, state }) => (
+const Routes: React.FC<{ routes: Route[]; state: SceneState }> = ({ routes, state }) => {
+  const m = useMaterial();
+  return (
   <svg style={{ position: 'absolute', inset: 0 }} width={1920} height={1080} viewBox="0 0 1920 1080">
     {routes.map((route) => {
       const shown = settle(state.ms, state.seg.reveals[route.id]).opacity;
@@ -80,15 +84,18 @@ const Routes: React.FC<{ routes: Route[]; state: SceneState }> = ({ routes, stat
           {traced > 0 ? <path d={d} stroke={TOKENS.terracotta} strokeWidth={3} pathLength={1} strokeDasharray={`${traced} 1`} /> : null}
           {(() => {
             const end = route.points[route.points.length - 1]!;
-            return <rect x={end.x - 5} y={end.y - 5} width={10} height={10} fill={traced >= 1 ? TOKENS.terracotta : TOKENS.surface} stroke={TOKENS.charcoalRail} />;
+            return <rect x={end.x - 5} y={end.y - 5} width={10} height={10} fill={traced >= 1 ? TOKENS.terracotta : m.flat.surface} stroke={TOKENS.charcoalRail} />;
           })()}
         </g>
       );
     })}
   </svg>
-);
+  );
+};
 
-const RouteView: React.FC<{ scene: GraphScene; state: SceneState }> = ({ scene, state }) => (
+const RouteView: React.FC<{ scene: GraphScene; state: SceneState }> = ({ scene, state }) => {
+  const m = useMaterial();
+  return (
   <>
     <TextAt region={scene.caption ? regionFor(state.layout, scene.caption.id) : undefined} state={state} />
     {state.layout.platforms
@@ -97,7 +104,7 @@ const RouteView: React.FC<{ scene: GraphScene; state: SceneState }> = ({ scene, 
         const nodeId = p.id.slice('pillar:'.length);
         return (
           <div key={p.id} style={{ opacity: settle(state.ms, state.seg.reveals[nodeId]).opacity }}>
-            <Masonry rect={p.rect} />
+            <Formation kind="pillar" id={p.id} rect={p.rect} />
           </div>
         );
       })}
@@ -110,28 +117,22 @@ const RouteView: React.FC<{ scene: GraphScene; state: SceneState }> = ({ scene, 
         <div key={n.id} style={{ ...reveal, ...dipStyle(state, `node:${n.id}`, reveal.transform) }}>
           <Platform rect={platform.rect} style={focus ? { borderTop: `3px solid ${TOKENS.terracotta}` } : {}} />
           <TextAt region={regionFor(state.layout, n.id)} state={state} />
-          <TextAt region={n.detail ? regionFor(state.layout, n.detail.id) : undefined} state={state} color={TOKENS.inkMuted} />
+          <TextAt region={n.detail ? regionFor(state.layout, n.detail.id) : undefined} state={state} color={m.flat.text.muted} />
         </div>
       );
     })}
   </>
-);
+  );
+};
 
-const LayeredView: React.FC<{ scene: GraphScene; state: SceneState }> = ({ scene, state }) => (
+const LayeredView: React.FC<{ scene: GraphScene; state: SceneState }> = ({ scene, state }) => {
+  const m = useMaterial();
+  return (
   <>
     <svg style={{ position: 'absolute', inset: 0 }} width={1920} height={1080} viewBox="0 0 1920 1080">
-      {state.layout.slabs.map((slab) => {
-        const [tl, tr, br, bl] = slab.corners;
-        const courses = [0.34, 0.67].map((f) => ({ a: { x: tl.x + (bl.x - tl.x) * f, y: tl.y + (bl.y - tl.y) * f }, b: { x: tr.x + (br.x - tr.x) * f, y: tr.y + (br.y - tr.y) * f } }));
-        return (
-          <g key={slab.id}>
-            <polygon points={slab.corners.map((p) => `${p.x},${p.y}`).join(' ')} fill={TOKENS.stone} fillOpacity={slab.id === 'upper' ? 0.32 : 0.45} stroke={TOKENS.charcoalBorder} />
-            {courses.map((c, i) => (
-              <line key={i} x1={c.a.x} y1={c.a.y} x2={c.b.x} y2={c.b.y} stroke={TOKENS.stoneLow} strokeOpacity={0.45} />
-            ))}
-          </g>
-        );
-      })}
+      {state.layout.slabs.map((slab) => (
+        <RockSlab key={slab.id} slab={slab} />
+      ))}
     </svg>
     <TextAt region={scene.caption ? regionFor(state.layout, scene.caption.id) : undefined} state={state} />
     <Routes routes={state.layout.routes} state={state} />
@@ -142,12 +143,13 @@ const LayeredView: React.FC<{ scene: GraphScene; state: SceneState }> = ({ scene
         <div key={n.id} style={{ ...reveal, ...dipStyle(state, `node:${n.id}`, reveal.transform) }}>
           <Platform rect={platform.rect} style={state.attention.has(n.id) ? { borderTop: `3px solid ${TOKENS.terracotta}` } : {}} />
           <TextAt region={regionFor(state.layout, n.id)} state={state} />
-          <TextAt region={n.detail ? regionFor(state.layout, n.detail.id) : undefined} state={state} color={TOKENS.inkMuted} />
+          <TextAt region={n.detail ? regionFor(state.layout, n.detail.id) : undefined} state={state} color={m.flat.text.muted} />
         </div>
       );
     })}
   </>
-);
+  );
+};
 
 const UiView: React.FC<{ scene: UiScene; state: SceneState; spec: VideoSpec }> = ({ scene, state, spec }) => {
   const frame = state.layout.platforms.find((p) => p.kind === 'FRAME')!;
@@ -163,10 +165,12 @@ const UiView: React.FC<{ scene: UiScene; state: SceneState; spec: VideoSpec }> =
   );
 };
 
-const TakeawayView: React.FC<{ scene: TakeawayScene; state: SceneState }> = ({ scene, state }) => (
+const TakeawayView: React.FC<{ scene: TakeawayScene; state: SceneState }> = ({ scene, state }) => {
+  const m = useMaterial();
+  return (
   <>
     <div style={{ position: 'absolute', inset: 0, ...dipStyle(state, 'ledge') }}>
-      <Masonry rect={SUMMIT_LEDGE} course={30} />
+      <Formation kind="ledge" id="ledge" rect={SUMMIT_LEDGE} />
     </div>
     {[scene.statement, ...scene.support].map((el) => (
       <Attention key={`a-${el.id}`} rect={regionFor(state.layout, el.id)?.rect} on={state.attention.has(el.id)} resolved={state.resolved.has(el.id)} />
@@ -177,9 +181,10 @@ const TakeawayView: React.FC<{ scene: TakeawayScene; state: SceneState }> = ({ s
       return (
         <React.Fragment key={el.id}>
           {r ? <BrickMarker x={r.rect.x} y={r.rect.y - 14} opacity={settle(state.ms, state.seg.reveals[el.id]).opacity} /> : null}
-          <TextAt region={r} state={state} color={TOKENS.inkMuted} />
+          <TextAt region={r} state={state} color={m.flat.text.muted} />
         </React.Fragment>
       );
     })}
   </>
-);
+  );
+};

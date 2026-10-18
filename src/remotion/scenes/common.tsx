@@ -3,9 +3,10 @@
 
 import React from 'react';
 import { TOKENS } from '../../brand/tokens.ts';
-import { GROUND_Y, type Rect } from '../../layout/geometry.ts';
+import type { Rect } from '../../layout/geometry.ts';
 import type { SceneLayout, TextRegion } from '../../layout/scene-layout.ts';
 import type { TimedSegment } from '../../timeline/timeline.ts';
+import { useMaterial } from '../material.tsx';
 import { HAIRLINE, rectStyle, settle, textStyle } from '../style.ts';
 
 export interface SceneState {
@@ -37,10 +38,11 @@ export function regionFor(layout: SceneLayout, elementId: string): TextRegion | 
 }
 
 export const TextAt: React.FC<{ region: TextRegion | undefined; state: SceneState; color?: string }> = ({ region, state, color }) => {
+  const m = useMaterial();
   if (!region) return null;
   const reveal = settle(state.ms, state.seg.reveals[region.elementId]);
   return (
-    <div style={{ ...rectStyle(region.rect), ...textStyle(region.styleKey, region.mono), ...(color ? { color } : {}), ...reveal }}>{region.text}</div>
+    <div style={{ ...rectStyle(region.rect), ...textStyle(region.styleKey, region.mono, color ?? m.flat.text.ink), ...reveal }}>{region.text}</div>
   );
 };
 
@@ -62,17 +64,14 @@ export const Attention: React.FC<{ rect: Rect | undefined; on: boolean; resolved
   );
 };
 
-/** The ground line, edge to edge unless a template draws only a stretch of it. */
-export const Ground: React.FC<{ x0?: number; x1?: number }> = ({ x0 = 0, x1 = 1920 }) => (
-  <div style={{ position: 'absolute', left: x0, top: GROUND_Y, width: x1 - x0, height: 1, background: TOKENS.charcoalRail }} />
-);
-
-/** A raised card / platform with WalletWall's fine border and 2px corners. */
-export const Platform: React.FC<{ rect: Rect; style?: React.CSSProperties; children?: React.ReactNode }> = ({ rect, style, children }) => (
+/** A raised card / platform with WalletWall's fine border and 2px corners, in the warm parchment of the material rule (never white). */
+export const Platform: React.FC<{ rect: Rect; style?: React.CSSProperties; children?: React.ReactNode }> = ({ rect, style, children }) => {
+  const m = useMaterial();
+  return (
   <div
     style={{
       ...rectStyle(rect),
-      background: TOKENS.surface,
+      background: m.flat.surface,
       border: HAIRLINE,
       borderTop: `2px solid ${TOKENS.charcoalBorder}`,
       borderRadius: TOKENS.radiusPanel,
@@ -82,24 +81,6 @@ export const Platform: React.FC<{ rect: Rect; style?: React.CSSProperties; child
   >
     {children}
   </div>
-);
-
-/** Masonry courses for pillars and ledges: the brand's brick language, kept faint. */
-export const Masonry: React.FC<{ rect: Rect; course?: number }> = ({ rect, course = 26 }) => {
-  const rows = Math.max(1, Math.floor(rect.h / course));
-  return (
-    <svg style={{ ...rectStyle(rect), overflow: 'hidden' }} viewBox={`0 0 ${rect.w} ${rect.h}`}>
-      <rect x={0} y={0} width={rect.w} height={rect.h} fill={TOKENS.stone} opacity={0.42} stroke={TOKENS.charcoalBorder} />
-      {Array.from({ length: rows }, (_, r) => (
-        <g key={r} stroke={TOKENS.stoneLow} strokeWidth={1} opacity={0.5}>
-          <line x1={0} y1={(r + 1) * course} x2={rect.w} y2={(r + 1) * course} />
-          {Array.from({ length: Math.ceil(rect.w / 64) + 1 }, (_, c) => {
-            const x = c * 64 + (r % 2 ? 32 : 0);
-            return <line key={c} x1={x} y1={r * course} x2={x} y2={(r + 1) * course} />;
-          })}
-        </g>
-      ))}
-    </svg>
   );
 };
 

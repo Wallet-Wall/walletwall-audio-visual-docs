@@ -4,6 +4,7 @@
 // the Rust/WASM motion engine, the engine's plans (data: one state per frame).
 // It never receives credentials, prompts, or provider handles.
 
+import type { BlenderVisual } from '../blender/visual-core.ts';
 import type { CopyTemplates } from '../config/types.ts';
 import type { MotionEngineProps } from '../motion/rust-path.ts';
 import type { VideoSpec } from '../spec/types.ts';
@@ -18,6 +19,38 @@ export interface ReviewOverlays {
   guides: boolean;
 }
 
+/** A staged, hash-verified Blender frame sequence of WalletWallaby (docs/BLENDER.md). */
+export interface BlenderCharacterProps {
+  schema: 'walletwall.blender-character-props/v1';
+  renderer: 'blender';
+  /** The sequence's name and where it is served from in the bundle's public dir. */
+  name: string;
+  dir: string;
+  /** The bridge range it was rendered from. */
+  range: { first: number; last: number };
+  /** The visible frames the sequence holds, one full-frame PNG each. */
+  frames: number[];
+  /** sha256 of Blender's render manifest (every PNG's hash), and of the bridge the frames were rendered from. */
+  renderSha256: string;
+  bridgeSha256: string;
+  /** The Blender identity the frames were made with (src/blender/identity.ts): versions and hashes only. */
+  identity: Record<string, string | number | null>;
+}
+
+/**
+ * A staged Blender depth-reveal transition (the 2D -> 3D signature move): full frames that replace the flat transition
+ * for exactly their range. Their teaching surfaces are Remotion's own characterless frames, projected; Blender draws
+ * no copy of its own.
+ */
+export interface BlenderTransitionProps {
+  schema: 'walletwall.blender-transition-props/v1';
+  name: string;
+  dir: string;
+  range: { first: number; last: number };
+  renderSha256: string;
+  identity: Record<string, string | number | null>;
+}
+
 export interface DocsVideoProps {
   spec: VideoSpec;
   track: NarrationTrack;
@@ -28,8 +61,14 @@ export interface DocsVideoProps {
   overlays: ReviewOverlays;
   /** Rendered into the docs-reference card: short provenance identifiers. */
   provenance: { blob: string; contentHash: string };
+  /** The resolved material (config/blender-visual.json): authored cards in parchment, text colours, and the terrain formations' palette. */
+  material: BlenderVisual;
   /** Rust/WASM Motion Intelligence plans for the paths it owns; absent = the TypeScript solver alone. */
   motionEngine?: MotionEngineProps;
+  /** WalletWallaby drawn from a staged Blender sequence; absent = the Rive rig. */
+  characterRenderer?: BlenderCharacterProps;
+  /** Blender depth-reveal transitions, each replacing the flat transition for its frames. */
+  depthReveals?: BlenderTransitionProps[];
   /** Index signature required by Remotion's props constraint. */
   [key: string]: unknown;
 }

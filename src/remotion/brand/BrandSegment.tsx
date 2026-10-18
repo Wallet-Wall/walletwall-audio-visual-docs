@@ -10,7 +10,9 @@ import type { CopyTemplate } from '../../config/types.ts';
 import type { VideoSpec } from '../../spec/types.ts';
 import type { TimedSegment } from '../../timeline/timeline.ts';
 import { rectStyle, settle, textStyle } from '../style.ts';
-import { Ground, Platform } from '../scenes/common.tsx';
+import { Platform } from '../scenes/common.tsx';
+import { Ground } from '../scenes/terrain-art.tsx';
+import { useMaterial } from '../material.tsx';
 
 interface BrandProps {
   seg: TimedSegment;
@@ -29,13 +31,15 @@ function brandMark(spec: VideoSpec): string | null {
 export const BrandSegment: React.FC<BrandProps> = ({ seg, ms, spec, template, docTitle, provenance }) => {
   const t0 = seg.contentStartMs;
   const mark = brandMark(spec);
+  const m = useMaterial();
+  const ink = m.flat.text.ink;
   switch (seg.role) {
     case 'IDENT':
       // Multiple possibilities -> brief interference -> resolution -> tactile set: visually, the mark settles like a laid brick.
       return (
         <AbsoluteFill>
           {mark ? <Img src={mark} style={{ ...rectStyle(IDENT_MARK), objectFit: 'contain', ...settle(ms, t0, 520) }} /> : null}
-          <div style={{ ...rectStyle(IDENT_WORDMARK), ...textStyle('cardHeading'), textAlign: 'center', color: TOKENS.terracotta, ...settle(ms, t0 + 380, 420) }}>
+          <div style={{ ...rectStyle(IDENT_WORDMARK), ...textStyle('cardHeading', false, ink), textAlign: 'center', color: TOKENS.terracotta, ...settle(ms, t0 + 380, 420) }}>
             {template.onScreen}
           </div>
         </AbsoluteFill>
@@ -44,7 +48,7 @@ export const BrandSegment: React.FC<BrandProps> = ({ seg, ms, spec, template, do
       return (
         <AbsoluteFill>
           <Ground {...BRAND_GROUND.CTA} />
-          <div style={{ ...rectStyle(CTA_TEXT), ...textStyle('cardHeading'), ...settle(ms, t0) }}>{template.onScreen}</div>
+          <div style={{ ...rectStyle(CTA_TEXT), ...textStyle('cardHeading', false, ink), ...settle(ms, t0) }}>{template.onScreen}</div>
         </AbsoluteFill>
       );
     case 'DOCS_REFERENCE': {
@@ -55,9 +59,9 @@ export const BrandSegment: React.FC<BrandProps> = ({ seg, ms, spec, template, do
           <Platform rect={DOCS_CARD} />
           <div style={{ position: 'absolute', left: DOCS_CARD.x + 56, top: DOCS_CARD.y + 52, width: DOCS_CARD.w - 112, ...settle(ms, t0) }}>
             <div style={{ ...textStyle('eyebrow'), color: TOKENS.terracotta }}>{template.onScreen}</div>
-            <div style={{ ...textStyle('cardHeading'), marginTop: 26 }}>{docTitle}</div>
-            <div style={{ ...textStyle('cardBody', true), fontSize: 30, color: TOKENS.terracottaDark, marginTop: 30 }}>{url}</div>
-            <div style={{ ...textStyle('chip', true), color: TOKENS.inkMuted, marginTop: 44 }}>
+            <div style={{ ...textStyle('cardHeading', false, ink), marginTop: 26 }}>{docTitle}</div>
+            <div style={{ ...textStyle('cardBody', true, ink), fontSize: 30, color: m.flat.text.link, marginTop: 30 }}>{url}</div>
+            <div style={{ ...textStyle('chip', true), color: m.flat.text.muted, marginTop: 44 }}>
               {`doc blob ${provenance.blob.slice(0, 7)} · content ${provenance.contentHash.slice(0, 12)} · video r${spec.revision}`}
             </div>
           </div>
@@ -69,7 +73,7 @@ export const BrandSegment: React.FC<BrandProps> = ({ seg, ms, spec, template, do
         <AbsoluteFill>
           <Ground {...BRAND_GROUND.OUTRO} />
           {mark ? <Img src={mark} style={{ ...rectStyle(OUTRO_MARK), objectFit: 'contain', ...settle(ms, t0, 420) }} /> : null}
-          <div style={{ ...rectStyle(OUTRO_TEXT), ...textStyle('graphCaption'), textAlign: 'center', color: TOKENS.terracotta, ...settle(ms, t0 + 200) }}>{template.onScreen}</div>
+          <div style={{ ...rectStyle(OUTRO_TEXT), ...textStyle('graphCaption', false, ink), textAlign: 'center', color: TOKENS.terracotta, ...settle(ms, t0 + 200) }}>{template.onScreen}</div>
         </AbsoluteFill>
       );
     case 'END_SCREEN':

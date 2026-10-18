@@ -22,6 +22,8 @@ docs → normalized source → storyboard (selections only) → `VideoSpec` → 
 - **Fail closed.** Do not turn a validation error into a warning, skip a gate, or loosen an adversarial test to make a build pass.
 - **Version what changes a frame.** A change to rig, motion, palette, or voice/sonic config bumps its declared version; the provenance tests enforce this.
 - **Do not add a game engine.** No Phaser, Matter.js, Rapier, Three.js character conversion, ragdolls, particle systems, or camera shake. A new runtime dependency needs a concrete, documented need.
+- **Blender performs; it never decides** ([docs/BLENDER.md](docs/BLENDER.md)). The Blender lane receives Motion Intelligence's decisions through `walletwall.blender-motion/v1` and maps them onto its body; it never chooses a destination, contact, time, or support, and no physics simulation, rigid body, or randomness enters it. Blender runs only through `src/blender/toolchain.ts` (the pinned build, fixed arguments, factory settings, auto-run disabled, offline, a minimal environment), only the lane's own entry scripts, and only on job files inside `dist/blender/jobs/`. The VideoSpec never gains a Python, path, camera, or style field, and Blender never renders public copy.
+- **Nothing WalletWall authors is white** ([docs/BLENDER_VISUAL.md](docs/BLENDER_VISUAL.md)). Cards and panels are warm parchment, the character's accents and every terrain formation come from the brand's stone, tan and terracotta, and `src/blender/visual-core.ts` refuses any white-ish colour (luma at least 0.80 with chroma at most 0.14). The terrain family under the dedicated supports (the ground, the summit ledge, the pillars, the slabs) is cut inside each support's declared rectangle: its top edge and contact faces stay on the declared coordinates (`src/layout/rock.ts`), and a card or node is never turned into rock. External captured UI may contain white; authored surfaces may not. `npm run test` runs the audit (`src/blender/white-audit.ts`); a new white-reading token in `src/remotion` is forbidden until it is named as an exception there.
 
 ## Canonical sources and public safety
 
@@ -47,6 +49,8 @@ Report exact results in the PR:
 - `npm audit --audit-level=moderate`
 - `git diff --check`
 - for anything visual: `npm run render:stills migration-readiness`, with before/after stills attached
+- for anything that changes an authored colour or a formation under `src/remotion/` or `src/layout/rock.ts`: `node scripts/review/white-audit.ts --before=<main's stills> --after=dist/migration-readiness/stills` (settled characterless stills; must PASS)
+- for anything under `blender/` or `src/blender/` (with the pinned Blender, `WALLETWALL_BLENDER`): `npm run blender:determinism -- --frames=1812,1822,1850,1904,1916,1922,1928,1990` and `npm run blender:review`, with before/after stills attached
 - for anything under `motion-intelligence/` (in that directory): `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo clippy --target wasm32-unknown-unknown --lib -- -D warnings`, `cargo test`; then `npm run motion:build` and `npm run motion:check` on Linux or WSL (the committed WASM is a canonical Linux build), and `npm run motion:fixtures` after a deliberate behaviour change ([docs/MOTION_INTELLIGENCE.md](docs/MOTION_INTELLIGENCE.md))
 
 ## Copy
