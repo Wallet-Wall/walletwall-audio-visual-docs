@@ -1,0 +1,85 @@
+{
+  "schema": "walletwall.motion-config/v1",
+  "id": "walletwallaby-motion",
+  "version": 2,
+  "note": "WalletWallaby's physical performance. Lengths are in body heights (WALLABY_HEIGHT x the character's scale at that moment) so a near and a far WalletWallaby move alike; times are in milliseconds. Changing any value requires a new version (see src/character/walletwallaby/versions.ts).",
+  "gravityBodyHeightsPerS2": 21,
+  "maxGravityBoost": 1.8,
+  "hop": {
+    "peakBase": 0.3,
+    "peakPerPx": 0.08,
+    "peakMin": 0.18,
+    "peakMax": 1.0,
+    "anticipationMs": 190,
+    "anticipationHoldFrac": 0.3,
+    "orientMaxMs": 160,
+    "minFlightMs": 110,
+    "landingBlendMs": 110
+  },
+  "trace": {
+    "strideBodyHeights": 0.62,
+    "stepPeakBodyHeights": 0.075,
+    "contactFrac": 0.24,
+    "stepImpulse": 0.3,
+    "maxPitchFrac": 0.35,
+    "skipStepMs": 230
+  },
+  "push": {
+    "weightBackFrac": 0.26,
+    "driveStartFrac": 0.36,
+    "leanBackDeg": -7,
+    "arcPx": 70
+  },
+  "drop": {
+    "heightPx": 420,
+    "fadeFrac": 0.4
+  },
+  "hold": {
+    "poseBlendMs": 300,
+    "shiftImpulse": 0.2,
+    "gazeTurnMs": 260,
+    "breathePeriodMs": 3400,
+    "breatheCrouch": 0.016
+  },
+  "response": {
+    "compression": {
+      "freqHz": 3.1,
+      "damping": 0.55,
+      "windowMs": 700
+    },
+    "tail": {
+      "freqHz": 2.2,
+      "damping": 0.36,
+      "windowMs": 1300
+    },
+    "ears": {
+      "freqHz": 3.4,
+      "damping": 0.3,
+      "windowMs": 1100
+    },
+    "platform": {
+      "freqHz": 5.5,
+      "damping": 0.62,
+      "windowMs": 420
+    }
+  },
+  "gains": {
+    "landingCrouch": 0.5,
+    "landingHeadTiltDeg": 5,
+    "landingTailDeg": -16,
+    "landingEarDeg": 7,
+    "takeoffTailDeg": -12,
+    "takeoffEarDeg": -6,
+    "platformDipPx": 2.2
+  },
+  "limits": {
+    "maxRotationDeg": 9,
+    "maxCompression": 0.085,
+    "maxStretch": 0.065,
+    "maxTailLagDeg": 22,
+    "maxEarLagDeg": 9,
+    "maxHeadStabDeg": 6,
+    "platformMaxPx": 3,
+    "maxSpeedBodyHeightsPerS": 16
+  }
+}

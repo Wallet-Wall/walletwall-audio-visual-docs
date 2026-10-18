@@ -40,7 +40,7 @@ The spec has no field for styling, code, camera, or prompts; validation rejects 
 
 ## Small grammars
 
-Scene types `CARD`, `GRAPH`, `UI`, `TAKEAWAY`, each with fixed layouts. WalletWallaby has ten actions (`HOP`, `LAND`, `PERCH`, `INSPECT`, `TRACE`, `REVEAL`, `COMPARE`, `PUSH_THROUGH`, `DIMENSION_JUMP`, `RESOLVE`), six expressions, and nine poses. The planner picks an action and a target anchor; the renderer owns locomotion. See [MOTION_ARCHITECTURE.md](MOTION_ARCHITECTURE.md).
+Scene types `CARD`, `GRAPH`, `UI`, `TAKEAWAY`, each with fixed layouts. WalletWallaby has ten actions (`HOP`, `LAND`, `PERCH`, `INSPECT`, `TRACE`, `REVEAL`, `COMPARE`, `PUSH_THROUGH`, `DIMENSION_JUMP`, `RESOLVE`), six expressions, and nine poses. The planner picks an action and a target anchor. The choreography fixes where and when; a deterministic motion system (ballistic hops, contact, compression, settle, a tiny bounded platform response) decides how, and can never change a destination. See [MOTION_ARCHITECTURE.md](MOTION_ARCHITECTURE.md).
 
 The terrain metaphor is geometry, not a game: cards and graph nodes are platforms, edges are dashed trails that turn terracotta when traced, ascending order is shown as rising masonry pillars only when a claim states the order, and depth is a pair of stacked masonry slabs. No HUD, score, or collectibles.
 

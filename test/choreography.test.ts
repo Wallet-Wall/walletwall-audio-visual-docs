@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { estimateTrack } from '../src/audio/voice-provider.ts';
-import { choreograph, clipAt, layoutsFor, mouthAt, wallabyStateAt } from '../src/character/walletwallaby/choreography.ts';
+import { choreograph, clipAt, layoutsFor, mouthAt } from '../src/character/walletwallaby/choreography.ts';
+import { planMotion, sampleWallaby } from '../src/character/walletwallaby/motion.ts';
 import { buildTimeline } from '../src/timeline/timeline.ts';
 import { committedSnapshot, committedSpec, config } from './helpers.ts';
 
@@ -10,6 +11,8 @@ const headings = Object.fromEntries(committedSnapshot().sections.map((s) => [s.i
 const timeline = buildTimeline(spec, estimateTrack(spec, config.voice, config.lexicon), config.templates);
 const layouts = layoutsFor(timeline, (id) => headings[id] ?? '');
 const clips = choreograph(timeline, layouts);
+const plan = planMotion(clips, layouts);
+const wallabyStateAt = (_clips: unknown, ms: number, mouth: Parameters<typeof sampleWallaby>[2] = 'REST') => sampleWallaby(plan, ms, mouth);
 
 describe('WalletWallaby choreography', () => {
   test('clips tile the whole video with no gaps or overlaps', () => {

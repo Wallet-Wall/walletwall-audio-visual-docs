@@ -21,7 +21,7 @@ describe('character versions', () => {
     }
   });
   test('a definition change is detected (positive control)', () => {
-    const changed = { ...rigDefinition(), palette: { ...rigDefinition().palette, fur: 'terracotta' } };
+    const changed = { ...rigDefinition(), palette: { ...rigDefinition().palette, fur: 'tan' } };
     assert.notEqual(contentAddress(changed), RIG_PINS[RIG.version]);
   });
 });

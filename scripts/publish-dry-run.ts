@@ -10,6 +10,8 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { buildCaptions, checkCaptions, toSrt, toWebVtt } from '../src/audio/captions.ts';
 import { buildCueSheet } from '../src/audio/cue-sheet.ts';
+import { choreograph, layoutsFor } from '../src/character/walletwallaby/choreography.ts';
+import { planMotion } from '../src/character/walletwallaby/motion.ts';
 import { FixtureVoiceProvider } from '../src/audio/voice-provider.ts';
 import { loadPipelineConfig, readJson, VIDEO_ROOT } from '../src/config/load.ts';
 import { prettyJson } from '../src/core/canonical-json.ts';
@@ -45,7 +47,10 @@ const vtt = toWebVtt(cues);
 writeFileSync(path.join(out, `${videoId}.en.vtt`), vtt);
 writeFileSync(path.join(out, `${videoId}.en.srt`), toSrt(cues));
 
-const cueSheet = buildCueSheet(timeline, config.sonic, spec.audio.musicBedId);
+const headings: Record<string, string> = Object.fromEntries(source.sections.map((s) => [s.id, s.heading]));
+const layouts = layoutsFor(timeline, (id) => headings[id] ?? '');
+const motion = planMotion(choreograph(timeline, layouts), layouts);
+const cueSheet = buildCueSheet(timeline, config.sonic, spec.audio.musicBedId, motion.events);
 writeFileSync(path.join(out, 'cue-sheet.json'), prettyJson(cueSheet));
 
 const renderInfoPath = path.join(out, 'render.json');
