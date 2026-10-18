@@ -40,7 +40,7 @@ The spec has no field for styling, code, camera, or prompts; validation rejects 
 
 ## Small grammars
 
-Scene types `CARD`, `GRAPH`, `UI`, `TAKEAWAY`, each with fixed layouts. WalletWallaby has ten actions (`HOP`, `LAND`, `PERCH`, `INSPECT`, `TRACE`, `REVEAL`, `COMPARE`, `PUSH_THROUGH`, `DIMENSION_JUMP`, `RESOLVE`), six expressions, and nine poses. The planner picks an action and a target anchor; the renderer owns locomotion. See [MOTION_ARCHITECTURE.md](MOTION_ARCHITECTURE.md).
+Scene types `CARD`, `GRAPH`, `UI`, `TAKEAWAY`, each with fixed layouts. WalletWallaby has ten actions (`HOP`, `LAND`, `PERCH`, `INSPECT`, `TRACE`, `REVEAL`, `COMPARE`, `PUSH_THROUGH`, `DIMENSION_JUMP`, `RESOLVE`), six expressions, and nine poses. The planner picks an action and a target anchor. The choreography fixes where and when; a deterministic motion system (ballistic hops, ledge mantles, contact, compression, settle, a tail that balances, braces, and rests as a support, a tiny bounded platform response) decides how, and can never change a destination. WalletWallaby is drawn by a Rive rig compiled from code and posed frame by frame on the pinned Rive runtime: Rive blends the key poses, solves the IK, and skins the body, while Remotion owns time. See [MOTION_ARCHITECTURE.md](MOTION_ARCHITECTURE.md).
 
 The terrain metaphor is geometry, not a game: cards and graph nodes are platforms, edges are dashed trails that turn terracotta when traced, ascending order is shown as rising masonry pillars only when a claim states the order, and depth is a pair of stacked masonry slabs. No HUD, score, or collectibles.
 
@@ -60,7 +60,7 @@ The committed normalized snapshot is compared with the live doc. Line-ending, em
 
 ## Provenance
 
-A rendered video traces back to: the doc blob id, normalized content hash, and normalizer version; every claim's quote hash; every asset's sha256; the `VideoSpec` hash; the lockfile hash and renderer version; the character rig, motion config, voice, and sonic config versions; the validation outcome; and the MP4 sha256. Uploads are lineage, never overwrites: a materially updated video is a new revision and a new upload, waiting in `UNLISTED_REVIEW` until a human publishes it.
+A rendered video traces back to: the doc blob id, normalized content hash, and normalizer version; every claim's quote hash; every asset's sha256; the `VideoSpec` hash; the lockfile hash and renderer version; the character rig, motion config, voice, and sonic config versions; the sha256 of the Rive rig asset and of the Rive runtime's WASM; the validation outcome; and the MP4 sha256. Uploads are lineage, never overwrites: a materially updated video is a new revision and a new upload, waiting in `UNLISTED_REVIEW` until a human publishes it.
 
 ## Security
 

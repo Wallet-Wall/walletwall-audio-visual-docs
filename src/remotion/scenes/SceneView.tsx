@@ -8,7 +8,7 @@ import type { Point } from '../../layout/geometry.ts';
 import { EYEBROW_RECT, SUMMIT_LEDGE, type Route } from '../../layout/scene-layout.ts';
 import type { CardScene, GraphScene, SceneSpec, TakeawayScene, UiScene, VideoSpec } from '../../spec/types.ts';
 import { rectStyle, settle, textStyle } from '../style.ts';
-import { Attention, BrickMarker, Ground, Masonry, Platform, regionFor, TextAt, type SceneState } from './common.tsx';
+import { Attention, BrickMarker, dipStyle, Ground, Masonry, Platform, regionFor, TextAt, type SceneState } from './common.tsx';
 
 export const SceneView: React.FC<{ scene: SceneSpec; state: SceneState; spec: VideoSpec }> = ({ scene, state, spec }) => {
   const eyebrow = regionFor(state.layout, 'eyebrow');
@@ -29,7 +29,7 @@ const CardView: React.FC<{ scene: CardScene; state: SceneState }> = ({ scene, st
   const card = state.layout.platforms.find((p) => p.kind === 'CARD')!;
   const items = [scene.heading, ...scene.body];
   return (
-    <>
+    <div style={{ position: 'absolute', inset: 0, ...dipStyle(state, card.id) }}>
       <Platform rect={card.rect} />
       {scene.layout === 'SPLIT' && scene.body.length === 2
         ? (() => {
@@ -52,7 +52,7 @@ const CardView: React.FC<{ scene: CardScene; state: SceneState }> = ({ scene, st
           </React.Fragment>
         );
       })}
-    </>
+    </div>
   );
 };
 
@@ -107,7 +107,7 @@ const RouteView: React.FC<{ scene: GraphScene; state: SceneState }> = ({ scene, 
       const reveal = settle(state.ms, state.seg.reveals[n.id]);
       const focus = state.attention.has(n.id);
       return (
-        <div key={n.id} style={{ ...reveal }}>
+        <div key={n.id} style={{ ...reveal, ...dipStyle(state, `node:${n.id}`, reveal.transform) }}>
           <Platform rect={platform.rect} style={focus ? { borderTop: `3px solid ${TOKENS.terracotta}` } : {}} />
           <TextAt region={regionFor(state.layout, n.id)} state={state} />
           <TextAt region={n.detail ? regionFor(state.layout, n.detail.id) : undefined} state={state} color={TOKENS.inkMuted} />
@@ -139,7 +139,7 @@ const LayeredView: React.FC<{ scene: GraphScene; state: SceneState }> = ({ scene
       const platform = state.layout.platforms.find((p) => p.id === `node:${n.id}`)!;
       const reveal = settle(state.ms, state.seg.reveals[n.id]);
       return (
-        <div key={n.id} style={{ ...reveal }}>
+        <div key={n.id} style={{ ...reveal, ...dipStyle(state, `node:${n.id}`, reveal.transform) }}>
           <Platform rect={platform.rect} style={state.attention.has(n.id) ? { borderTop: `3px solid ${TOKENS.terracotta}` } : {}} />
           <TextAt region={regionFor(state.layout, n.id)} state={state} />
           <TextAt region={n.detail ? regionFor(state.layout, n.detail.id) : undefined} state={state} color={TOKENS.inkMuted} />
@@ -165,7 +165,9 @@ const UiView: React.FC<{ scene: UiScene; state: SceneState; spec: VideoSpec }> =
 
 const TakeawayView: React.FC<{ scene: TakeawayScene; state: SceneState }> = ({ scene, state }) => (
   <>
-    <Masonry rect={SUMMIT_LEDGE} course={30} />
+    <div style={{ position: 'absolute', inset: 0, ...dipStyle(state, 'ledge') }}>
+      <Masonry rect={SUMMIT_LEDGE} course={30} />
+    </div>
     {[scene.statement, ...scene.support].map((el) => (
       <Attention key={`a-${el.id}`} rect={regionFor(state.layout, el.id)?.rect} on={state.attention.has(el.id)} resolved={state.resolved.has(el.id)} />
     ))}

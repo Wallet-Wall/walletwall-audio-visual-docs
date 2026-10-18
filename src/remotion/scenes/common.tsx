@@ -18,6 +18,18 @@ export interface SceneState {
   resolved: Set<string>;
   /** Route id -> traced fraction 0..1. */
   traced: Record<string, number>;
+  /** Platform id -> downward contact displacement in px (a few px at most, returning to 0). */
+  platformDip: Record<string, number>;
+}
+
+/**
+ * Translate a platform and everything printed on it by its contact displacement,
+ * composed after any existing transform (e.g. a reveal's settle).
+ */
+export function dipStyle(state: SceneState, platformId: string, base = 'none'): React.CSSProperties {
+  const dy = Math.round((state.platformDip[platformId] ?? 0) * 100) / 100;
+  if (dy === 0) return base === 'none' ? {} : { transform: base };
+  return { transform: `${base === 'none' ? '' : `${base} `}translateY(${dy}px)` };
 }
 
 export function regionFor(layout: SceneLayout, elementId: string): TextRegion | undefined {

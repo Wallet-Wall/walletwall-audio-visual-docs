@@ -1,10 +1,11 @@
 // What a render was made with, beyond the spec: the toolchain, the hashed
-// version-controlled configuration, and WalletWallaby's declared rig and motion
-// versions. Recorded in render.json and the provenance manifest. Node-only.
+// version-controlled configuration, WalletWallaby's declared rig and motion
+// versions, and the exact Rive asset and runtime bytes the renderer loads.
+// Recorded in render.json and the provenance manifest. Node-only.
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { RIG, MOTION, motionDefinition, rigDefinition } from '../character/walletwallaby/versions.ts';
+import { RIG, MOTION, motionDefinition, rigDefinition, RIVE_ASSET, RIVE_RUNTIME } from '../character/walletwallaby/versions.ts';
 import { readJson, VIDEO_ROOT } from '../config/load.ts';
 import { contentAddress, sha256Hex } from '../core/hash.ts';
 
@@ -15,10 +16,15 @@ export interface BuildIdentity {
   character: {
     rig: { id: string; version: number; definition: string };
     motion: { id: string; version: number; definition: string };
+    /** The compiled rig the renderer loads (sha256 of the committed bytes) and the runtime that draws it. */
+    rive: {
+      asset: { path: string; rigVersion: number; sha256: string };
+      runtime: { package: string; version: string; wasmSha256: string };
+    };
   };
 }
 
-const PINNED_PACKAGES = ['remotion', '@remotion/bundler', '@remotion/renderer', 'react', 'react-dom', 'typescript'] as const;
+const PINNED_PACKAGES = ['remotion', '@remotion/bundler', '@remotion/renderer', '@rive-app/canvas-advanced', 'react', 'react-dom', 'typescript'] as const;
 const IDENTITY_CONFIGS = [
   'config/voice-identity.json',
   'config/pronunciation.json',
@@ -41,6 +47,14 @@ export function buildIdentity(): BuildIdentity {
     character: {
       rig: { ...RIG, definition: contentAddress(rigDefinition()) },
       motion: { ...MOTION, definition: contentAddress(motionDefinition()) },
+      rive: {
+        asset: { path: RIVE_ASSET.path, rigVersion: RIVE_ASSET.rigVersion, sha256: sha256Hex(readFileSync(path.join(VIDEO_ROOT, ...RIVE_ASSET.path.split('/')))) },
+        runtime: {
+          package: RIVE_RUNTIME.package,
+          version: packages[RIVE_RUNTIME.package]!,
+          wasmSha256: sha256Hex(readFileSync(path.join(VIDEO_ROOT, 'node_modules', ...RIVE_RUNTIME.package.split('/'), RIVE_RUNTIME.wasm))),
+        },
+      },
     },
   };
 }

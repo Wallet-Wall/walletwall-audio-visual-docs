@@ -1,12 +1,13 @@
 // The WalletWall docs-video composition. Everything visible is a pure function
 // of (props, current time): the timeline, scene layouts, and WalletWallaby's
-// clips are computed once from the spec, then sampled per frame.
+// clips and motion plan are computed once from the spec, then sampled per frame.
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { AbsoluteFill, cancelRender, continueRender, delayRender, useCurrentFrame, useVideoConfig } from 'remotion';
 import { buildCaptions } from '../audio/captions.ts';
 import { TOKENS, withAlpha } from '../brand/tokens.ts';
-import { choreograph, layoutsFor, mouthAt, wallabyStateAt, type Clip } from '../character/walletwallaby/choreography.ts';
+import { choreograph, layoutsFor, mouthAt, type Clip } from '../character/walletwallaby/choreography.ts';
+import { planMotion, platformOffsets, sampleWallaby, traverseProgress, type MotionPlan } from '../character/walletwallaby/motion.ts';
 import { CONTENT_BOTTOM, easeInOut, TITLE_SAFE } from '../layout/geometry.ts';
 import { END_SCREEN_ZONES, PROVENANCE_CHIP } from '../layout/brand-layout.ts';
 import type { SceneLayout } from '../layout/scene-layout.ts';
@@ -18,19 +19,21 @@ import type { DocsVideoProps } from './props.ts';
 import { SceneView } from './scenes/SceneView.tsx';
 import type { SceneState } from './scenes/common.tsx';
 import { rectStyle, textStyle } from './style.ts';
-import { WallabyFigure } from './wallaby/WallabyFigure.tsx';
+import { WallabyRive } from './wallaby/WallabyRive.tsx';
 
 interface Model {
   timeline: Timeline;
   layouts: Map<string, SceneLayout>;
   clips: Clip[];
+  motion: MotionPlan;
   captions: ReturnType<typeof buildCaptions>;
 }
 
 export function buildModel(props: DocsVideoProps): Model {
   const timeline = buildTimeline(props.spec, props.track, props.templates);
   const layouts = layoutsFor(timeline, (id) => props.headings[id] ?? '');
-  return { timeline, layouts, clips: choreograph(timeline, layouts), captions: buildCaptions(timeline) };
+  const clips = choreograph(timeline, layouts);
+  return { timeline, layouts, clips, motion: planMotion(clips, layouts), captions: buildCaptions(timeline) };
 }
 
 /** Map a Wallaby anchor id to the scene element it designates. */
@@ -43,7 +46,7 @@ function elementForAnchor(anchor: string | undefined, scene: SceneSpec): string[
   return [];
 }
 
-function sceneState(seg: TimedSegment, layout: SceneLayout, clips: Clip[], ms: number): SceneState {
+function sceneState(seg: TimedSegment, layout: SceneLayout, motion: MotionPlan, ms: number): SceneState {
   const scene = seg.scene!;
   const attention = new Set<string>();
   const resolved = new Set<string>();
@@ -58,11 +61,12 @@ function sceneState(seg: TimedSegment, layout: SceneLayout, clips: Clip[], ms: n
   }
   for (const b of started) if (b.beat.action === 'RESOLVE') for (const id of elementForAnchor(b.beat.target, scene)) resolved.add(id);
   const traced: Record<string, number> = {};
-  for (const c of clips) {
+  for (const c of motion.clips) {
     if (c.segmentId !== seg.id || c.kind !== 'TRAVERSE' || !c.target) continue;
-    traced[c.target] = Math.max(0, Math.min(1, (ms - c.startMs) / (c.endMs - c.startMs)));
+    // The trail fills in as WalletWallaby's feet cover it.
+    traced[c.target] = ms < c.startMs ? 0 : traverseProgress(motion, c, ms);
   }
-  return { ms, seg, layout, attention, resolved, traced };
+  return { ms, seg, layout, attention, resolved, traced, platformDip: platformOffsets(motion, seg.id, ms) };
 }
 
 function transitionStyles(type: TimedSegment['transitionIn']['type'], e: number): { exit: React.CSSProperties; enter: React.CSSProperties } {
@@ -109,13 +113,13 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
   const renderSegment = (s: TimedSegment, at: number): React.ReactNode => {
     if (s.scene) {
       const layout = model.layouts.get(s.id)!;
-      return <SceneView scene={s.scene} state={sceneState(s, layout, model.clips, at)} spec={props.spec} />;
+      return <SceneView scene={s.scene} state={sceneState(s, layout, model.motion, at)} spec={props.spec} />;
     }
     const template = s.templateId ? props.templates.templates[s.templateId] : undefined;
     return template ? <BrandSegment seg={s} ms={at} spec={props.spec} template={template} docTitle={props.docTitle} provenance={props.provenance} /> : null;
   };
 
-  const wallaby = wallabyStateAt(model.clips, ms, mouthAt(timeline, ms));
+  const wallaby = sampleWallaby(model.motion, ms, mouthAt(timeline, ms));
   const cue = props.overlays.captions ? model.captions.find((c) => ms >= c.startMs && ms < c.endMs) : undefined;
   const section = seg.scene ? props.headings[seg.scene.eyebrowSectionId] : undefined;
 
@@ -130,7 +134,7 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
         </div>
       ) : null}
 
-      {props.overlays.characterless ? null : <WallabyFigure state={wallaby} />}
+      {props.overlays.characterless ? null : <WallabyRive states={[wallaby]} opacity={wallaby.opacity} />}
 
       {cue ? (
         <div style={{ position: 'absolute', left: 260, width: 1400, top: 948, display: 'flex', justifyContent: 'center' }}>

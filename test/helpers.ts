@@ -9,6 +9,7 @@ import { estimateTrack } from '../src/audio/voice-provider.ts';
 import { loadPipelineConfig, VIDEO_ROOT } from '../src/config/load.ts';
 import type { PipelineConfig } from '../src/config/types.ts';
 import type { ValidationReport } from '../src/core/issues.ts';
+import type { PoseParams } from '../src/character/walletwallaby/rig.ts';
 import { repoFileResolver } from '../src/pipeline/context.ts';
 import { canonicalText } from '../src/source/canonical.ts';
 import type { NormalizedSource } from '../src/source/types.ts';
@@ -59,3 +60,6 @@ export function segment(spec: VideoSpec, id: string) {
 export function scaledTrack(track: NarrationTrack, factor: number): NarrationTrack {
   return { ...track, lines: track.lines.map((l) => ({ ...l, durationMs: Math.round(l.durationMs * factor) })) };
 }
+
+/** Every number a pose carries: its continuous parameters and its clip weights. */
+export const poseNumbers = (p: PoseParams): number[] => [p.crouch, p.headTilt, p.reach, p.lift, ...Object.values(p.mix).map((w) => w ?? Number.NaN)];

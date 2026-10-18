@@ -1,15 +1,18 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { estimateTrack } from '../src/audio/voice-provider.ts';
-import { choreograph, clipAt, layoutsFor, mouthAt, wallabyStateAt } from '../src/character/walletwallaby/choreography.ts';
+import { choreograph, clipAt, layoutsFor, mouthAt } from '../src/character/walletwallaby/choreography.ts';
+import { planMotion, sampleWallaby } from '../src/character/walletwallaby/motion.ts';
 import { buildTimeline } from '../src/timeline/timeline.ts';
-import { committedSnapshot, committedSpec, config } from './helpers.ts';
+import { committedSnapshot, committedSpec, config, poseNumbers } from './helpers.ts';
 
 const spec = committedSpec();
 const headings = Object.fromEntries(committedSnapshot().sections.map((s) => [s.id, s.heading]));
 const timeline = buildTimeline(spec, estimateTrack(spec, config.voice, config.lexicon), config.templates);
 const layouts = layoutsFor(timeline, (id) => headings[id] ?? '');
 const clips = choreograph(timeline, layouts);
+const plan = planMotion(clips, layouts);
+const wallabyStateAt = (_clips: unknown, ms: number, mouth: Parameters<typeof sampleWallaby>[2] = 'REST') => sampleWallaby(plan, ms, mouth);
 
 describe('WalletWallaby choreography', () => {
   test('clips tile the whole video with no gaps or overlaps', () => {
@@ -43,7 +46,7 @@ describe('WalletWallaby choreography', () => {
     for (let ms = 0; ms < timeline.totalMs; ms += 40) {
       const s = wallabyStateAt(clips, ms, mouthAt(timeline, ms));
       if (!s.visible) continue;
-      for (const v of [s.x, s.y, s.scale, s.opacity, s.gaze.x, s.gaze.y, ...Object.values(s.pose)]) assert.ok(Number.isFinite(v), `t=${ms}`);
+      for (const v of [s.x, s.y, s.scale, s.opacity, s.gaze.x, s.gaze.y, ...poseNumbers(s.pose)]) assert.ok(Number.isFinite(v), `t=${ms}`);
       assert.ok(s.scale > 0 && s.scale <= 1.2, `t=${ms} scale ${s.scale}`);
       assert.ok(Math.abs(s.gaze.x) <= 1 && Math.abs(s.gaze.y) <= 1);
     }

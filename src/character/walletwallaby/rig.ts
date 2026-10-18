@@ -1,54 +1,69 @@
 // WalletWallaby rig parameters: the semantic controls the renderer exposes.
 //
-// Performance comes from posture, head, ears, eyes, and tail balance, with a
-// restrained four-state mouth. No exaggerated cartoon faces, no squash-and-
-// stretch gags. Every value here is owned by WalletWall; a planner can only
-// pick a pose/expression NAME from the vocabulary. Isomorphic.
+// Rig v3 performs through a Rive rig (./rive/): a vocabulary pose is a blend of
+// the rig's pose clips plus a few continuous parameters, and expressions drive
+// the ears, lid, and brow. No exaggerated cartoon faces, no squash-and-stretch
+// gags. Every value here is owned by WalletWall; a planner can only pick a
+// pose/expression NAME from the vocabulary. Isomorphic.
 
 import type { TOKENS } from '../../brand/tokens.ts';
 import type { WallabyExpression, WallabyPose } from '../../spec/vocabulary.ts';
+import type { PoseClip } from './rive/rig-source.ts';
 
-/** Which brand token paints each part of the figure. Names only: values live in the brand contract. */
+/**
+ * Which brand token paints each part of the figure. Names only: values live in
+ * the brand contract. WalletWallaby wears WalletWall terracotta: the coat, tail,
+ * and outer ears are the canonical terracotta; belly, muzzle, and inner ears are
+ * cream; outline, eyes, nose, and claws are charcoal. The shade is derived from
+ * two canonical tokens (terracotta toward the dark terracotta), never typed in;
+ * the highlight is a restrained cream.
+ */
 export const RIG_PALETTE = {
-  fur: 'tan',
-  furFar: 'stoneLow',
+  fur: 'terracotta',
+  furShade: { from: 'terracotta', to: 'terracottaDark', t: 0.42 },
   belly: 'cream',
-  innerEar: 'mortar',
+  innerEar: 'cream',
   ink: 'charcoal',
-  tag: 'terracotta',
-} as const satisfies Record<string, keyof typeof TOKENS>;
+  highlight: 'cream',
+  tag: 'tan',
+} as const satisfies Record<string, keyof typeof TOKENS | { from: keyof typeof TOKENS; to: keyof typeof TOKENS; t: number }>;
+
+/** Weights over the rig's pose clips. Non-negative; a resolved pose sums to 1. */
+export type ClipMix = Readonly<Partial<Record<PoseClip, number>>>;
 
 export interface PoseParams {
-  /** 0..1 knee bend (anticipation, landing, perching). */
+  /** The body's key pose, as a blend of Rive pose clips. */
+  mix: ClipMix;
+  /** 0..1 extra compression from contact responses (the hips drop, the knees take it). */
   crouch: number;
-  /** Body lean in degrees, positive = toward the facing direction. */
-  lean: number;
   /** Head tilt in degrees, positive = chin down toward facing. */
   headTilt: number;
   /** 0..1 forearm extended toward the gaze target (pointing). */
   reach: number;
   /** 0..1 forearm raised (open, presenting gesture). */
   lift: number;
-  /** Tail angle in degrees; the tail counterbalances lean and flight. */
-  tail: number;
-  /** 0..1 legs tucked for flight. */
-  airborne: number;
 }
 
 export const POSES: Readonly<Record<WallabyPose, PoseParams>> = {
-  NEUTRAL: { crouch: 0.08, lean: 0, headTilt: 0, reach: 0, lift: 0, tail: 0, airborne: 0 },
-  TEACH: { crouch: 0.06, lean: 3, headTilt: -3, reach: 0.35, lift: 0.25, tail: 4, airborne: 0 },
-  POINT: { crouch: 0.05, lean: 6, headTilt: -2, reach: 1, lift: 0.15, tail: 7, airborne: 0 },
-  INSPECT: { crouch: 0.25, lean: 13, headTilt: 11, reach: 0.15, lift: 0, tail: 11, airborne: 0 },
-  PERCH: { crouch: 0.4, lean: -2, headTilt: 1, reach: 0, lift: 0, tail: -6, airborne: 0 },
-  PREPARE_JUMP: { crouch: 1, lean: 11, headTilt: -5, reach: 0, lift: 0, tail: 18, airborne: 0 },
-  LAND: { crouch: 0.65, lean: 6, headTilt: 5, reach: 0, lift: 0.1, tail: -12, airborne: 0 },
-  TAKEAWAY: { crouch: 0.05, lean: -3, headTilt: -4, reach: 0.45, lift: 0.45, tail: 2, airborne: 0 },
-  CTA: { crouch: 0.04, lean: 0, headTilt: -5, reach: 0.25, lift: 0.85, tail: 4, airborne: 0 },
+  NEUTRAL: { mix: { idle_alert: 1 }, crouch: 0, headTilt: 0, reach: 0, lift: 0 },
+  TEACH: { mix: { idle_alert: 0.55, resolve: 0.45 }, crouch: 0, headTilt: -2, reach: 0.3, lift: 0.2 },
+  POINT: { mix: { idle_alert: 0.7, resolve: 0.3 }, crouch: 0, headTilt: -2, reach: 1, lift: 0.1 },
+  INSPECT: { mix: { inspect: 1 }, crouch: 0, headTilt: 3, reach: 0.15, lift: 0 },
+  PERCH: { mix: { perch: 1 }, crouch: 0, headTilt: 1, reach: 0, lift: 0 },
+  PREPARE_JUMP: { mix: { crouch_preload: 1 }, crouch: 0, headTilt: -4, reach: 0, lift: 0 },
+  LAND: { mix: { land_soft: 1 }, crouch: 0, headTilt: 3, reach: 0, lift: 0 },
+  TAKEAWAY: { mix: { resolve: 1 }, crouch: 0, headTilt: -3, reach: 0.4, lift: 0.4 },
+  CTA: { mix: { resolve: 1 }, crouch: 0, headTilt: -4, reach: 0.2, lift: 0.8 },
 };
 
 /** Flight is a transient state, not a vocabulary pose. */
-export const AIRBORNE: PoseParams = { crouch: 0.15, lean: 5, headTilt: -4, reach: 0, lift: 0.05, tail: 24, airborne: 1 };
+export const AIRBORNE: PoseParams = { mix: { airborne: 1 }, crouch: 0, headTilt: -3, reach: 0, lift: 0 };
+/** Takeoff extension and the two landing weights are transient too. */
+export const TAKEOFF: PoseParams = { mix: { takeoff: 1 }, crouch: 0, headTilt: -4, reach: 0, lift: 0 };
+export const LAND_HARD: PoseParams = { mix: { land_hard: 1 }, crouch: 0, headTilt: 4, reach: 0, lift: 0 };
+export const MANTLE: PoseParams = { mix: { mantle: 1 }, crouch: 0, headTilt: -6, reach: 0, lift: 0 };
+export const PUSH: PoseParams = { mix: { push: 1 }, crouch: 0, headTilt: -2, reach: 0, lift: 0 };
+export const TRACE: PoseParams = { mix: { trace: 1 }, crouch: 0, headTilt: -2, reach: 0, lift: 0 };
 
 export interface ExpressionParams {
   /** Ear spread outward, degrees. */
@@ -84,8 +99,25 @@ function lerpRecord<T extends object>(a: T, b: T, t: number): T {
   return out;
 }
 
-export const blendPose = (a: PoseParams, b: PoseParams, t: number): PoseParams => lerpRecord(a, b, t);
+/** Blend two clip mixes; the result keeps only positive weights, in a stable key order. */
+export function blendMix(a: ClipMix, b: ClipMix, t: number): ClipMix {
+  const out: Partial<Record<PoseClip, number>> = {};
+  const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort() as PoseClip[];
+  for (const k of keys) {
+    const v = (a[k] ?? 0) * (1 - t) + (b[k] ?? 0) * t;
+    if (v > 1e-9) out[k] = v;
+  }
+  return out;
+}
+
+export const blendPose = (a: PoseParams, b: PoseParams, t: number): PoseParams => ({
+  mix: blendMix(a.mix, b.mix, t),
+  crouch: a.crouch + (b.crouch - a.crouch) * t,
+  headTilt: a.headTilt + (b.headTilt - a.headTilt) * t,
+  reach: a.reach + (b.reach - a.reach) * t,
+  lift: a.lift + (b.lift - a.lift) * t,
+});
 export const blendExpression = (a: ExpressionParams, b: ExpressionParams, t: number): ExpressionParams => lerpRecord(a, b, t);
 
-/** Nominal standing height in px at scale 1 (ear tips to feet). */
+/** Nominal standing height in px at scale 1 (ear tips to feet); the unit of the motion physics. */
 export const WALLABY_HEIGHT = 236;
