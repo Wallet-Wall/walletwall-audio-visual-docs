@@ -62,8 +62,9 @@ export const Attention: React.FC<{ rect: Rect | undefined; on: boolean; resolved
   );
 };
 
-export const Ground: React.FC = () => (
-  <div style={{ position: 'absolute', left: 0, top: GROUND_Y, width: 1920, height: 1, background: TOKENS.charcoalRail }} />
+/** The ground line, edge to edge unless a template draws only a stretch of it. */
+export const Ground: React.FC<{ x0?: number; x1?: number }> = ({ x0 = 0, x1 = 1920 }) => (
+  <div style={{ position: 'absolute', left: x0, top: GROUND_Y, width: x1 - x0, height: 1, background: TOKENS.charcoalRail }} />
 );
 
 /** A raised card / platform with WalletWall's fine border and 2px corners. */

@@ -1,15 +1,15 @@
 {
   "schema": "walletwall.motion-config/v2",
   "id": "walletwallaby-motion",
-  "version": 3,
-  "note": "WalletWallaby's physical performance. Lengths are in body heights (WALLABY_HEIGHT x the character's scale at that moment) so a near and a far WalletWallaby move alike; times are in milliseconds; angles in degrees. Changing any value requires a new version (see src/character/walletwallaby/versions.ts).",
+  "version": 4,
+  "note": "WalletWallaby's physical performance. Lengths are in body heights (WALLABY_HEIGHT x the character's scale at that moment) so a near and a far WalletWallaby move alike; times are in milliseconds; angles in degrees. Changing any value requires a new version (see src/character/walletwallaby/versions.ts). v4: support plausibility (what a body can stand on, grip, or brace against) and supported trace footholds.",
   "gravityBodyHeightsPerS2": 21,
   "maxGravityBoost": 1.8,
   "hop": {
     "peakBase": 0.3,
     "peakPerPx": 0.08,
     "peakMin": 0.18,
-    "peakMax": 1.0,
+    "peakMax": 1,
     "anticipationMs": 190,
     "anticipationHoldFrac": 0.3,
     "orientMaxMs": 160,
@@ -56,6 +56,23 @@
     "hardFrom": 0.55,
     "hardFull": 0.95,
     "hardRecoverScale": 2.5
+  },
+  "support": {
+    "footprintBackBodyHeights": 0.16,
+    "footprintFrontBodyHeights": 0.19,
+    "comAheadBodyHeights": 0.02,
+    "comMarginBodyHeights": 0.08,
+    "stepComMarginBodyHeights": 0.04,
+    "narrowWidthBodyHeights": 0.6,
+    "broadWidthBodyHeights": 1,
+    "broadMarginBodyHeights": 0.1,
+    "tailReachBodyHeights": 0.82,
+    "contactHeightBodyHeights": 0.1,
+    "shoulderHeightBodyHeights": 0.62,
+    "shoulderAheadBodyHeights": 0.06,
+    "armReachBodyHeights": 0.3,
+    "minThicknessPx": 4,
+    "tolerancePx": 1
   },
   "tail": {
     "restTension": 0.1,

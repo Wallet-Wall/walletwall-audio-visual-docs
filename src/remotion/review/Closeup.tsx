@@ -12,8 +12,8 @@ export const Closeup: React.FC = () => (
     <div style={{ position: 'absolute', left: 0, top: 1000, width: 1920, height: 2, background: TOKENS.charcoalRail }} />
     <WallabyRive
       states={[
-        staticState({ x: 620, y: 1000, scale: 3.3 }, POSES.NEUTRAL),
-        staticState({ x: 1500, y: 1000, scale: 2.2 }, POSES.INSPECT, { tail: { swing: 0, curl: 1.5, tension: 0.35 } }),
+        staticState({ x: 720, y: 1000, scale: 3.15 }, POSES.NEUTRAL),
+        staticState({ x: 1570, y: 1000, scale: 2.05 }, POSES.INSPECT, { tail: { swing: 0, curl: 1.5, tension: 0.35 } }),
       ]}
     />
   </AbsoluteFill>

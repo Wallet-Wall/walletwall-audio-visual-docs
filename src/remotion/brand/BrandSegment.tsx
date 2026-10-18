@@ -5,7 +5,7 @@
 import React from 'react';
 import { AbsoluteFill, Img, staticFile } from 'remotion';
 import { TOKENS } from '../../brand/tokens.ts';
-import { CTA_TEXT, DOCS_CARD, END_SCREEN_LABEL, END_SCREEN_ZONES, IDENT_MARK, IDENT_WORDMARK, OUTRO_MARK, OUTRO_TEXT } from '../../layout/brand-layout.ts';
+import { BRAND_GROUND, CTA_TEXT, DOCS_CARD, END_SCREEN_LABEL, END_SCREEN_ZONES, IDENT_MARK, IDENT_WORDMARK, OUTRO_MARK, OUTRO_TEXT } from '../../layout/brand-layout.ts';
 import type { CopyTemplate } from '../../config/types.ts';
 import type { VideoSpec } from '../../spec/types.ts';
 import type { TimedSegment } from '../../timeline/timeline.ts';
@@ -43,7 +43,7 @@ export const BrandSegment: React.FC<BrandProps> = ({ seg, ms, spec, template, do
     case 'CTA':
       return (
         <AbsoluteFill>
-          <Ground />
+          <Ground {...BRAND_GROUND.CTA} />
           <div style={{ ...rectStyle(CTA_TEXT), ...textStyle('cardHeading'), ...settle(ms, t0) }}>{template.onScreen}</div>
         </AbsoluteFill>
       );
@@ -51,7 +51,7 @@ export const BrandSegment: React.FC<BrandProps> = ({ seg, ms, spec, template, do
       const url = spec.source.docUrl.replace(/^https?:\/\//, '');
       return (
         <AbsoluteFill>
-          <Ground />
+          <Ground {...BRAND_GROUND.DOCS_REFERENCE} />
           <Platform rect={DOCS_CARD} />
           <div style={{ position: 'absolute', left: DOCS_CARD.x + 56, top: DOCS_CARD.y + 52, width: DOCS_CARD.w - 112, ...settle(ms, t0) }}>
             <div style={{ ...textStyle('eyebrow'), color: TOKENS.terracotta }}>{template.onScreen}</div>
@@ -67,7 +67,7 @@ export const BrandSegment: React.FC<BrandProps> = ({ seg, ms, spec, template, do
     case 'OUTRO':
       return (
         <AbsoluteFill>
-          <Ground />
+          <Ground {...BRAND_GROUND.OUTRO} />
           {mark ? <Img src={mark} style={{ ...rectStyle(OUTRO_MARK), objectFit: 'contain', ...settle(ms, t0, 420) }} /> : null}
           <div style={{ ...rectStyle(OUTRO_TEXT), ...textStyle('graphCaption'), textAlign: 'center', color: TOKENS.terracotta, ...settle(ms, t0 + 200) }}>{template.onScreen}</div>
         </AbsoluteFill>
@@ -75,6 +75,8 @@ export const BrandSegment: React.FC<BrandProps> = ({ seg, ms, spec, template, do
     case 'END_SCREEN':
       return (
         <AbsoluteFill>
+          {/* The sign-off's own stretch of ground: WalletWallaby stands on it, clear of the reserved zones. */}
+          <Ground {...BRAND_GROUND.END_SCREEN} />
           <div style={{ ...rectStyle(END_SCREEN_LABEL), ...textStyle('eyebrow'), color: TOKENS.terracotta }}>{template.onScreen}</div>
           {/* Reserved zones stay empty: YouTube places end-screen elements here. */}
           {Object.entries(END_SCREEN_ZONES).map(([id, r]) => (

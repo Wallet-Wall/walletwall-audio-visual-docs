@@ -1,13 +1,22 @@
 {
-  "schema": "walletwall.motion-input/v2",
+  "schema": "walletwall.motion-input/v3",
   "action": "HOP",
   "start": {
     "x": 1050,
     "y": 370
   },
-  "target": {
-    "x": 1600,
-    "y": 600
+  "destination": {
+    "candidates": [
+      {
+        "x": 1600,
+        "y": 600
+      }
+    ],
+    "focus": {
+      "x": 750,
+      "y": 364.5
+    },
+    "narrowAllowed": false
   },
   "startScale": 0.78,
   "targetScale": 0.78,
@@ -22,13 +31,52 @@
     "height": 1080
   },
   "terrain": {
-    "start": null,
-    "target": {
-      "kind": "LEDGE",
-      "topY": 600,
-      "leftX": 1440,
-      "rightX": 1760
-    },
+    "surfaces": [
+      {
+        "id": "ground:top",
+        "element": "ground",
+        "face": "TOP",
+        "support": "SUPPORTED_SURFACE",
+        "x0": 0,
+        "y0": 880,
+        "x1": 1920,
+        "y1": 880,
+        "thicknessPx": 200
+      },
+      {
+        "id": "ledge:top",
+        "element": "ledge",
+        "face": "TOP",
+        "support": "LEDGE",
+        "x0": 1440,
+        "y0": 600,
+        "x1": 1760,
+        "y1": 600,
+        "thicknessPx": 280
+      },
+      {
+        "id": "ledge:left",
+        "element": "ledge",
+        "face": "LEFT",
+        "support": "SIDE_FACE",
+        "x0": 1440,
+        "y0": 600,
+        "x1": 1440,
+        "y1": 880,
+        "thicknessPx": 320
+      },
+      {
+        "id": "ledge:right",
+        "element": "ledge",
+        "face": "RIGHT",
+        "support": "SIDE_FACE",
+        "x0": 1760,
+        "y0": 600,
+        "x1": 1760,
+        "y1": 880,
+        "thicknessPx": 320
+      }
+    ],
     "protectedText": [
       {
         "x": 160,
@@ -61,6 +109,93 @@
         "h": 32
       }
     ],
+    "outgoing": {
+      "surfaces": [
+        {
+          "id": "ground:top",
+          "element": "ground",
+          "face": "TOP",
+          "support": "SUPPORTED_SURFACE",
+          "x0": 0,
+          "y0": 880,
+          "x1": 1920,
+          "y1": 880,
+          "thicknessPx": 200
+        },
+        {
+          "id": "card:top",
+          "element": "card",
+          "face": "TOP",
+          "support": "SUPPORTED_SURFACE",
+          "x0": 160,
+          "y0": 370,
+          "x1": 1280,
+          "y1": 370,
+          "thicknessPx": 510
+        },
+        {
+          "id": "card:left",
+          "element": "card",
+          "face": "LEFT",
+          "support": "SIDE_FACE",
+          "x0": 160,
+          "y0": 370,
+          "x1": 160,
+          "y1": 880,
+          "thicknessPx": 1120
+        },
+        {
+          "id": "card:right",
+          "element": "card",
+          "face": "RIGHT",
+          "support": "SIDE_FACE",
+          "x0": 1280,
+          "y0": 370,
+          "x1": 1280,
+          "y1": 880,
+          "thicknessPx": 1120
+        }
+      ],
+      "protectedText": [
+        {
+          "x": 160,
+          "y": 104,
+          "w": 1100,
+          "h": 32
+        },
+        {
+          "x": 210,
+          "y": 420,
+          "w": 1020,
+          "h": 135
+        },
+        {
+          "x": 210,
+          "y": 583,
+          "w": 1020,
+          "h": 89
+        },
+        {
+          "x": 210,
+          "y": 686,
+          "w": 1020,
+          "h": 89
+        },
+        {
+          "x": 210,
+          "y": 789,
+          "w": 1020,
+          "h": 89
+        },
+        {
+          "x": 160,
+          "y": 104,
+          "w": 1100,
+          "h": 32
+        }
+      ],
+      "untilMs": 124042
+    },
     "figure": {
       "left": 150,
       "right": 100,
@@ -82,10 +217,10 @@
     }
   },
   "config": {
-    "schema": "walletwall.motion-intelligence-config/v2",
+    "schema": "walletwall.motion-intelligence-config/v3",
     "id": "walletwallaby-motion-intelligence",
-    "version": 2,
-    "note": "Physics for the Rust/WASM Motion Intelligence engine (motion-intelligence/). Lengths are in body heights (bodyHeightPx x the character's scale), times in milliseconds, angles in degrees. The hop timing values must equal config/motion.json while the TypeScript solver remains the oracle (test/rust-motion-engine.test.ts enforces it). Changing any value requires a new version (pinned in src/motion/engine-identity.ts).",
+    "version": 3,
+    "note": "Physics for the Rust/WASM Motion Intelligence engine (motion-intelligence/). Lengths are in body heights (bodyHeightPx x the character's scale), times in milliseconds, angles in degrees. The hop timing values and the support section must equal config/motion.json while the TypeScript solver remains the oracle (test/rust-motion-engine.test.ts enforces it). Changing any value requires a new version (pinned in src/motion/engine-identity.ts).",
     "bodyHeightPx": 236,
     "gravityBodyHeightsPerS2": 21,
     "maxGravityBoost": 1.8,
@@ -147,6 +282,23 @@
       "damping": 0.3,
       "accelGainDeg": 2,
       "maxDeg": 9
+    },
+    "support": {
+      "footprintBackBodyHeights": 0.16,
+      "footprintFrontBodyHeights": 0.19,
+      "comAheadBodyHeights": 0.02,
+      "comMarginBodyHeights": 0.08,
+      "stepComMarginBodyHeights": 0.04,
+      "narrowWidthBodyHeights": 0.6,
+      "broadWidthBodyHeights": 1,
+      "broadMarginBodyHeights": 0.1,
+      "tailReachBodyHeights": 0.82,
+      "contactHeightBodyHeights": 0.1,
+      "shoulderHeightBodyHeights": 0.62,
+      "shoulderAheadBodyHeights": 0.06,
+      "armReachBodyHeights": 0.3,
+      "minThicknessPx": 4,
+      "tolerancePx": 1
     },
     "limits": {
       "maxHeadDeg": 6,

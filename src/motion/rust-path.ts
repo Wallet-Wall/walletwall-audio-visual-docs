@@ -1,8 +1,10 @@
 // Which WalletWallaby paths the Rust/WASM Motion Intelligence engine performs, and how its plans
-// meet the composition. The engine performs every hop of a selected lesson that ends in a perch on
-// its anchor: the preload and push-off, the flight on the arc its surface-aware search keeps clear
-// of the scene's text, the landing, and the perch. Every other move (chained skips, traces, mantles,
-// push-through, drop-in, exit leaps, and a hop that runs straight into a trace) stays on the
+// meet the composition. The engine performs every hop of a selected lesson that starts standing and
+// ends in a perch on its anchor: it chooses the stand among the lesson's authored ones by support,
+// judges its own takeoff and landing against the terrain on screen, and performs the preload and
+// push-off, the flight on the arc its surface-aware search keeps clear of the scene's text, the
+// landing, and the perch. Every other move (chained skips, traces, mantles, push-through, drop-in,
+// exit leaps, the fall that continues one, and a hop that runs straight into a trace) stays on the
 // transitional TypeScript solver (../character/walletwallaby/motion.ts), which is also the exact
 // oracle the engine's paths are checked against.
 //
@@ -16,13 +18,15 @@
 // body. Isomorphic: the composition binds and samples plans; it never runs the engine.
 
 import motionIntelligenceJson from '../../config/motion-intelligence.json' with { type: 'json' };
-import { protectedText, sampleWallaby, type BodyAction, type BodyPhase, type ClipMotion, type HopMotion, type MotionEvent, type MotionPlan as TsMotionPlan, type Surface, type WallabyState } from '../character/walletwallaby/motion.ts';
+import { sampleWallaby, type BodyAction, type BodyPhase, type ClipMotion, type HopMotion, type MotionEvent, type MotionPlan as TsMotionPlan, type Surface, type WallabyState } from '../character/walletwallaby/motion.ts';
 import type { Clip } from '../character/walletwallaby/choreography.ts';
+import type { SegmentWindow } from '../character/walletwallaby/contacts.ts';
 import { blendPose, POSES, TAKEOFF, WALLABY_HEIGHT, type PoseParams, type Viseme } from '../character/walletwallaby/rig.ts';
-import { easeOut } from '../layout/geometry.ts';
-import { WALLABY_EXTENT, type SceneLayout } from '../layout/scene-layout.ts';
+import { easeOut, FRAME } from '../layout/geometry.ts';
+import { WALLABY_EXTENT } from '../layout/scene-layout.ts';
+import type { Terrain } from '../layout/terrain.ts';
 import type { VideoSpec } from '../spec/types.ts';
-import { INPUT_SCHEMA, limitsOf, MOTION_PHASES, MotionEngineError, validateMotionPlan, type MotionAction, type MotionContact, type MotionInput, type MotionIntelligenceConfig, type MotionPhase, type MotionPlan, type MotionStance, type MotionState, type MotionSurface, type PlanExpectation } from './plan.ts';
+import { INPUT_SCHEMA, limitsOf, MOTION_PHASES, MotionEngineError, validateMotionPlan, type MotionAction, type MotionContact, type MotionDestination, type MotionInput, type MotionIntelligenceConfig, type MotionPhase, type MotionPlan, type MotionStance, type MotionState, type PlanExpectation } from './plan.ts';
 
 /** config/motion-intelligence.json, as committed (the engine validates it; tests pin it to its version). */
 export const MOTION_INTELLIGENCE_CONFIG = motionIntelligenceJson as MotionIntelligenceConfig;
@@ -84,10 +88,13 @@ const perchesOn = (travel: Clip, next: Clip | undefined): next is Clip => next !
 const engineAction = (travel: Clip): RustPathSelection['action'] => (travel.action === 'LAND' || travel.action === 'PERCH' ? travel.action : 'HOP');
 const moveName = (m: ClipMotion): string => (m.kind === 'TRACE' ? (m.mode === 'SKIP' ? 'chained skip' : 'trace') : m.kind.toLowerCase());
 
-/** The paths a video selects, in clip order: every TRAVEL clip the transitional solver performs as a hop that ends in a perch (none for a video the engine does not perform). */
+/** A hop the body starts standing (not the fall that continues an exit leap, which has no takeoff). */
+const standingHop = (m: ClipMotion): m is HopMotion => m.kind === 'HOP' && !m.airborneStart;
+
+/** The paths a video selects, in clip order: every TRAVEL clip the transitional solver performs as a hop from a stance that ends in a perch (none for a video the engine does not perform). */
 export function selectRustPaths(ts: TsMotionPlan, videoId: string): RustPathSelection[] {
   if (!RUST_MOTION_PATHS.some((v) => v.videoId === videoId)) return [];
-  return ts.clips.flatMap((c, i) => (c.kind === 'TRAVEL' && ts.motions[i]!.kind === 'HOP' && perchesOn(c, ts.clips[i + 1]) ? [{ videoId, segmentId: c.segmentId, clip: i, action: engineAction(c) }] : []));
+  return ts.clips.flatMap((c, i) => (c.kind === 'TRAVEL' && standingHop(ts.motions[i]!) && perchesOn(c, ts.clips[i + 1]) ? [{ videoId, segmentId: c.segmentId, clip: i, action: engineAction(c) }] : []));
 }
 
 /** A hop's own takeoff and landing in the transitional plan. */
@@ -106,6 +113,7 @@ export function findRustPath(ts: TsMotionPlan, sel: RustPathSelection, engineOwn
   if (!travel || travel.kind !== 'TRAVEL' || travel.segmentId !== sel.segmentId) ineligible(sel, 'there is no such travel clip in this segment');
   const hop = ts.motions[i]!;
   if (hop.kind !== 'HOP') ineligible(sel, `the move is a ${moveName(hop)}, which stays on the TypeScript solver`);
+  if (hop.airborneStart) ineligible(sel, 'the move continues a flight (it has no takeoff), which stays on the TypeScript solver');
   const hold = ts.clips[i + 1];
   if (!perchesOn(travel, hold)) ineligible(sel, 'the hop does not end in a perch on its anchor');
   if (engineAction(travel) !== sel.action) ineligible(sel, `the lesson asks for ${engineAction(travel)} here`);
@@ -164,56 +172,81 @@ function handOffStances(p: RustPath, ts: TsMotionPlan, fps: number, muted: Reado
   };
 }
 
-function surfaceOf(s: Surface | null, layout: SceneLayout | undefined, sel: RustPathSelection): MotionSurface | null {
-  if (!s) return null;
-  const platform = layout?.platforms.find((x) => x.id === s.id);
-  if (!platform || platform.kind === 'FRAME') ineligible(sel, `surface ${s.id} is not terrain in its layout`);
-  return { kind: platform.kind, topY: platform.rect.y, leftX: platform.rect.x, rightX: platform.rect.x + platform.rect.w };
+/**
+ * The lesson's authored destination for a path: the stands the grammar authored there (the clip's
+ * `to` was chosen among them), the subject the perch faces, and whether a narrow perch was authored.
+ * A move to a fixed mark (a brand segment's) authors its one stand, facing what the perch looks at.
+ */
+export function destinationForPath(p: RustPath): MotionDestination {
+  const d = p.travel.destination ?? { candidates: [p.travel.to], focus: p.hold.lookAt ?? p.travel.to, narrow: false };
+  return { candidates: d.candidates.map((c) => ({ x: c.x, y: c.y })), focus: { x: d.focus.x, y: d.focus.y }, narrowAllowed: d.narrow };
+}
+
+const copyTerrain = (t: Terrain): { surfaces: Terrain['surfaces']; protectedText: MotionInput['terrain']['protectedText'] } => ({
+  surfaces: t.surfaces.map((s) => ({ ...s })),
+  protectedText: t.protectedText.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h })),
+});
+
+/**
+ * The terrain on screen during a path: its segment's own declared terrain (src/layout/terrain.ts),
+ * and the previous segment's until this one's content takes the screen.
+ */
+export function terrainForPath(p: RustPath, terrains: ReadonlyMap<string, Terrain>, segments: readonly SegmentWindow[]): MotionInput['terrain'] {
+  const i = segments.findIndex((s) => s.id === p.travel.segmentId);
+  const own = terrains.get(p.travel.segmentId);
+  if (i < 0 || !own) ineligible(p.selection, 'no terrain is declared for this segment');
+  const previous = i > 0 ? terrains.get(segments[i - 1]!.id) : undefined;
+  return {
+    ...copyTerrain(own),
+    outgoing: { ...(previous ? copyTerrain(previous) : { surfaces: [], protectedText: [] }), untilMs: segments[i]!.contentStartMs },
+    figure: { left: WALLABY_EXTENT.left, right: WALLABY_EXTENT.right, top: WALLABY_EXTENT.top },
+  };
 }
 
 /**
- * The lesson's motion intent for one path, as engine input. No physics here: fixed endpoints, a
- * window, the terrain (surfaces, the text the transitional solver keeps clear, the figure's box), the
- * stances. `muted`: the transitional events every engine path owns.
+ * The lesson's motion intent for one path, as engine input. No physics here: a fixed start, the
+ * authored destination, a window, the declared terrain (every surface and what it offers, the text
+ * the transitional solver keeps clear, the outgoing scene's terrain, the figure's box), the stances.
+ * `muted`: the transitional events every engine path owns.
  */
-export function motionInputForPath(p: RustPath, ts: TsMotionPlan, layouts: Map<string, SceneLayout>, output: VideoSpec['output'], muted: ReadonlySet<MotionEvent>, config: MotionIntelligenceConfig = MOTION_INTELLIGENCE_CONFIG): MotionInput {
-  const layout = layouts.get(p.travel.segmentId);
+export function motionInputForPath(p: RustPath, ts: TsMotionPlan, terrains: ReadonlyMap<string, Terrain>, segments: readonly SegmentWindow[], output: VideoSpec['output'], muted: ReadonlySet<MotionEvent>, config: MotionIntelligenceConfig = MOTION_INTELLIGENCE_CONFIG): MotionInput {
   return {
     schema: INPUT_SCHEMA,
     action: p.selection.action,
     start: { x: p.travel.from.x, y: p.travel.from.y },
-    target: { x: p.travel.to.x, y: p.travel.to.y },
+    destination: destinationForPath(p),
     startScale: p.travel.fromScale,
     targetScale: p.travel.toScale,
     timing: { startMs: p.travel.startMs, arriveByMs: p.travel.endMs, endMs: p.hold.endMs },
     fps: output.fps,
     stage: { width: output.width, height: output.height },
-    terrain: {
-      start: surfaceOf(p.surfaces.from, layout, p.selection),
-      target: surfaceOf(p.surfaces.to, layout, p.selection),
-      // Exactly the list the transitional solver's arc search avoids, in its order.
-      protectedText: (protectedText(layout) ?? []).map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h })),
-      figure: { left: WALLABY_EXTENT.left, right: WALLABY_EXTENT.right, top: WALLABY_EXTENT.top },
-    },
+    terrain: terrainForPath(p, terrains, segments),
     stance: handOffStances(p, ts, output.fps, muted),
     config,
   };
 }
 
-/** What a plan for this path must agree with, derived from the clips alone (no engine input needed). */
+/**
+ * What a plan for this path must agree with, derived from the clips alone (no engine input needed):
+ * among the authored stands, exactly the one the clips perform, with the contacts the transitional
+ * solver declares at both ends.
+ */
 export function expectationForPath(p: RustPath, ts: TsMotionPlan, fps: number, muted: ReadonlySet<MotionEvent>, config: MotionIntelligenceConfig = MOTION_INTELLIGENCE_CONFIG): PlanExpectation {
   const contact = (s: Surface | null): MotionContact => (s ? 'PLATFORM' : 'GROUND');
   return {
     action: p.selection.action,
     start: { x: p.travel.from.x, y: p.travel.from.y },
+    candidates: destinationForPath(p).candidates,
     target: { x: p.travel.to.x, y: p.travel.to.y },
     startScale: p.travel.fromScale,
     targetScale: p.travel.toScale,
     timing: { startMs: p.travel.startMs, arriveByMs: p.travel.endMs, endMs: p.hold.endMs },
     fps,
+    stage: { width: FRAME.width, height: FRAME.height },
     rest: handOffStances(p, ts, fps, muted).rest,
     contactAtStart: contact(p.surfaces.from),
-    contactAtTarget: contact(p.surfaces.to),
+    // The plan is held to the clip's own stand (`target`), so this is only ever asked about it.
+    contactAt: () => contact(p.surfaces.to),
     limits: limitsOf(config),
   };
 }

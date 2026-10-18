@@ -13,14 +13,16 @@ use motion_intelligence::{MotionInput, MotionPlan, Vec2, solve_motion};
 fn level_hop(text: Vec<Rect>) -> MotionInput {
     let mut i = common::input();
     i.start = Vec2::new(400.0, 800.0);
-    i.target = Vec2::new(1400.0, 800.0);
+    common::set_stand(&mut i, Vec2::new(1400.0, 800.0));
+    i.destination.focus = Vec2::new(1700.0, 600.0);
     i.start_scale = 1.0;
     i.target_scale = 1.0;
     i.timing.start_ms = 1000.0;
     i.timing.arrive_by_ms = 2500.0;
     i.timing.end_ms = 4500.0;
-    i.terrain.start = None;
-    i.terrain.target = None;
+    i.terrain.surfaces = vec![common::ground(800.0)];
+    i.terrain.outgoing.surfaces.clear();
+    i.terrain.outgoing.protected_text.clear();
     i.terrain.protected_text = text;
     i
 }
@@ -74,12 +76,13 @@ fn text_over_the_natural_arc_lowers_it_to_the_first_arc_that_clears_it() {
 
 #[test]
 fn ties_keep_the_more_natural_arc() {
-    // Text covering the whole frame: every candidate crosses it on every sample.
+    // Text covering the whole frame above the feet: every candidate crosses it on every sample
+    // (and none sits where the feet touch, which no stand may have).
     let everywhere = vec![Rect {
         x: 0.0,
         y: 0.0,
         w: 1920.0,
-        h: 1080.0,
+        h: 760.0,
     }];
     let p = solve(&level_hop(everywhere));
     assert_eq!(p.trajectory.arc_fraction, 1.0);
@@ -119,17 +122,18 @@ fn when_only_a_higher_arc_clears_low_text_it_keeps_its_height() {
 }
 
 #[test]
-fn the_lesson_s_higher_arc_onto_a_graph_node_is_kept_with_stronger_gravity() {
-    let tiers = common::fixture("tiers-land");
-    let p = solve(&tiers);
-    assert_eq!(p.trajectory.arc_fraction, 1.3);
-    assert!(p.trajectory.gravity_boost > 1.0);
-    // Positive control: with nothing to avoid, the same hop flies its natural arc at the configured gravity.
-    let mut open = tiers.clone();
+fn the_lesson_s_lowest_arc_crosses_the_least_of_the_hook_s_statement() {
+    let hook = common::fixture("hook-hop");
+    let p = solve(&hook);
+    // Every candidate crosses the statement somewhere; the lowest crosses it least (2 of 31 samples).
+    assert_eq!(p.trajectory.arc_fraction, 0.05);
+    assert_eq!(p.trajectory.text_crossings, 2);
+    // Positive control: with nothing to avoid, the same hop flies its natural arc.
+    let mut open = hook.clone();
     open.terrain.protected_text.clear();
     let q = solve(&open);
-    assert_eq!((q.trajectory.arc_fraction, q.trajectory.gravity_boost), (1.0, 1.0));
-    assert!(q.trajectory.text_crossings == 0 && q.trajectory.depth_px < p.trajectory.depth_px);
+    assert_eq!(q.trajectory.arc_fraction, 1.0);
+    assert!(q.trajectory.depth_px > p.trajectory.depth_px);
 }
 
 #[test]

@@ -1,4 +1,4 @@
-// WalletWallaby rig v3, authored as code: skeleton, IK constraints, silhouette,
+// WalletWallaby rig v4, authored as code: skeleton, IK constraints, silhouette,
 // paint slots, draw order, and the pose clips. ./rig-compile.ts turns this into
 // the .riv the Rive runtime loads; ./rig-controls.ts and ./rig-apply.ts pose it
 // per frame. Rive does the body performance (clip blending, IK, skinning,
@@ -10,13 +10,25 @@
 // on the ground behind as a third point of support, ears up, head reading the
 // terrain ahead.
 //
-// Silhouette brief (v3): a lightweight traversal specialist, not a plush
-// mascot. Tapered torso with a clear chest line and a narrow waist; a small,
-// long-muzzled head; long directional limbs; a strong, springy hind leg; and a
-// long, thick-based tail that tapers to a point and does real work (balance,
-// counterweight, brace). Isomorphic.
+// Design brief (v4): WalletWallaby is WalletWallrus's sibling. The two share one
+// mascot grammar: one unified body silhouette in WalletWallrus's own coat colour,
+// charcoal linework, cream accents on the face, the WalletWall brick motif built
+// into the belly, and one exaggerated signature feature. WalletWallrus's is his
+// tusks; WalletWallaby's is his tail. He stays an athletic traversal specialist,
+// not a plush mascot: a tapered torso, a small long-muzzled head, long
+// directional limbs, a strong springy hind leg, and a long tail, thick at the
+// base and tapering to a point, that does real work (balance, counterweight,
+// brace) and draws the main line of action in every pose. Flat colour only: no
+// gradients, highlights, or gear.
+//
+// One mass, not an assembly: every body part is filled without its own outline,
+// and a charcoal underlay (each part's contour stroked at twice the silhouette
+// width, drawn behind every fill) shows only around the union of the parts. The
+// torso, tail, head, and far limbs therefore read as one shape with one outer
+// line; thinner interior lines mark only what is in front of the body (the near
+// forelimb, the near ear, the line of the haunch) and the face. Isomorphic.
 
-import type { ContourPoint, Vec } from './rig-math.ts';
+import { add, len, sampleContour, scale, smoothContour, sub, type ContourPoint, type Vec } from './rig-math.ts';
 
 // ── Contract names ──────────────────────────────────────────────────────────
 
@@ -86,16 +98,16 @@ export const CONTROL_CLIPS = ['tail_free', 'point_near'] as const satisfies read
 export type PoseClip = Exclude<RigClip, 'base' | (typeof CONTROL_CLIPS)[number]>;
 export const POSE_CLIPS = RIG_CLIPS.filter((c): c is PoseClip => c !== 'base' && !(CONTROL_CLIPS as readonly string[]).includes(c));
 
-export const ARTBOARD = { name: 'WalletWallaby', width: 340, height: 340 } as const;
+export const ARTBOARD = { name: 'WalletWallaby', width: 400, height: 340 } as const;
 /** Where the rig origin (the feet) sits on the artboard. */
-export const RIG_ORIGIN: Vec = [200, 310];
+export const RIG_ORIGIN: Vec = [250, 310];
 /**
  * The drawn character's ink stays inside this rig-space box in every pose the
  * motion system can produce (feet at 0, facing +x, scale 1): standing, flying,
  * hanging from a ledge, or with the tail over an edge. Tests measure it on the
  * runtime's own transforms; growing it is a deliberate, versioned change.
  */
-export const RIG_ENVELOPE = { minX: -176, maxX: 152, minY: -284, maxY: 72 } as const;
+export const RIG_ENVELOPE = { minX: -224, maxX: 152, minY: -280, maxY: 92 } as const;
 
 // ── Skeleton (rest pose, rig space) ─────────────────────────────────────────
 
@@ -124,14 +136,19 @@ export const TOE_PLANT: Vec = TOE;
 const SHOULDER: Vec = [14, -146];
 const ELBOW: Vec = [29.3, -121.4];
 const PAW: Vec = [49.7, -116.6];
-/** Tail centreline at rest: thick base behind the pelvis, sweeping down to a tip that rests on the ground. */
+/**
+ * Tail centreline at rest: the signature. A thick base leaves the rump almost
+ * level, sweeps back and down in one long curve, and flattens as the tip comes
+ * to rest on the ground well behind the heels (the third point of the tripod).
+ * About 182 px long: three quarters of the standing height.
+ */
 export const TAIL_REST: readonly Vec[] = [
-  [-30, -71],
-  [-55, -66],
-  [-80, -55],
-  [-103, -39],
-  [-124, -21],
-  [-143, -4],
+  [-30, -72],
+  [-65, -67],
+  [-99, -55],
+  [-131, -36],
+  [-162, -16],
+  [-196, -4],
 ];
 
 export const BONES: readonly BoneSpec[] = [
@@ -187,8 +204,8 @@ export const CONTROLS: readonly ControlSpec[] = [
   { name: 'target_tail', parent: 'root', at: TAIL_REST[TAIL_REST.length - 1]!, rotation: 0 },
   // Face controls ride the head: gaze shifts the eye, lid closes it, brow tilts.
   { name: 'gaze', parent: 'head', at: [58, -191], rotation: 0 },
-  { name: 'lid', parent: 'head', at: [58, -196], rotation: 0 },
-  { name: 'brow', parent: 'head', at: [58.5, -198.6], rotation: 0 },
+  { name: 'lid', parent: 'head', at: [57.5, -197.6], rotation: 0 },
+  { name: 'brow', parent: 'head', at: [58, -202.6], rotation: 0 },
 ];
 
 /** Knees forward, feet aimed at their toes, elbows down, the tail arched over its ground contact. */
@@ -207,7 +224,8 @@ export const REST_IK: Readonly<Record<IkGroup, number>> = { legs: 1, arms: 0, ta
 
 // ── Silhouette ──────────────────────────────────────────────────────────────
 
-export type PaintSlot = 'fur' | 'furShade' | 'belly' | 'innerEar' | 'ink' | 'highlight' | 'tag';
+/** Paint slots: the coat, its derived far-side shade, the cream accents, the inner ear, and the charcoal ink. */
+export type PaintSlot = 'fur' | 'furShade' | 'accent' | 'innerEar' | 'ink';
 
 export interface PaintSpec {
   slot: PaintSlot;
@@ -219,8 +237,16 @@ export interface StrokeSpec extends PaintSpec {
   join?: 'miter' | 'round';
 }
 
+export interface ContourSpec {
+  points: readonly ContourPoint[];
+  closed: boolean;
+  roundness?: number;
+}
+
 export type Geometry =
-  | { kind: 'contour'; points: readonly ContourPoint[]; closed: boolean; roundness?: number }
+  | ({ kind: 'contour' } & ContourSpec)
+  /** Several paths drawn by one shape with one paint (each is skinned on its own when the shape is). */
+  | { kind: 'contours'; contours: readonly ContourSpec[] }
   | { kind: 'ellipse'; center: Vec; width: number; height: number };
 
 export interface ShapeSpec {
@@ -236,8 +262,15 @@ export interface ShapeSpec {
   skin?: readonly RigBone[];
 }
 
-const OUTLINE: StrokeSpec = { slot: 'ink', width: 2.2, join: 'round', cap: 'round' };
-const FINE: StrokeSpec = { slot: 'ink', width: 1.3, join: 'round', cap: 'round' };
+/** Visible width of the outer silhouette line (rig px at scale 1): the emblem's bold charcoal outline. */
+export const SILHOUETTE_W = 3;
+/** The underlay: twice the visible width, so the fills drawn over it leave exactly SILHOUETTE_W outside the union. */
+const UNDERLAY: StrokeSpec = { slot: 'ink', width: SILHOUETTE_W * 2, join: 'round', cap: 'round' };
+/** Interior lines: what sits in front of the body (near forelimb, near ear, the haunch). */
+const INTERIOR: StrokeSpec = { slot: 'ink', width: 2, join: 'round', cap: 'round' };
+/** The brick belly's mortar: charcoal and as bold as the outline, as on WalletWallrus. */
+const MORTAR: StrokeSpec = { slot: 'ink', width: 2.6, join: 'round', cap: 'round' };
+const FINE: StrokeSpec = { slot: 'ink', width: 1.5, join: 'round', cap: 'round' };
 
 /** A tapered limb along a bone's local x axis, rounded at both ends. */
 function limb(length: number, w0: number, w1: number): ContourPoint[] {
@@ -253,10 +286,12 @@ function limb(length: number, w0: number, w1: number): ContourPoint[] {
   ];
 }
 
+// ── The signature tail ──────────────────────────────────────────────────────
+
 const tailSeg = TAIL_REST.slice(1).map((p, i) => Math.hypot(p[0] - TAIL_REST[i]![0], p[1] - TAIL_REST[i]![1]));
 const tailTotal = tailSeg.reduce((a, b) => a + b, 0);
-/** Tail half-width along its length (u = 0 root .. 1 tip): a thick, muscular root tapering to a point. */
-const tailHalf = (u: number): number => 1.6 + 15.6 * Math.pow(1 - u, 1.4);
+/** Tail half-width along its length (u = 0 root .. 1 tip): a thick, muscular root, a long graceful taper to a point. */
+export const tailHalf = (u: number): number => 1.5 + 20 * Math.pow(1 - u, 1.3);
 
 /** A point on the tail's rest centreline by arc length, with its unit normal (toward the upper side). */
 function tailAt(u: number): { p: Vec; n: Vec } {
@@ -275,273 +310,206 @@ function tailAt(u: number): { p: Vec; n: Vec } {
   return { p: TAIL_REST[TAIL_REST.length - 1]!, n: [0, 1] };
 }
 
+const TAIL_STATIONS = [0, 0.08, 0.18, 0.3, 0.42, 0.54, 0.66, 0.77, 0.87, 0.94] as const;
+const TAIL_ROUNDNESS = 0.9;
+/** A point offset from the tail's centreline by `k` half-widths (+1: the upper edge, -1: the underside). */
+const tailSide = (u: number, k: number): ContourPoint => {
+  const { p, n } = tailAt(u);
+  return [p[0] + n[0] * tailHalf(u) * k, p[1] + n[1] * tailHalf(u) * k];
+};
+const tailTip = (): ContourPoint => {
+  const tip = tailAt(1).p;
+  return [tip[0], tip[1], 'corner'];
+};
+
 /** Tail outline from its rest centreline. */
 function tailOutline(): ContourPoint[] {
-  const pts: Vec[] = [];
-  const at = tailAt;
-  const half = tailHalf;
-  const stations = [0, 0.1, 0.22, 0.36, 0.5, 0.64, 0.78, 0.9];
-  for (const u of stations) {
-    const { p, n } = at(u);
-    pts.push([p[0] + n[0] * half(u), p[1] + n[1] * half(u)]);
-  }
-  const tip = at(1).p;
-  const back = [...stations].reverse().map((u) => {
-    const { p, n } = at(u);
-    return [p[0] - n[0] * half(u), p[1] - n[1] * half(u)] as Vec;
-  });
-  // Root end tucks under the haunch, so it closes with a simple round.
-  return [...pts.map((p) => [p[0], p[1]] as ContourPoint), [tip[0], tip[1], 'corner'], ...back.map((p) => [p[0], p[1]] as ContourPoint), [TAIL_REST[0]![0] + 6, TAIL_REST[0]![1] + 2]];
+  const upper = TAIL_STATIONS.map((u) => tailSide(u, 1));
+  const lower = [...TAIL_STATIONS].reverse().map((u) => tailSide(u, -1));
+  // The root end is buried in the rump and the haunch, so it closes with a simple round.
+  return [...upper, tailTip(), ...lower, [TAIL_REST[0]![0] + 7, TAIL_REST[0]![1] + 3]];
 }
 
-/** Draw order, back to front. */
-export const SHAPES: readonly ShapeSpec[] = [
-  { name: 'shadow', attach: 'root', space: 'rig', geometry: { kind: 'ellipse', center: [8, 1], width: 112, height: 11 }, fill: { slot: 'ink', alpha: 0.12 } },
+/** How far the cream underside reaches toward the tail's centreline, in half-widths from the underside edge. */
+const TAIL_UNDERSIDE_REACH = 0.7;
+/**
+ * The tail's cream underside, the wallaby's answer to WalletWallrus's cream tusks: a band along the
+ * underside from near the root to the tip. Its outer edge is the tail's own underside, vertex for vertex
+ * and with the same smoothing (so it bends exactly with the tail and never spills past the outline); its
+ * inner edge runs a little below the centreline and narrows to the tip.
+ */
+function tailUnderside(): ContourPoint[] {
+  const from = TAIL_STATIONS.slice(1);
+  const edge = [...from].reverse().map((u) => tailSide(u, -1));
+  // It grows out of the underside from a sliver near the root (no blunt end beside the haunch) and narrows to the tip.
+  const grow = (u: number): number => Math.min(1, Math.max(0, (u - 0.08) / 0.24));
+  const inner = from.filter((u) => grow(u) > 0).map((u) => tailSide(u, -1 + TAIL_UNDERSIDE_REACH * grow(u) * (1 - u) ** 0.15));
+  return [tailTip(), ...edge, ...inner];
+}
 
-  // Far side, in the derived shade.
-  {
-    name: 'ear_f',
-    attach: 'ear_f',
-    space: 'local',
-    geometry: { kind: 'contour', closed: true, points: [[-3, 8], [12, 10], [28, 9], [44, 5], [56, 0, 'corner'], [44, -5], [28, -8.5], [12, -9], [-3, -7]] },
-    fill: { slot: 'furShade' },
-    stroke: OUTLINE,
-  },
-  { name: 'arm_f', attach: 'arm_f', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(29, 6, 4.4) }, fill: { slot: 'furShade' }, stroke: OUTLINE },
-  { name: 'forearm_f', attach: 'forearm_f', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(21, 4.4, 3.8) }, fill: { slot: 'furShade' }, stroke: OUTLINE },
-  { name: 'thigh_f', attach: 'thigh_f', space: 'rig', geometry: thighGeometry(FAR_LEG), fill: { slot: 'furShade' }, stroke: OUTLINE },
-  { name: 'shin_f', attach: 'shin_f', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(49.2, 7.6, 4.6) }, fill: { slot: 'furShade' }, stroke: OUTLINE },
-  { name: 'foot_f', attach: 'foot_f', space: 'local', geometry: footGeometry(), fill: { slot: 'furShade' }, stroke: OUTLINE },
+// ── The torso and its brick belly ───────────────────────────────────────────
 
-  // Tail: one skinned outline along the tail chain, with a shade line under it.
-  { name: 'tail', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: true, points: tailOutline(), roundness: 0.9 }, fill: { slot: 'fur' }, stroke: OUTLINE, skin: TAIL_BONES },
-  {
-    name: 'tail_shade',
-    attach: 'root',
-    space: 'rig',
-    geometry: { kind: 'contour', closed: false, points: tailShade() },
-    stroke: { slot: 'furShade', width: 3, alpha: 0.75, cap: 'round', join: 'round' },
-    skin: TAIL_BONES,
-  },
-
-  // Torso: skinned along hip → chest → neck so it bends and compresses as one body.
-  {
-    name: 'torso',
-    attach: 'root',
-    space: 'rig',
-    geometry: {
-      kind: 'contour',
-      closed: true,
-      points: [
-        [-44, -62],
-        [-47, -82],
-        [-40, -103],
-        [-28, -124],
-        [-13, -146],
-        [1, -164],
-        [15, -180],
-        [27, -188],
-        [38, -172],
-        [44, -156],
-        [44, -139],
-        [38, -123],
-        [27, -108],
-        [17, -92],
-        [7, -77],
-        [-8, -63],
-        [-26, -56],
-      ],
-    },
-    fill: { slot: 'fur' },
-    stroke: OUTLINE,
-    skin: ['hip', 'chest', 'neck'],
-  },
-  {
-    name: 'belly',
-    attach: 'root',
-    space: 'rig',
-    geometry: {
-      kind: 'contour',
-      closed: true,
-      points: [
-        [35.6, -171],
-        [42, -155.6],
-        [42.1, -139.2],
-        [36.4, -123.9],
-        [25.6, -109.2],
-        [15.5, -93.2],
-        [5.6, -79],
-        [-0.5, -86],
-        [8.5, -103],
-        [19.5, -120.5],
-        [27.5, -137.5],
-        [28.5, -156],
-      ],
-    },
-    fill: { slot: 'belly' },
-    skin: ['hip', 'chest', 'neck'],
-  },
-  {
-    name: 'back_highlight',
-    attach: 'root',
-    space: 'rig',
-    geometry: { kind: 'contour', closed: false, points: [[-36, -104], [-24, -126], [-10, -146], [3, -161]] },
-    stroke: { slot: 'highlight', width: 2.6, alpha: 0.3, cap: 'round', join: 'round' },
-    skin: ['hip', 'chest', 'neck'],
-  },
-  {
-    name: 'strap',
-    attach: 'root',
-    space: 'rig',
-    geometry: { kind: 'contour', closed: false, points: [[-22, -138], [-2, -124], [14, -112], [26, -103]] },
-    stroke: { slot: 'ink', width: 2.2, cap: 'round', join: 'round' },
-    skin: ['hip', 'chest', 'neck'],
-  },
-
-  // Near hind leg: the haunch carries the weight; shin and the long foot spring.
-  { name: 'thigh_n', attach: 'thigh_n', space: 'rig', geometry: thighGeometry([0, 0]), fill: { slot: 'fur' }, stroke: OUTLINE },
-  {
-    name: 'thigh_crease',
-    attach: 'thigh_n',
-    space: 'rig',
-    geometry: { kind: 'contour', closed: false, points: [[-36, -60], [-20, -48], [-3, -41]] },
-    stroke: { slot: 'furShade', width: 2.6, alpha: 0.85, cap: 'round', join: 'round' },
-  },
-  { name: 'shin_n', attach: 'shin_n', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(49.2, 7.6, 4.6) }, fill: { slot: 'fur' }, stroke: OUTLINE },
-  { name: 'foot_n', attach: 'foot_n', space: 'local', geometry: footGeometry(), fill: { slot: 'fur' }, stroke: OUTLINE },
-  { name: 'claws_n', attach: 'foot_n', space: 'local', geometry: { kind: 'contour', closed: false, points: [[60, -1.5], [64, 0.2], [67.5, 1.6]] }, stroke: { slot: 'ink', width: 1.4, cap: 'round', join: 'round' } },
-
-  // Head: mouth interior behind the jaw, the jaw behind the upper head.
-  {
-    name: 'mouth',
-    attach: 'head',
-    space: 'rig',
-    geometry: { kind: 'contour', closed: true, points: [[56, -169], [82, -171], [79, -164], [60, -163]] },
-    fill: { slot: 'ink' },
-  },
-  {
-    name: 'jaw',
-    attach: 'jaw',
-    space: 'rig',
-    geometry: { kind: 'contour', closed: true, points: [[52, -170], [68, -171], [80, -171.5], [78.5, -167], [70, -163], [56, -162], [45, -163.5], [41, -167]] },
-    fill: { slot: 'belly' },
-    stroke: FINE,
-  },
-  {
-    name: 'head',
-    attach: 'head',
-    space: 'rig',
-    geometry: {
-      kind: 'contour',
-      closed: true,
-      points: [
-        [17, -183],
-        [21, -197],
-        [31, -206],
-        [45, -209],
-        [58, -204],
-        [69, -194],
-        [79, -186],
-        [87, -180],
-        [89, -175],
-        [85, -171],
-        [74, -170],
-        [61, -168],
-        [47, -166],
-        [33, -166],
-        [23, -172],
-      ],
-    },
-    fill: { slot: 'fur' },
-    stroke: OUTLINE,
-  },
-  {
-    name: 'muzzle',
-    attach: 'head',
-    space: 'rig',
-    geometry: { kind: 'contour', closed: true, points: [[56, -169.5], [70, -171], [83, -172.2], [86, -175.2], [77, -176.6], [64, -176.4], [50, -174.2]] },
-    fill: { slot: 'belly' },
-  },
-  {
-    name: 'head_highlight',
-    attach: 'head',
-    space: 'rig',
-    geometry: { kind: 'contour', closed: false, points: [[26, -197], [37, -204], [50, -205]] },
-    stroke: { slot: 'highlight', width: 2.4, alpha: 0.32, cap: 'round', join: 'round' },
-  },
-  { name: 'nose', attach: 'head', space: 'rig', geometry: { kind: 'contour', closed: true, points: [[84, -181], [89.5, -177.5], [88.5, -173.5], [84, -175]] }, fill: { slot: 'ink' } },
-  {
-    name: 'eye',
-    attach: 'gaze',
-    space: 'rig',
-    geometry: { kind: 'contour', closed: true, points: [[51, -191], [55, -195], [61, -195.5], [65, -192], [61.5, -187.5], [55.5, -187.5]] },
-    fill: { slot: 'ink' },
-  },
-  { name: 'glint', attach: 'gaze', space: 'rig', geometry: { kind: 'ellipse', center: [60.5, -193], width: 3.4, height: 3.4 }, fill: { slot: 'belly' } },
-  {
-    name: 'lid',
-    attach: 'lid',
-    space: 'local',
-    geometry: { kind: 'contour', closed: true, points: [[-8, 4.5], [-4, 0.4], [3, 0], [7.6, 3.6], [3.5, 9], [-2.5, 9]] },
-    fill: { slot: 'fur' },
-    stroke: FINE,
-  },
-  { name: 'brow', attach: 'brow', space: 'local', geometry: { kind: 'contour', closed: false, points: [[-5.5, 0.6], [0, -0.2], [5.5, -1.1]] }, stroke: { slot: 'ink', width: 1.8, cap: 'round', join: 'round' } },
-
-  // Near ear in front of the head.
-  {
-    name: 'ear_n',
-    attach: 'ear_n',
-    space: 'local',
-    geometry: { kind: 'contour', closed: true, points: [[-4, 9], [12, 11.5], [29, 10.5], [47, 6], [64.5, 0, 'corner'], [47, -6.5], [29, -10.5], [12, -10.5], [-4, -8]] },
-    fill: { slot: 'fur' },
-    stroke: OUTLINE,
-  },
-  {
-    name: 'ear_inner',
-    attach: 'ear_n',
-    space: 'local',
-    geometry: { kind: 'contour', closed: true, points: [[7, 4.6], [27, 5.6], [47, 2.6], [57, 0, 'corner'], [45, -3], [25, -4.6], [9, -3.4]] },
-    fill: { slot: 'innerEar' },
-  },
-
-  // Near forelimb in front of the body, with charcoal claws.
-  { name: 'arm_n', attach: 'arm_n', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(29, 6.4, 4.6) }, fill: { slot: 'fur' }, stroke: OUTLINE },
-  { name: 'forearm_n', attach: 'forearm_n', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(21, 4.6, 4) }, fill: { slot: 'fur' }, stroke: OUTLINE },
-  { name: 'paw_claws', attach: 'forearm_n', space: 'local', geometry: { kind: 'contour', closed: false, points: [[23.4, -2.6], [26.4, -0.6], [27.4, 2]] }, stroke: { slot: 'ink', width: 1.2, cap: 'round', join: 'round' } },
-
-  // The guide's trail tag, kept small so gear never competes with the tail.
-  { name: 'tag', attach: 'hip', space: 'rig', geometry: { kind: 'contour', closed: true, points: [[19, -110, 'corner'], [26, -106, 'corner'], [23, -98, 'corner'], [16, -102, 'corner']] }, fill: { slot: 'tag' }, stroke: FINE },
+const TORSO: readonly ContourPoint[] = [
+  [-45, -61],
+  [-49, -82],
+  [-41, -104],
+  [-28, -124],
+  [-13, -146],
+  [1, -164],
+  [15, -180],
+  [27, -188],
+  [38, -172],
+  [44, -156],
+  [44, -139],
+  [38, -123],
+  [27, -108],
+  [17, -92],
+  [7, -77],
+  [-8, -63],
+  [-26, -56],
 ];
+const TORSO_SKIN: readonly RigBone[] = ['hip', 'chest', 'neck'];
 
-/** The tail's shade line: inside the outline along the underside, fading out before the tip. */
-function tailShade(): ContourPoint[] {
-  return [0.12, 0.28, 0.44, 0.6, 0.74].map((u) => {
-    const { p, n } = tailAt(u);
-    const k = -0.5 * tailHalf(u);
-    return [p[0] + n[0] * k, p[1] + n[1] * k] as ContourPoint;
-  });
+/**
+ * The stomach's brick field is bounded at the back by a line parallel to the
+ * spine (where the belly turns into the flank): `v` measures across the spine,
+ * toward the belly, from the hip joint.
+ */
+const SPINE_O: Vec = [-20, -78];
+const SPINE_A: Vec = scale([36, -78], 1 / len([36, -78]));
+const SPINE_B: Vec = [-SPINE_A[1], SPINE_A[0]];
+/** The field's back edge at height y (rest pose): the point at across-spine offset `v` on that horizontal. */
+const fieldBackAt = (y: number, v: number): Vec => {
+  const u = (y - SPINE_O[1] - v * SPINE_B[1]) / SPINE_A[1];
+  return add(SPINE_O, add(scale(SPINE_A, u), scale(SPINE_B, v)));
+};
+
+/** The torso's drawn outline (the smoothed contour, finely sampled). */
+const TORSO_LINE: readonly Vec[] = sampleContour(smoothContour(TORSO, true, 1), true, 24);
+
+/** Where the ray from `p` along `d` first crosses the torso outline. */
+function torsoEdge(p: Vec, d: Vec): Vec {
+  let best = Infinity;
+  for (let i = 0; i < TORSO_LINE.length; i++) {
+    const q1 = TORSO_LINE[i]!;
+    const q2 = TORSO_LINE[(i + 1) % TORSO_LINE.length]!;
+    const e = sub(q2, q1);
+    const den = d[0] * e[1] - d[1] * e[0];
+    if (Math.abs(den) < 1e-12) continue;
+    const w = sub(q1, p);
+    const t = (w[0] * e[1] - w[1] * e[0]) / den;
+    const s = (w[0] * d[1] - w[1] * d[0]) / den;
+    if (t > 1e-9 && s >= 0 && s <= 1 && t < best) best = t;
+  }
+  if (!Number.isFinite(best)) throw new Error('rig-source: a mortar course does not meet the belly outline');
+  return add(p, scale(d, best));
 }
 
-function thighGeometry(d: Vec): Geometry {
-  const pts: Vec[] = [
-    [-46, -67],
-    [-43, -85],
-    [-31, -97],
-    [-13, -99],
-    [3, -92],
-    [14, -74],
-    [25, -52],
-    [27, -42],
-    [21, -34],
-    [10, -32],
-    [-4, -39],
-    [-23, -49],
-    [-39, -57],
-  ];
+/** Back edge of the brick field (across-spine offset, px): the field takes the front of the stomach, rounding out at its middle. */
+const BRICK_BACK_V = -10;
+const BRICK_BACK_BULGE = 4;
+/** Bed joints at rest, bottom to top (y, px): four bold courses from the haunch up to the chest. */
+const BRICK_BEDS = [-91, -104.5, -118, -131.5, -145] as const;
+/** Brick length (twice the course height) and the running bond's half-brick offset between courses. */
+const BRICK_LEN = 27;
+const BRICK_X0 = 1;
+/** A head joint closer than this to either end of its course is left out (no slivers). */
+const BRICK_MIN_END = 6;
+
+const brickTop = BRICK_BEDS[BRICK_BEDS.length - 1]!;
+const brickBottom = BRICK_BEDS[0]!;
+/** The field's back edge at height y: parallel to the spine, bulging back a little at the middle (a rounded belly). */
+const brickBack = (y: number): Vec => fieldBackAt(y, BRICK_BACK_V - BRICK_BACK_BULGE * Math.sin((Math.PI * (y - brickTop)) / (brickBottom - brickTop)));
+/** Where a level line at height y meets the front of the torso. */
+const brickFront = (y: number): Vec => torsoEdge(brickBack(y), [1, 0]);
+
+/**
+ * The brick belly: the WalletWall brick motif built into the stomach, exactly as
+ * on WalletWallrus. Courses of bricks in the coat's own colour, laid level
+ * in running bond and marked out only by charcoal mortar. The front of the
+ * stomach cuts every course (each bed joint runs into the silhouette line), a
+ * mortar line closes the field at the top and along the flank, and the haunch
+ * covers the lowest course's back. Every mortar line is skinned to the torso's
+ * bone chain, so the bricks bend, compress, and stretch with the body that
+ * carries them instead of riding on it.
+ */
+function brickMortar(): ContourSpec[] {
+  const lines: ContourSpec[] = [];
+  const back = brickBack;
+  const front = brickFront;
+  // The flank edge of the field, from below the haunch line up to the top course (densely, to keep its curve).
+  lines.push({ points: Array.from({ length: 9 }, (_, i): ContourPoint => back(brickBottom + ((brickTop - brickBottom) * i) / 8)), closed: false });
+  // Bed joints (the lowest is hidden behind the haunch).
+  for (const y of BRICK_BEDS.slice(1)) lines.push({ points: [back(y), front(y)], closed: false });
+  // Head joints: a half-brick offset between courses (running bond), none that would cut a sliver.
+  for (let k = 0; k < BRICK_BEDS.length - 1; k++) {
+    const y0 = BRICK_BEDS[k]!;
+    const y1 = BRICK_BEDS[k + 1]!;
+    const lo = Math.max(back(y0)[0], back(y1)[0]) + BRICK_MIN_END;
+    const hi = Math.min(front(y0)[0], front(y1)[0]) - BRICK_MIN_END;
+    const shift = (k % 2) * (BRICK_LEN / 2);
+    for (let x = BRICK_X0 + shift - BRICK_LEN * 4; x <= hi; x += BRICK_LEN) {
+      if (x >= lo) lines.push({ points: [[x, y0], [x, y1]], closed: false });
+    }
+  }
+  return lines;
+}
+
+const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+
+/**
+ * The cream chest: the inner body's cream, from under the chin down the front of the throat and chest to
+ * the top of the brick field (the wallaby's own cream front, as on the WalletWallaby reference). Its front
+ * edge is the torso's drawn outline itself, so the cream runs into the silhouette line; it is skinned
+ * with the torso.
+ */
+function creamChest(): ContourPoint[] {
+  const top = -178;
+  const front = TORSO_LINE.filter((p) => p[0] > 25 && p[1] >= top && p[1] < brickTop).map((p): ContourPoint => [p[0], p[1]]);
+  const corner = brickFront(brickTop);
+  // The back edge: a smooth curve from the field's top back up under the jaw.
+  const backEdge = Array.from({ length: 7 }, (_, i): ContourPoint => {
+    const t = i / 6;
+    return [lerp(14, 29, t) - 3 * Math.sin(Math.PI * t), lerp(brickTop, top, t)];
+  });
+  return [...front, [corner[0], corner[1]], ...backEdge];
+}
+
+/** The haunch: the hind leg's big thigh, drawn over the torso. */
+const THIGH_POINTS: readonly Vec[] = [
+  [-46, -67],
+  [-43, -85],
+  [-31, -97],
+  [-13, -99],
+  [3, -92],
+  [14, -74],
+  [25, -52],
+  [27, -42],
+  [21, -34],
+  [10, -32],
+  [-4, -39],
+  [-23, -49],
+  [-39, -57],
+];
+const thighPoint = (p: Vec, d: Vec): Vec => {
   const c: Vec = [-8, -66];
   const k = 0.92;
-  return { kind: 'contour', closed: true, points: pts.map((p) => [c[0] + (p[0] - c[0]) * k + d[0], c[1] + (p[1] - c[1]) * k + d[1]] as ContourPoint) };
+  return [c[0] + (p[0] - c[0]) * k + d[0], c[1] + (p[1] - c[1]) * k + d[1]];
+};
+function thighGeometry(d: Vec): Geometry {
+  return { kind: 'contour', closed: true, points: THIGH_POINTS.map((p) => thighPoint(p, d)) };
+}
+/**
+ * The line of the haunch over the belly: exactly the thigh's own drawn outline
+ * from the rump, over the top of the thigh, to where it leaves the body at the
+ * knee (the rest of the thigh's edge is the silhouette).
+ */
+function haunchLine(): ContourPoint[] {
+  const verts = smoothContour(THIGH_POINTS.map((p) => thighPoint(p, [0, 0])), true, 1);
+  const steps = 8;
+  const samples = sampleContour(verts, true, steps);
+  // From a little past vertex 1 (the rump) to two thirds of the way from vertex 5 to vertex 6 (above the knee).
+  return samples.slice(steps + 3, steps * 5 + 6).map((p): ContourPoint => [p[0], p[1]]);
 }
 
 function footGeometry(): Geometry {
@@ -551,6 +519,146 @@ function footGeometry(): Geometry {
     points: [[-6, -0.5], [-2, -5.6], [20, -6], [44, -4.2], [58, -1.8], [66.5, 1.4, 'corner'], [58, 4.2], [30, 5.2], [4, 5.6], [-4, 3.6]],
   };
 }
+
+// ── Parts and draw order ────────────────────────────────────────────────────
+
+/** A body part: one filled mass. Its contour also joins the silhouette underlay. */
+type Part = Required<Pick<ShapeSpec, 'name' | 'attach' | 'space' | 'geometry' | 'fill'>> & Pick<ShapeSpec, 'skin' | 'stroke'>;
+
+const EAR_F: Part = {
+  name: 'ear_f',
+  attach: 'ear_f',
+  space: 'local',
+  geometry: { kind: 'contour', closed: true, points: [[-3, 8], [12, 10], [28, 9], [44, 5], [56, 0, 'corner'], [44, -5], [28, -8.5], [12, -9], [-3, -7]] },
+  fill: { slot: 'furShade' },
+};
+const ARM_F: Part = { name: 'arm_f', attach: 'arm_f', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(29, 6, 4.4) }, fill: { slot: 'furShade' } };
+const FOREARM_F: Part = { name: 'forearm_f', attach: 'forearm_f', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(21, 4.4, 3.8) }, fill: { slot: 'furShade' } };
+const THIGH_F: Part = { name: 'thigh_f', attach: 'thigh_f', space: 'rig', geometry: thighGeometry(FAR_LEG), fill: { slot: 'furShade' } };
+const SHIN_F: Part = { name: 'shin_f', attach: 'shin_f', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(49.2, 7.6, 4.6) }, fill: { slot: 'furShade' } };
+const FOOT_F: Part = { name: 'foot_f', attach: 'foot_f', space: 'local', geometry: footGeometry(), fill: { slot: 'furShade' } };
+const TAIL: Part = { name: 'tail', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: true, points: tailOutline(), roundness: TAIL_ROUNDNESS }, fill: { slot: 'fur' }, skin: TAIL_BONES };
+const TORSO_PART: Part = { name: 'torso', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: true, points: TORSO }, fill: { slot: 'fur' }, skin: TORSO_SKIN };
+const THIGH_N: Part = { name: 'thigh_n', attach: 'thigh_n', space: 'rig', geometry: thighGeometry([0, 0]), fill: { slot: 'fur' } };
+const SHIN_N: Part = { name: 'shin_n', attach: 'shin_n', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(49.2, 7.6, 4.6) }, fill: { slot: 'fur' } };
+const FOOT_N: Part = { name: 'foot_n', attach: 'foot_n', space: 'local', geometry: footGeometry(), fill: { slot: 'fur' } };
+const JAW: Part = {
+  name: 'jaw',
+  attach: 'jaw',
+  space: 'rig',
+  geometry: { kind: 'contour', closed: true, points: [[52, -170], [68, -171], [80, -171.5], [78.5, -167], [70, -163], [56, -162], [45, -163.5], [41, -167]] },
+  fill: { slot: 'accent' },
+  stroke: FINE,
+};
+const HEAD: Part = {
+  name: 'head',
+  attach: 'head',
+  space: 'rig',
+  geometry: {
+    kind: 'contour',
+    closed: true,
+    points: [
+      [17, -183],
+      [21, -197],
+      [31, -206],
+      [45, -209],
+      [58, -204],
+      [69, -194],
+      [79, -186],
+      [87, -180],
+      [89, -175],
+      [85, -171],
+      [74, -170],
+      [61, -168],
+      [47, -166],
+      [33, -166],
+      [23, -172],
+    ],
+  },
+  fill: { slot: 'fur' },
+};
+const EAR_N: Part = {
+  name: 'ear_n',
+  attach: 'ear_n',
+  space: 'local',
+  geometry: { kind: 'contour', closed: true, points: [[-4, 9], [12, 11.5], [29, 10.5], [47, 6], [64.5, 0, 'corner'], [47, -6.5], [29, -10.5], [12, -10.5], [-4, -8]] },
+  fill: { slot: 'fur' },
+  stroke: INTERIOR,
+};
+const ARM_N: Part = { name: 'arm_n', attach: 'arm_n', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(29, 6.4, 4.6) }, fill: { slot: 'fur' }, stroke: INTERIOR };
+const FOREARM_N: Part = { name: 'forearm_n', attach: 'forearm_n', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(21, 4.6, 4) }, fill: { slot: 'fur' }, stroke: INTERIOR };
+
+/** Every part of the one silhouette, in draw order (back to front). */
+const PARTS: readonly Part[] = [EAR_F, ARM_F, FOREARM_F, THIGH_F, SHIN_F, FOOT_F, TAIL, TORSO_PART, THIGH_N, SHIN_N, FOOT_N, JAW, HEAD, EAR_N, ARM_N, FOREARM_N];
+/** The parts whose contour forms the silhouette underlay. */
+export const SILHOUETTE_PARTS: readonly string[] = PARTS.map((p) => p.name);
+
+const shapeOf = (p: Part): ShapeSpec => ({ name: p.name, attach: p.attach, space: p.space, geometry: p.geometry, fill: p.fill, ...(p.stroke ? { stroke: p.stroke } : {}), ...(p.skin ? { skin: p.skin } : {}) });
+const underlayOf = (p: Part): ShapeSpec => ({ name: `${p.name}_ink`, attach: p.attach, space: p.space, geometry: p.geometry, stroke: UNDERLAY, ...(p.skin ? { skin: p.skin } : {}) });
+
+/** Draw order, back to front. */
+export const SHAPES: readonly ShapeSpec[] = [
+  { name: 'shadow', attach: 'root', space: 'rig', geometry: { kind: 'ellipse', center: [8, 1], width: 112, height: 11 }, fill: { slot: 'ink', alpha: 0.12 } },
+
+  // The silhouette: every part's contour, stroked behind every fill; only the outer line of the union survives.
+  ...PARTS.map(underlayOf),
+
+  // Far side, in the derived shade.
+  ...[EAR_F, ARM_F, FOREARM_F, THIGH_F, SHIN_F, FOOT_F].map(shapeOf),
+
+  // The tail and the torso: one coat, joined without a seam. The tail's underside and the throat and chest are cream.
+  shapeOf(TAIL),
+  { name: 'tail_underside', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: true, points: tailUnderside(), roundness: TAIL_ROUNDNESS }, fill: { slot: 'accent' }, skin: TAIL_BONES },
+  shapeOf(TORSO_PART),
+  { name: 'chest', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: true, points: creamChest(), roundness: 0 }, fill: { slot: 'accent' }, skin: TORSO_SKIN },
+  { name: 'brick_belly', attach: 'root', space: 'rig', geometry: { kind: 'contours', contours: brickMortar() }, stroke: MORTAR, skin: TORSO_SKIN },
+
+  // Near hind leg: the haunch carries the weight; shin and the long foot spring.
+  shapeOf(THIGH_N),
+  { name: 'haunch', attach: 'thigh_n', space: 'rig', geometry: { kind: 'contour', closed: false, points: haunchLine(), roundness: 0 }, stroke: INTERIOR },
+  shapeOf(SHIN_N),
+  shapeOf(FOOT_N),
+  { name: 'claws_n', attach: 'foot_n', space: 'local', geometry: { kind: 'contour', closed: false, points: [[60, -1.5], [64, 0.2], [67.5, 1.6]] }, stroke: { slot: 'ink', width: 1.4, cap: 'round', join: 'round' } },
+
+  // Head: mouth interior behind the jaw, the jaw behind the upper head; a cream muzzle and a round charcoal nose.
+  { name: 'mouth', attach: 'head', space: 'rig', geometry: { kind: 'contour', closed: true, points: [[56, -169], [82, -171], [79, -164], [60, -163]] }, fill: { slot: 'ink' } },
+  shapeOf(JAW),
+  shapeOf(HEAD),
+  {
+    name: 'muzzle',
+    attach: 'head',
+    space: 'rig',
+    geometry: { kind: 'contour', closed: true, points: [[47, -169.6], [55, -175.4], [67, -178.6], [79, -179], [86.6, -176.6], [86.2, -172.2], [76, -170.6], [62, -169.6]] },
+    fill: { slot: 'accent' },
+  },
+  { name: 'nose', attach: 'head', space: 'rig', geometry: { kind: 'contour', closed: true, points: [[82.6, -181.6], [88.4, -180.6], [90.8, -176.8], [89.4, -173], [85.2, -172.8], [82.2, -176.2]] }, fill: { slot: 'ink' } },
+  { name: 'eye', attach: 'gaze', space: 'rig', geometry: { kind: 'ellipse', center: [57.5, -191.4], width: 10.4, height: 11.2 }, fill: { slot: 'ink' } },
+  { name: 'glint', attach: 'gaze', space: 'rig', geometry: { kind: 'ellipse', center: [59.7, -193.5], width: 3.2, height: 3.2 }, fill: { slot: 'accent' } },
+  {
+    name: 'lid',
+    attach: 'lid',
+    space: 'local',
+    geometry: { kind: 'contour', closed: true, points: [[-6.6, 3.2], [-3.6, 0.3], [3.6, 0.3], [6.6, 3.2], [6.4, 11.8], [-6.4, 11.8]] },
+    fill: { slot: 'fur' },
+    stroke: FINE,
+  },
+  { name: 'brow', attach: 'brow', space: 'local', geometry: { kind: 'contour', closed: false, points: [[-5, 0.8], [0, -0.7], [5, 0.3]] }, stroke: { slot: 'ink', width: 1.8, cap: 'round', join: 'round' } },
+
+  // Near ear in front of the head.
+  shapeOf(EAR_N),
+  {
+    name: 'ear_inner',
+    attach: 'ear_n',
+    space: 'local',
+    geometry: { kind: 'contour', closed: true, points: [[7, 4.6], [27, 5.6], [47, 2.6], [57, 0, 'corner'], [45, -3], [25, -4.6], [9, -3.4]] },
+    fill: { slot: 'innerEar' },
+  },
+
+  // Near forelimb in front of the body, with charcoal claws.
+  shapeOf(ARM_N),
+  shapeOf(FOREARM_N),
+  { name: 'paw_claws', attach: 'forearm_n', space: 'local', geometry: { kind: 'contour', closed: false, points: [[23.4, -2.6], [26.4, -0.6], [27.4, 2]] }, stroke: { slot: 'ink', width: 1.2, cap: 'round', join: 'round' } },
+];
 
 // ── Pose clips ──────────────────────────────────────────────────────────────
 
@@ -600,10 +708,10 @@ export const CLIPS: readonly ClipSpec[] = [
     keys: [{ atS: 0, pose: { hip: { dy: -10 }, bones: { hip: 30, chest: 4, neck: -14, head: -14, tail_0: -14, tail_1: -2, tail_2: -1, thigh_n: -48, shin_n: 34, foot_n: 38, thigh_f: -48, shin_f: 34, foot_f: 38, arm_n: 36, forearm_n: -40, arm_f: 36, forearm_f: -40, ear_n: -18, ear_f: -16 }, ik: { legs: 0, tail: 0 } } }],
   },
   {
-    // Flight: body long, legs tucked forward, tail out behind and slightly up to counter the pitch.
+    // Flight: body long, legs tucked forward, the tail streaming straight back as the long opposing line (its tip lifts a little).
     name: 'airborne',
     loop: false,
-    keys: [{ atS: 0, pose: { hip: { dy: -6 }, bones: { hip: 34, chest: 2, neck: -16, head: -14, tail_0: 4, tail_1: 3, tail_2: 3, tail_3: 2, tail_4: 2, thigh_n: 22, shin_n: -26, foot_n: 14, thigh_f: 18, shin_f: -22, foot_f: 14, arm_n: 30, forearm_n: -44, arm_f: 30, forearm_f: -44, ear_n: -20, ear_f: -18 }, ik: { legs: 0, tail: 0 } } }],
+    keys: [{ atS: 0, pose: { hip: { dy: -6 }, bones: { hip: 34, chest: 2, neck: -16, head: -14, tail_0: -18, tail_1: 3, tail_2: 3, tail_3: 2, tail_4: 2, thigh_n: 22, shin_n: -26, foot_n: 14, thigh_f: 18, shin_f: -22, foot_f: 14, arm_n: 30, forearm_n: -44, arm_f: 30, forearm_f: -44, ear_n: -20, ear_f: -18 }, ik: { legs: 0, tail: 0 } } }],
   },
   {
     // Soft landing: feet first, light compression, tail lowering toward the ground.

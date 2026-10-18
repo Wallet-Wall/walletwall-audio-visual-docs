@@ -14,7 +14,7 @@ import { estimateTrack } from '../src/audio/voice-provider.ts';
 import { TOKENS } from '../src/brand/tokens.ts';
 import { choreograph, layoutsFor, mouthAt } from '../src/character/walletwallaby/choreography.ts';
 import { planMotion, sampleWallaby, type MotionPlan } from '../src/character/walletwallaby/motion.ts';
-import { RIG_PALETTE } from '../src/character/walletwallaby/rig.ts';
+import { FAMILY_COLORS, RIG_PALETTE } from '../src/character/walletwallaby/rig.ts';
 import { boneWorlds, checkClipMix, finalizePose, openFreshPose, RigPlayer, RigPoseError, TAIL_GROUND, withFreshPose, type RiveArtboard } from '../src/character/walletwallaby/rive/rig-apply.ts';
 import { poseExtent } from '../src/character/walletwallaby/rive/rig-bounds.ts';
 import { compileRig, poseValues, RigCompileError, slotColor } from '../src/character/walletwallaby/rive/rig-compile.ts';
@@ -67,14 +67,14 @@ describe('rig asset', () => {
     assert.deepEqual(compileRig().bytes, fresh, 'compiling is deterministic');
   });
 
-  test('the coat is the canonical WalletWall terracotta, written into the asset itself', () => {
-    const contract = JSON.parse(readFileSync(path.join(VIDEO_ROOT, 'contracts', 'walletwall-brand.json'), 'utf8')) as { theme: Record<string, string> };
-    assert.equal(RIG_PALETTE.fur, 'terracotta');
-    assert.equal(slotColor('fur'), contract.theme['COLORS.brand.terracotta']);
-    assert.equal(slotColor('fur'), TOKENS.terracotta);
+  test('the coat is WalletWallrus\'s coat, written into the asset itself', () => {
+    assert.equal(RIG_PALETTE.fur, 'wallrusCoat');
+    assert.equal(slotColor('fur'), FAMILY_COLORS.wallrusCoat);
+    assert.equal(slotColor('fur'), '#BA6F38');
     const le = (n: number) => [n % 256, Math.floor(n / 256) % 256, Math.floor(n / 65536) % 256, Math.floor(n / 16777216)].join(',');
     const bytes = compileRig().bytes.join(',');
-    assert.ok(bytes.includes(le(rivColor(TOKENS.terracotta))), 'terracotta is a paint in the .riv');
+    assert.ok(bytes.includes(le(rivColor(FAMILY_COLORS.wallrusCoat))), 'the walrus coat is a paint in the .riv');
+    assert.ok(!bytes.includes(le(rivColor(TOKENS.terracotta))), 'control: the docs theme\'s terracotta is not');
     assert.ok(bytes.includes(le(rivColor(TOKENS.cream))) && bytes.includes(le(rivColor(TOKENS.charcoal))), 'cream and charcoal too');
   });
 

@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::MotionConfig;
 use crate::math::Vec2;
+use crate::support::SupportVerdict;
 use crate::terrain::{Stage, Terrain};
 
 /// A semantic action, as the lesson names it. The engine performs `Hop`, `Land`, and `Perch` (which
@@ -147,9 +148,24 @@ pub struct StanceChange {
     pub rest: Stance,
 }
 
-/// Everything the engine needs: a semantic action with a fixed start and a fixed authored target,
-/// a time budget, the frame grid to sample, and the versioned physics configuration. The engine
-/// can only reach `target`; nothing here lets it choose another.
+/// Where the lesson sends the body: the stands it authored for this destination (in its order of
+/// preference), the subject a perch there faces, and whether a narrow perch was authored. The
+/// engine picks the stand the terrain carries best ([`crate::support::select_support`]); it can only
+/// pick one of these, never move one, and refuses when none is a plausible perch.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct Destination {
+    /// The authored stands, px: at least one.
+    pub candidates: Vec<Vec2>,
+    /// The subject the perch faces, px.
+    pub focus: Vec2,
+    /// The lesson authored a narrow perch here.
+    pub narrow_allowed: bool,
+}
+
+/// Everything the engine needs: a semantic action with a fixed start and the lesson's authored
+/// destination, a time budget, the frame grid to sample, and the versioned physics configuration.
+/// The engine can only reach one of the destination's stands; nothing here lets it choose another.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct MotionInput {
@@ -159,8 +175,8 @@ pub struct MotionInput {
     pub action: MotionAction,
     /// Where the feet are when the window opens, px.
     pub start: Vec2,
-    /// Where the lesson decided the feet must end, px. Immutable.
-    pub target: Vec2,
+    /// Where the lesson sends the feet: its authored stands. Immutable.
+    pub destination: Destination,
     /// Character scale at the start.
     pub start_scale: f64,
     /// Character scale at the target.
@@ -171,7 +187,8 @@ pub struct MotionInput {
     pub fps: u32,
     /// The visible frame.
     pub stage: Stage,
-    /// Surfaces under the start and the target, the text to keep clear, and the figure's box.
+    /// The declared surfaces (the segment's own and the outgoing one's), the text to keep clear, and
+    /// the figure's box.
     pub terrain: Terrain,
     /// Postures at both ends.
     pub stance: StanceChange,
@@ -318,6 +335,44 @@ pub struct FrameRange {
     pub count: u32,
 }
 
+/// Whose terrain carried a contact.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum TerrainOf {
+    /// The segment's own.
+    Own,
+    /// The outgoing segment's, still on screen while this one transitions in.
+    Outgoing,
+}
+
+/// One of the plan's own contacts, judged for support at its instant.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JudgedContact {
+    /// When, absolute ms.
+    pub at_ms: f64,
+    /// The terrain that carried it (or, refused, the segment's own).
+    pub terrain: TerrainOf,
+    /// The judge's verdict.
+    pub verdict: SupportVerdict,
+}
+
+/// How the plan is carried: the stand the engine chose among the authored ones, every authored
+/// stand's verdict, and the verdicts on its own takeoff and landing.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanSupport {
+    /// Index of the chosen stand in `destination.candidates`.
+    pub candidate: u32,
+    /// Every authored stand's verdict as a perch facing the focus, in authored order.
+    pub candidates: Vec<SupportVerdict>,
+    /// The push-off from the start (a passing step), judged at liftoff; `None` when the start is off
+    /// the stage (an entrance from beyond the frame: nothing there can be seen standing).
+    pub takeoff: Option<JudgedContact>,
+    /// The touchdown on the chosen stand (a perch, facing the direction of travel), judged at contact.
+    pub landing: JudgedContact,
+}
+
 /// Engine identity recorded in every plan.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct EngineId {
@@ -339,8 +394,10 @@ pub struct MotionPlan {
     pub action: MotionAction,
     /// Echo of the input start.
     pub start: Vec2,
-    /// Echo of the input target: the plan's final position, bit for bit.
+    /// The chosen stand (one of `destination.candidates`, bit for bit): the plan's final position.
     pub target: Vec2,
+    /// How the start, the stand, and the landing are carried.
+    pub support: PlanSupport,
     /// Key instants.
     pub timing: PlanTiming,
     /// The flight.

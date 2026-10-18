@@ -23,7 +23,7 @@ export const FIXTURE_DIR = path.join(MOTION_CRATE_DIR, 'tests', 'fixtures');
 export const MOTION_FIXTURES = [
   { name: 'takeaway-hop', segmentId: 'takeaway', covers: 'the natural arc onto the summit ledge' },
   { name: 'hook-hop', segmentId: 'hook', covers: 'the lowest arc the search offers, and a settle hurried onto a short perch' },
-  { name: 'tiers-land', segmentId: 'tiers', covers: 'a higher arc kept with stronger gravity, onto a graph node at a new scale' },
+  { name: 'reading-land', segmentId: 'reading', covers: 'a landing at a new scale whose takeoff stands on the terrain of the outgoing scene' },
   { name: 'signals-hop', segmentId: 'signals', covers: 'a perch that leans in to inspect, where the tail settles into a curl' },
 ] as const;
 

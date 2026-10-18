@@ -2,12 +2,12 @@
   "schema": "walletwall.motion-wasm-artifact/v1",
   "crate": {
     "name": "motion-intelligence",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "abi": 1,
   "file": "motion_intelligence.wasm",
-  "bytes": 236889,
-  "sha256": "4762a0523e0d2e504e609dea99b09b694583f384d17bd651a1f2cd5a55b0d3b6",
+  "bytes": 313631,
+  "sha256": "e903c6e5618f93052003f39534159f9165b55bfdccac268387542e957a79eb41",
   "build": {
     "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
     "host": "x86_64-unknown-linux-gnu",
@@ -15,5 +15,5 @@
     "profile": "release",
     "rustflags": "--remap-path-prefix=<CARGO_HOME>=/cargo"
   },
-  "sourceSha256": "cff77077cf3520c0db2fbef104440f35229b5f9f1288f020b4060f9a59dadf50"
+  "sourceSha256": "f207df5fcec67e18238084c8afd5657ca48ffc61bacb33ad64afe2f598321c97"
 }

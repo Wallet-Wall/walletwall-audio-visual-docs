@@ -24,3 +24,15 @@ export const END_SCREEN_ZONES: Record<string, Rect> = {
 
 /** Provenance chip: top-right, on the eyebrow row, clear of captions and player chrome. */
 export const PROVENANCE_CHIP: Rect = { x: 1000, y: 106, w: 760, h: 24 };
+
+/**
+ * The ground each brand template draws (at the scene ground line), as the horizontal extent of the
+ * line: WalletWallaby's terrain in that segment. The end screen draws only the stretch right of the
+ * subscribe zone, so the zones YouTube fills stay empty. The ident draws none (he is not on screen).
+ */
+export const BRAND_GROUND = {
+  CTA: { x0: 0, x1: 1920 },
+  DOCS_REFERENCE: { x0: 0, x1: 1920 },
+  OUTRO: { x0: 0, x1: 1920 },
+  END_SCREEN: { x0: 1100, x1: 1920 },
+} as const satisfies Record<string, { x0: number; x1: number }>;

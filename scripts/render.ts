@@ -13,6 +13,9 @@ import path from 'node:path';
 import { bundle } from '@remotion/bundler';
 import { renderMedia, renderStill, selectComposition } from '@remotion/renderer';
 import { FixtureVoiceProvider } from '../src/audio/voice-provider.ts';
+import { choreograph, layoutsFor } from '../src/character/walletwallaby/choreography.ts';
+import { assertSupported, auditLesson } from '../src/character/walletwallaby/contacts.ts';
+import { planMotion } from '../src/character/walletwallaby/motion.ts';
 import { loadPipelineConfig, readJson, VIDEO_ROOT } from '../src/config/load.ts';
 import { buildIdentity } from '../src/manifest/build-identity.ts';
 import { prettyJson } from '../src/core/canonical-json.ts';
@@ -54,10 +57,24 @@ const track = await synthesize(spec, new FixtureVoiceProvider(), config);
 const timeline = buildTimeline(spec, track, config.templates);
 const out = distDir(videoId);
 mkdirSync(out, { recursive: true });
+const headings: Record<string, string> = Object.fromEntries(source.sections.map((s) => [s.id, s.heading]));
+
+// Fail closed: nothing renders while WalletWallaby would stand, grip, or brace on anything the terrain
+// on screen cannot carry (src/character/walletwallaby/contacts.ts).
+const layouts = layoutsFor(timeline, (id) => headings[id] ?? '');
+const contacts = auditLesson(timeline, layouts, planMotion(choreograph(timeline, layouts), layouts));
+try {
+  assertSupported(contacts);
+} catch (err) {
+  console.error(`[render] ${videoId}: ${(err as Error).message}`);
+  process.exit(1);
+}
+console.log(`[render] support: ${contacts.length} contacts, every one carried (${contacts.filter((c) => c.offStage).length} off stage)`);
 
 // The motion engine runs here, once, before anything is bundled: a plan the composition would refuse
-// stops the render now. The composition receives the plans as data and samples them per frame.
-const rust = engineArg === 'rust-wasm' ? planRustMotion({ spec, track, templates: config.templates, headings: Object.fromEntries(source.sections.map((s) => [s.id, s.heading])) }) : null;
+// stops the render now (and the engine audits every contact itself). The composition receives the plans
+// as data and samples them per frame.
+const rust = engineArg === 'rust-wasm' ? planRustMotion({ spec, track, templates: config.templates, headings }) : null;
 const motionEngine: MotionEngineIdentity = rust ? rust.identity : typescriptEngineIdentity();
 if (rust) for (const p of rust.identity.paths) console.log(`[render] rust-wasm ${rust.identity.wasm.sha256.slice(0, 12)}: ${p.segmentId} clip ${p.clip} ${p.action} frames ${p.frames.first}..${p.frames.first + p.frames.count - 1}, plan ${p.planSha256.slice(0, 12)}`);
 const withEngine = <T extends object>(props: T): T => (rust ? { ...props, motionEngine: rust.props } : props);

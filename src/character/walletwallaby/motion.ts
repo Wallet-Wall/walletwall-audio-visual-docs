@@ -28,7 +28,11 @@ import { easeInOut, easeOut, lerp, type Point } from '../../layout/geometry.ts';
 import { intersects, type Rect } from '../../layout/geometry.ts';
 import { EYEBROW_RECT, wallabyBounds, type PlatformKind, type SceneLayout } from '../../layout/scene-layout.ts';
 import type { WallabyExpression } from '../../spec/vocabulary.ts';
+import { sceneTerrain } from '../../layout/terrain.ts';
+import { arcDepth, MotionPlanError } from './ballistics.ts';
 import type { Clip } from './choreography.ts';
+import type { SupportConfig } from './support.ts';
+import { boundFeet, planFootholdTrace, traceMoment, trailAt, type TraceBound } from './trace.ts';
 import { AIRBORNE, blendPose, EXPRESSIONS, LAND_HARD, MANTLE, POSES, PUSH, TAKEOFF, TRACE, WALLABY_HEIGHT, type ExpressionParams, type PoseParams, type Viseme } from './rig.ts';
 
 // ── Configuration ───────────────────────────────────────────────────────────
@@ -53,19 +57,15 @@ export interface MotionConfig {
   hold: { poseBlendMs: number; shiftImpulse: number; gazeTurnMs: number };
   mantle: { minRiseBodyHeights: number; approachMarginBodyHeights: number; hangDepthBodyHeights: number; faceGapBodyHeights: number; apexAboveHangBodyHeights: number; preloadMs: number; hangMs: number; pullMs: number; settleMs: number; grabImpulse: number; topImpulse: number };
   landing: { hardFrom: number; hardFull: number; hardRecoverScale: number };
+  /** What a body can stand on, grip, or brace against (./support.ts). */
+  support: SupportConfig;
   tail: { restTension: number; preloadSwingDeg: number; preloadTension: number; takeoffTension: number; flightCounterGain: number; flightStreamDeg: number; flightTension: number; reachSwingDeg: number; braceSwingDeg: number; braceTension: number; hangSwingDeg: number; pullSwingDeg: number; narrowSwayDeg: number; narrowSwayPeriodMs: number; narrowWidthBodyHeights: number };
   response: { compression: SpringConfig; tail: SpringConfig; ears: SpringConfig; platform: SpringConfig };
   gains: { landingCrouch: number; landingHeadTiltDeg: number; landingTailDeg: number; landingEarDeg: number; takeoffTailDeg: number; takeoffEarDeg: number; platformDipPx: number };
   limits: { maxRotationDeg: number; maxCompression: number; maxStretch: number; maxTailLagDeg: number; maxEarLagDeg: number; maxHeadStabDeg: number; platformMaxPx: number; maxSpeedBodyHeightsPerS: number; maxTailSwingDeg: number; maxTailCurlDeg: number };
 }
 
-/** Any refusal by the motion layer: invalid config, non-finite input, or a move that cannot fit its window. */
-export class MotionPlanError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'MotionPlanError';
-  }
-}
+export { arcDepth, MotionPlanError } from './ballistics.ts';
 
 const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
 const smoothstep = (a: number, b: number, v: number): number => {
@@ -98,6 +98,23 @@ const CONFIG_BOUNDS: Record<string, Range | Record<string, Range | Record<string
     topImpulse: [0, 1],
   },
   landing: { hardFrom: [0, 1], hardFull: [0, 1.5], hardRecoverScale: [0, 6] },
+  support: {
+    footprintBackBodyHeights: [0.02, 0.5],
+    footprintFrontBodyHeights: [0.02, 0.5],
+    comAheadBodyHeights: [-0.3, 0.3],
+    comMarginBodyHeights: [0, 0.5],
+    stepComMarginBodyHeights: [0, 0.5],
+    narrowWidthBodyHeights: [0.1, 3],
+    broadWidthBodyHeights: [0.1, 6],
+    broadMarginBodyHeights: [0, 1],
+    tailReachBodyHeights: [0, 1.5],
+    contactHeightBodyHeights: [0, 0.5],
+    shoulderHeightBodyHeights: [0.1, 1.2],
+    shoulderAheadBodyHeights: [-0.5, 0.5],
+    armReachBodyHeights: [0.05, 1],
+    minThicknessPx: [1, 64],
+    tolerancePx: [0, 4],
+  },
   tail: {
     restTension: [0, 1],
     preloadSwingDeg: [-30, 30],
@@ -152,6 +169,9 @@ export function validateMotionConfig(raw: unknown): MotionConfig {
   if (c.push.weightBackFrac > c.push.driveStartFrac) throw new MotionPlanError('motion config: push weight shift must end before the drive');
   if (c.gains.platformDipPx > c.limits.platformMaxPx) throw new MotionPlanError('motion config: platform dip exceeds its limit');
   if (c.landing.hardFrom >= c.landing.hardFull) throw new MotionPlanError('motion config: landing.hardFrom must be below landing.hardFull');
+  if (c.support.stepComMarginBodyHeights > c.support.comMarginBodyHeights) throw new MotionPlanError('motion config: a passing step cannot need more margin than a perch');
+  if (c.support.narrowWidthBodyHeights >= c.support.broadWidthBodyHeights) throw new MotionPlanError('motion config: a narrow ledge must be narrower than broad support');
+  if (c.support.narrowWidthBodyHeights < c.support.footprintBackBodyHeights + c.support.footprintFrontBodyHeights) throw new MotionPlanError('motion config: the narrowest ledge must still hold both feet');
   for (const k of ['preloadSwingDeg', 'reachSwingDeg', 'braceSwingDeg', 'hangSwingDeg', 'pullSwingDeg', 'flightStreamDeg'] as const) {
     if (Math.abs(c.tail[k]) > c.limits.maxTailSwingDeg) throw new MotionPlanError(`motion config: tail.${k} exceeds limits.maxTailSwingDeg`);
   }
@@ -193,16 +213,6 @@ export function springResponse(tMs: number, s: SpringConfig): number {
 
 const bodyHeight = (scale: number): number => WALLABY_HEIGHT * scale;
 
-/**
- * Depth parameter c of the parabola y(s) = y0 + (y1 - y0)s - c·s(1 - s), s ∈ [0, 1],
- * whose apex sits h px above the higher endpoint (screen y grows downward).
- */
-export function arcDepth(y0: number, y1: number, h: number): number {
-  const d = y1 - y0;
-  const k = y0 - Math.min(y0, y1) + h;
-  return d + 2 * k + 2 * Math.sqrt(k * (k + d));
-}
-
 // ── Plans ───────────────────────────────────────────────────────────────────
 
 export type MotionEventKind = 'TAKEOFF' | 'LANDING' | 'STEP' | 'PUSH' | 'SHIFT';
@@ -239,6 +249,11 @@ export interface HopMotion {
   apexAbovePx: number;
   /** Flight samples (of 32) whose figure box crosses protected text. */
   textCrossings: number;
+  /**
+   * The flight continues one already under way (the body enters at the apex of an exit leap): no
+   * orient, no preload, no push-off and no takeoff contact; the fall starts at the clip's start.
+   */
+  airborneStart?: true;
 }
 export interface RiseMotion {
   kind: 'RISE';
@@ -257,6 +272,11 @@ export interface TraceMotion {
   endMs: number;
   /** Lift of each step, px (bounded by the clearance under any text above). */
   peakPx: number;
+  /**
+   * ROUTE: the body's bounds between supported footholds on the route's own nodes (./trace.ts); the
+   * drawn route is never stood on. Absent for SKIP, whose steps are on the one surface it crosses.
+   */
+  bounds?: readonly TraceBound[];
 }
 export interface PushMotion {
   kind: 'PUSH';
@@ -438,6 +458,60 @@ export function planHop(args: PlanHopArgs, config: MotionConfig = MOTION_CONFIG)
     gravityPx: finite(gravity, 'hop.gravity'),
     apexAbovePx: Math.min(from.y, to.y) - apexY,
     textCrossings: bestCrossings,
+  };
+}
+
+/**
+ * A flight already under way: the body enters at rest vertically (the apex of an exit leap) and falls on
+ * to land exactly on `to`, with constant horizontal speed. No standing start: there is nothing under the
+ * feet at the apex, so there is no orient, no preload, and no push-off. The fall takes as long as gravity
+ * says (raised within its bound only if the window is shorter). It lands as the window closes, as a hop
+ * does, so the body arrives as the scene does; the time before it falls is spent at the apex only when
+ * the apex is above the frame (out of view: nothing is seen hanging in the air). On screen, it falls at once.
+ */
+export function planFall(args: PlanHopArgs, config: MotionConfig = MOTION_CONFIG): HopMotion {
+  const from = finitePoint(args.from, 'fall.from');
+  const to = finitePoint(args.to, 'fall.to');
+  const fromScale = finite(args.fromScale, 'fall.fromScale');
+  const toScale = finite(args.toScale, 'fall.toScale');
+  const startMs = finite(args.startMs, 'fall.startMs');
+  const endMs = finite(args.endMs, 'fall.endMs');
+  if (fromScale <= 0 || toScale <= 0 || fromScale > 4 || toScale > 4) throw new MotionPlanError('fall scale must be in (0, 4]');
+  const d = to.y - from.y;
+  if (!(d > 0)) throw new MotionPlanError(`a flight entering at its apex can only fall: the target is ${-d} px above it`);
+  const budgetS = (endMs - startMs - SETTLE_RESERVE_MS) / 1000;
+  if (!(budgetS > 0)) throw new MotionPlanError(`fall window of ${endMs - startMs} ms leaves no time to fall`);
+  const body = bodyHeight((fromScale + toScale) / 2);
+  const g0 = config.gravityBodyHeightsPerS2 * body;
+  let gravity = g0;
+  // From rest at the apex, y(s) = y0 + d·s²: the arc's depth equals the drop.
+  let flightS = Math.sqrt((2 * d) / gravity);
+  if (flightS > budgetS) {
+    gravity = (2 * d) / (budgetS * budgetS);
+    if (gravity > g0 * config.maxGravityBoost) throw new MotionPlanError(`a ${Math.round(d)} px fall cannot land within ${Math.round(endMs - startMs)} ms under the gravity limit`);
+    flightS = budgetS;
+  }
+  if (Math.abs(to.x - from.x) / flightS > config.limits.maxSpeedBodyHeightsPerS * body) throw new MotionPlanError('the fall would cross too far, too fast');
+  let crossings = 0;
+  if (args.avoid?.length) {
+    for (let k = 1; k < FLIGHT_SAMPLES; k++) {
+      const u = k / FLIGHT_SAMPLES;
+      const box = wallabyBounds({ x: lerp(from.x, to.x, u), y: from.y + d * u * u }, lerp(fromScale, toScale, u));
+      if (args.avoid.some((r) => intersects(box, r))) crossings++;
+    }
+  }
+  // Out of view above the frame, the fall waits there to land as the window closes; in view, it starts at once.
+  const takeoffMs = from.y <= 0 ? startMs + (budgetS - flightS) * 1000 : startMs;
+  return {
+    kind: 'HOP',
+    orientEndMs: takeoffMs,
+    takeoffMs: finite(takeoffMs, 'fall.takeoff'),
+    contactMs: finite(takeoffMs + flightS * 1000, 'fall.contact'),
+    depthPx: d,
+    gravityPx: finite(gravity, 'fall.gravity'),
+    apexAbovePx: 0,
+    textCrossings: crossings,
+    airborneStart: true,
   };
 }
 
@@ -640,6 +714,15 @@ export function planMotion(clips: Clip[], layouts: Map<string, SceneLayout>, con
       case 'TRAVEL': {
         const avoid = protectedText(layouts.get(clip.segmentId));
         const here = surfaces[motions.length]!;
+        if (clip.airborne) {
+          // Entering in flight (the apex of an exit leap): the fall continues it; there is no takeoff contact.
+          const fall = planFall({ from: clip.from, to: clip.to, fromScale: clip.fromScale, toScale: clip.toScale, startMs: clip.startMs, endMs: clip.endMs, avoid }, config);
+          motions.push(fall);
+          const body = bodyHeight((clip.fromScale + clip.toScale) / 2);
+          const t = (fall.contactMs - fall.takeoffMs) / 1000;
+          event('LANDING', fall.contactMs, (fall.gravityPx * t) / Math.sqrt(2 * fall.gravityPx * 0.6 * body), clip.toScale, clip.to, clip.segmentId);
+          break;
+        }
         const stride = config.trace.strideBodyHeights * bodyHeight(clip.fromScale);
         const dur = clip.endMs - clip.startMs;
         const along = here.from && here.to && here.from.id === here.to.id && Math.abs(clip.to.y - clip.from.y) < 1 && clip.fromScale === clip.toScale;
@@ -689,16 +772,19 @@ export function planMotion(clips: Clip[], layouts: Map<string, SceneLayout>, con
         break;
       }
       case 'TRAVERSE': {
+        // The drawn route is information, not terrain: the body bounds between supported footholds on the
+        // route's own nodes and leaps what the route spans while the trail draws (./trace.ts).
         const path = clip.path.map((p) => finitePoint(p, 'trace.path'));
         const { lengths, total } = polylineLengths(path);
-        const stride = config.trace.strideBodyHeights * bodyHeight(clip.fromScale);
-        const steps = Math.max(1, Math.round(total / stride));
-        const avoid = protectedText(layouts.get(clip.segmentId));
-        const clear = avoid ? clearanceAbove(path, clip.fromScale, avoid) - 1 : Infinity;
-        const peakPx = Math.max(0, Math.min(config.trace.stepPeakBodyHeights * bodyHeight(clip.fromScale), clear));
-        const trace: TraceMotion = { kind: 'TRACE', mode: 'ROUTE', path, steps, lengths, total, startMs: clip.startMs, endMs: clip.endMs - Math.min(SETTLE_RESERVE_MS, (clip.endMs - clip.startMs) * 0.05), peakPx };
+        const layout = layouts.get(clip.segmentId);
+        if (!layout) throw new MotionPlanError(`trace in ${clip.segmentId}: the segment has no terrain`);
+        const bounds = planFootholdTrace({ from: clip.from, to: clip.to, fromScale: clip.fromScale, toScale: clip.toScale, startMs: clip.startMs, endMs: clip.endMs, path, terrain: sceneTerrain(layout) }, config);
+        const first = bounds[0]!;
+        const last = bounds[bounds.length - 1]!;
+        const trace: TraceMotion = { kind: 'TRACE', mode: 'ROUTE', path, steps: bounds.length, lengths, total, startMs: first.takeoffMs, endMs: last.contactMs, peakPx: 0, bounds };
         motions.push(trace);
-        stepEvents(trace, clip);
+        event('TAKEOFF', first.takeoffMs, config.trace.stepImpulse * 1.5, clip.fromScale, clip.from, clip.segmentId);
+        bounds.forEach((b, k) => event(k === bounds.length - 1 ? 'LANDING' : 'STEP', b.contactMs, config.trace.stepImpulse * (k === bounds.length - 1 ? 1.4 : b.kind === 'LEAP' ? 1.2 : 1), b.toScale, k === bounds.length - 1 ? clip.to : b.to, clip.segmentId));
         break;
       }
       case 'PUSH': {
@@ -954,6 +1040,7 @@ export function traverseProgress(plan: MotionPlan, clip: Clip, ms: number): numb
   const idx = plan.clips.indexOf(clip);
   const m = idx >= 0 ? plan.motions[idx] : undefined;
   if (!m || m.kind !== 'TRACE') return clamp((ms - clip.startMs) / (clip.endMs - clip.startMs), 0, 1);
+  if (m.bounds) return trailAt(m.bounds, ms);
   return traceProgress(plan.config, m, ms).f;
 }
 
@@ -1113,6 +1200,8 @@ export function sampleWallaby(plan: MotionPlan, ms: number, mouth: Viseme = 'RES
     case 'HOP': {
       const entry = entryPose();
       const surfaceFrom = plan.surfaces[idx]!.from;
+      // In flight above the frame before the fall: nothing under the feet, and out of view.
+      if (motion.airborneStart && ms < motion.takeoffMs) return state(clip.from.x, clip.from.y, clip.fromScale, AIRBORNE, 1, clip.to, { grounded: false, action: 'AIRBORNE', phase: 'FLIGHT', tail: { swing: 0, curl: 1.5, tension: plan.config.tail.flightTension } }, travelFacing());
       if (ms < motion.orientEndMs) return state(clip.from.x, clip.from.y, clip.fromScale, entry, 1, clip.to, { grounded: true, surface: surfaceFrom, action: 'HOP', phase: 'ORIENT' }, travelFacing());
       if (ms < motion.takeoffMs) {
         const u = clamp((ms - motion.orientEndMs) / (motion.takeoffMs - motion.orientEndMs), 0, 1);
@@ -1135,12 +1224,15 @@ export function sampleWallaby(plan: MotionPlan, ms: number, mouth: Viseme = 'RES
         const rotation = limits.maxRotationDeg * clamp(pitch * 1.3, -1, 1);
         const landing = plan.events.find((e) => e.kind === 'LANDING' && e.atMs === motion.contactMs);
         const reach = blendPose(POSES.LAND, LAND_HARD, hardness(plan.config, landing?.impulse ?? 0) * 0.5);
-        return state(x, y, scale, flightPose(s, reach), 1, clip.to, {
+        // A flight that was already under way has no push-off to extend from: it is airborne from its first instant.
+        const falling = motion.airborneStart === true;
+        const pose = falling ? (s < 0.72 ? AIRBORNE : blendPose(AIRBORNE, reach, easeInOut((s - 0.72) / 0.28))) : flightPose(s, reach);
+        return state(x, y, scale, pose, 1, clip.to, {
           rotation,
-          stretch: limits.maxStretch * extend,
+          stretch: falling ? 0 : limits.maxStretch * extend,
           grounded: false,
-          action: s < 0.18 ? 'HOP' : 'AIRBORNE',
-          phase: s < 0.18 ? 'TAKEOFF' : s < 0.72 ? 'FLIGHT' : 'REACH',
+          action: s < 0.18 && !falling ? 'HOP' : 'AIRBORNE',
+          phase: s < 0.18 && !falling ? 'TAKEOFF' : s < 0.72 ? 'FLIGHT' : 'REACH',
           velocity: { x: (clip.to.x - clip.from.x) / T, y: vy / T },
           tail: flightTail(rotation, vy, Math.hypot(vx, vy), s),
         }, travelFacing());
@@ -1206,6 +1298,48 @@ export function sampleWallaby(plan: MotionPlan, ms: number, mouth: Viseme = 'RES
       return state(x, y, lerp(clip.fromScale, clip.toScale, s), blendPose(TAKEOFF, AIRBORNE, easeInOut(s / 0.4)), 1, clip.to, { rotation, stretch: limits.maxStretch * (1 - s), grounded: false, action: 'AIRBORNE', phase: s < 0.18 ? 'TAKEOFF' : 'FLIGHT', velocity: { x: vx, y: vy }, tail: flightTail(rotation, vy * T, Math.hypot(vx * T, vy * T), Math.min(s, 0.7)) }, travelFacing());
     }
     case 'TRACE': {
+      if (motion.bounds) {
+        // A route on footholds: load, then bound between supported footholds; the trail draws during the leap.
+        const bounds = motion.bounds;
+        const ends = plan.surfaces[idx]!;
+        // Every foothold is on one of the route's own two tops: the start's (level with the start) or the end's.
+        const under = (p: Point): Surface | null => {
+          for (const [s, y] of [[ends.from, clip.from.y], [ends.to, clip.to.y]] as const) if (s && Math.abs(p.y - y) < 0.5 && p.x >= s.x0 && p.x <= s.x1) return s;
+          return null;
+        };
+        const facingOf = (b: TraceBound): 1 | -1 => (Math.abs(b.to.x - b.from.x) > 4 ? (b.to.x < b.from.x ? -1 : 1) : travelFacing());
+        const m = traceMoment(bounds, ms);
+        const b = bounds[m.bound]!;
+        if (m.phase === 'LOAD') {
+          const e = easeInOut(clamp((ms - clip.startMs) / Math.max(1, b.takeoffMs - clip.startMs), 0, 1));
+          return state(clip.from.x, clip.from.y, clip.fromScale, blendPose(entryPose(), POSES.PREPARE_JUMP, e * 0.6), 1, clip.to, { grounded: true, surface: under(clip.from), stretch: -limits.maxCompression * 0.35 * e, action: 'TRACE', phase: 'PRELOAD', tail: preloadTail(e * 0.6) }, facingOf(b));
+        }
+        if (m.phase === 'DONE') {
+          const landing = plan.events.find((e) => e.kind === 'LANDING' && e.atMs === b.contactMs);
+          const since = ms - b.contactMs;
+          return state(clip.to.x, clip.to.y, clip.toScale, landedPose(plan.config, landing?.impulse ?? 0, since), 1, clip.lookAt, { grounded: true, surface: under(clip.to), action: 'LAND', phase: 'SETTLE', tail: landingTail(landing?.impulse ?? 0, since) }, facingOf(b));
+        }
+        if (m.phase === 'CONTACT') {
+          return state(b.to.x, b.to.y, b.toScale, TRACE, 1, clip.lookAt, { grounded: true, surface: under(b.to), action: 'TRACE', phase: 'STEP', tail: { swing: 3, curl: 1, tension: 0.4 } }, facingOf(bounds[m.bound + 1] ?? b));
+        }
+        const s = m.s;
+        const T = (b.contactMs - b.takeoffMs) / 1000;
+        const at = boundFeet(b, s);
+        const vy = (b.to.y - b.from.y - b.depthPx * (1 - 2 * s)) / T;
+        const vx = (b.to.x - b.from.x) / T;
+        const pitch = vy / Math.max(1, Math.hypot(vx, vy));
+        const leap = b.kind === 'LEAP';
+        const rotation = limits.maxRotationDeg * clamp(pitch * (leap ? 1.3 : plan.config.trace.maxPitchFrac), -1, 1);
+        const pose = leap ? flightPose(s) : blendPose(TRACE, AIRBORNE, Math.sin(Math.PI * s) * 0.45);
+        return state(at.x, at.y, lerp(b.fromScale, b.toScale, s), pose, 1, clip.lookAt, {
+          rotation,
+          grounded: false,
+          action: leap ? 'AIRBORNE' : 'TRACE',
+          phase: leap && s < 0.18 ? 'TAKEOFF' : leap && s >= 0.72 ? 'REACH' : 'FLIGHT',
+          velocity: { x: vx, y: vy },
+          tail: leap ? flightTail(rotation, vy * T, Math.hypot(vx * T, vy * T), s) : { swing: -0.6 * rotation + 3, curl: 1, tension: 0.4 },
+        }, facingOf(b));
+      }
       if (ms < motion.startMs) {
         // Loading up for the first bound (SKIP only; a ROUTE trace starts stepping at once).
         const e = easeInOut(clamp((ms - clip.startMs) / (motion.startMs - clip.startMs), 0, 1));

@@ -17,6 +17,7 @@ export const MOTION_INTELLIGENCE_CONFIG_REL = 'config/motion-intelligence.json';
 export const MOTION_INTELLIGENCE_CONFIG_PINS: Readonly<Record<number, string>> = {
   1: '0b5de144aed204ab3353368681d459876a871de824a38a284d0f7e69d888b6c5',
   2: 'f89a15fde5a3c5d4af43fc543acf348997b158539731968990465a7902279f00',
+  3: '3a855473e9b51fe79915460e62fa9c107b3c66049f129a4ed1419ac615eaca5e',
 };
 
 export interface RustMotionEngineIdentity {
@@ -28,6 +29,15 @@ export interface RustMotionEngineIdentity {
   config: { path: string; schema: string; id: string; version: number; sha256: string };
   /** The plans the engine performed, in clip order: which clip, which frames, and the content address of the exact bytes it returned. */
   paths: { segmentId: string; clip: number; action: string; frames: { first: number; count: number }; planSha256: string }[];
+  /** The engine's own audit of every contact the lesson makes (../motion/rust-adapter.ts auditContactsWithEngine). */
+  support: EngineContactAudit;
+}
+
+/** What the engine's audit of a lesson's contacts covered: every contact (those off the stage are not judged), in how many terrain queries. */
+export interface EngineContactAudit {
+  contacts: number;
+  offStage: number;
+  queries: number;
 }
 
 export interface TypescriptMotionEngineIdentity {
@@ -45,7 +55,7 @@ export function typescriptEngineIdentity(): TypescriptMotionEngineIdentity {
   return { motionEngine: 'typescript', motion: { id: MOTION.id, version: MOTION.version } };
 }
 
-export function rustEngineIdentity(manifest: ArtifactManifest, paths: RustMotionEngineIdentity['paths']): RustMotionEngineIdentity {
+export function rustEngineIdentity(manifest: ArtifactManifest, paths: RustMotionEngineIdentity['paths'], support: EngineContactAudit): RustMotionEngineIdentity {
   const config = readMotionIntelligenceConfig();
   return {
     motionEngine: 'rust-wasm',
@@ -55,5 +65,6 @@ export function rustEngineIdentity(manifest: ArtifactManifest, paths: RustMotion
     toolchain: { rustc: manifest.build.rustc, target: manifest.build.target },
     config: { path: MOTION_INTELLIGENCE_CONFIG_REL, schema: config.schema, id: config.id, version: config.version, sha256: contentAddress(config) },
     paths,
+    support,
   };
 }

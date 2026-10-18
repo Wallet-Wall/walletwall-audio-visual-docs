@@ -10,10 +10,13 @@
 // No pathfinding, no simulation. Isomorphic.
 
 import { GROUND_Y, type Point } from '../../layout/geometry.ts';
-import { layoutScene, type SceneLayout } from '../../layout/scene-layout.ts';
+import { layoutScene, type Anchor, type SceneLayout } from '../../layout/scene-layout.ts';
+import { sceneTerrain } from '../../layout/terrain.ts';
 import type { WallabyAction, WallabyExpression, WallabyPose } from '../../spec/vocabulary.ts';
 import type { TimedSegment, Timeline } from '../../timeline/timeline.ts';
+import { MOTION_CONFIG } from './motion.ts';
 import type { Viseme } from './rig.ts';
+import { selectSupport } from './support.ts';
 
 export type ClipKind = 'HIDDEN' | 'HOLD' | 'TRAVEL' | 'TRAVERSE' | 'EXIT_JUMP' | 'PUSH' | 'DROP_IN';
 
@@ -37,7 +40,28 @@ export interface Clip {
   action: WallabyAction | null;
   /** Anchor id the action targets (e.g. the traced route), when it has one. */
   target: string | null;
+  /**
+   * The body enters this clip in flight (at the apex of the previous scene's exit leap), not standing:
+   * there is nothing under the feet to push off from, so the move continues the flight. Absent: standing.
+   */
+  airborne?: boolean;
+  /** A move to a lesson destination: the stands it authored there, among which `to` was chosen. */
+  destination?: ClipDestination;
 }
+
+/**
+ * The lesson's authored destination for a move: its stands, in the grammar's order of preference, the
+ * subject a perch there faces, and whether the grammar authored a narrow perch. Motion Intelligence
+ * chooses among the stands (the Rust/WASM engine receives exactly this); it never moves one.
+ */
+export interface ClipDestination {
+  candidates: readonly Point[];
+  focus: Point;
+  narrow: boolean;
+}
+
+/** An anchor as a destination. */
+export const destinationOf = (anchor: Anchor): ClipDestination => ({ candidates: anchor.candidates ?? [anchor.stand], focus: anchor.focus, narrow: anchor.narrow === true });
 
 export const ACTION_MS = {
   PUSH_THROUGH: 1500,
@@ -64,14 +88,29 @@ const ACTION_REST: Record<WallabyAction, { pose: WallabyPose; expression: Wallab
 
 const OFFSCREEN_RIGHT: Point = { x: 2100, y: GROUND_Y - 30 };
 const VANISHING_POINT: Point = { x: 960, y: 520 };
+/** An exit leap leaves the plane: its apex is above the frame, so the whole body (feet included) is out of view there. */
+const EXIT_APEX_Y = -60;
 
 /** Fixed brand choreography: WalletWallaby is a guide, not a mascot, so brand moments stay still. */
 const BRAND_MARKS: Partial<Record<TimedSegment['role'], { at: Point; scale: number; pose: WallabyPose; expression: WallabyExpression; lookAt: Point | null }>> = {
   CTA: { at: { x: 1420, y: GROUND_Y }, scale: 1, pose: 'CTA', expression: 'SATISFIED', lookAt: null },
   DOCS_REFERENCE: { at: { x: 1560, y: GROUND_Y }, scale: 0.95, pose: 'POINT', expression: 'NEUTRAL', lookAt: { x: 760, y: 560 } },
   OUTRO: { at: { x: 1380, y: GROUND_Y }, scale: 0.95, pose: 'PERCH', expression: 'SATISFIED', lookAt: { x: 900, y: 520 } },
-  END_SCREEN: { at: { x: 1700, y: 1010 }, scale: 0.5, pose: 'PERCH', expression: 'NEUTRAL', lookAt: { x: 1300, y: 600 } },
+  // The sign-off stands on the end screen's own stretch of ground (brand-layout.ts BRAND_GROUND), right of the reserved zones.
+  END_SCREEN: { at: { x: 1700, y: GROUND_Y }, scale: 0.5, pose: 'PERCH', expression: 'NEUTRAL', lookAt: { x: 1300, y: 600 } },
 };
+
+/**
+ * Where the feet go for a destination: among the stands the grammar authors there, the one Motion
+ * Intelligence judges best supported as a perch facing the anchor's subject (./support.ts). Fails closed
+ * when none is plausible, a single authored stand included. Every candidate is the same lesson
+ * destination; nothing here can pick another element or move a stand.
+ */
+export function standFor(anchor: Anchor, layout: SceneLayout): Point {
+  const { candidates, focus, narrow } = destinationOf(anchor);
+  const facingFor = (at: Point): 1 | -1 => (focus.x < at.x - 12 ? -1 : 1);
+  return selectSupport(candidates, { scale: anchor.scale, facing: 1, facingFor, role: 'PERCH', narrowAllowed: narrow }, sceneTerrain(layout), MOTION_CONFIG.support).at;
+}
 
 export function layoutsFor(timeline: Timeline, eyebrowFor: (sectionId: string) => string): Map<string, SceneLayout> {
   const out = new Map<string, SceneLayout>();
@@ -134,18 +173,22 @@ export function choreograph(timeline: Timeline, layouts: Map<string, SceneLayout
     if (until <= cursor) return;
     push(pos ? base(segmentId, 'HOLD', cursor, until) : base(segmentId, 'HIDDEN', cursor, until));
   };
-  const travel = (segmentId: string, to: Point, toScale: number, startMs: number, action: WallabyAction | null, minMs = 0): void => {
+  /** The apex an exit leap left the body at (it is in flight there, with nothing under it), until it moves on. */
+  let inFlightAt: Point | null = null;
+  const travel = (segmentId: string, to: Point, toScale: number, startMs: number, action: WallabyAction | null, minMs = 0, destination?: ClipDestination): void => {
     holdUntil(segmentId, startMs);
     const from = pos ?? OFFSCREEN_RIGHT;
     const d = dist(from, to);
     const dur = Math.max(minMs, Math.min(950, Math.max(560, 520 + d * 0.28)));
-    push({ ...base(segmentId, 'TRAVEL', startMs, startMs + dur), from, to, fromScale: pos ? scale : toScale, toScale, arc: Math.min(240, 60 + d * 0.18), action });
+    const airborne = inFlightAt !== null && from === inFlightAt;
+    push({ ...base(segmentId, 'TRAVEL', startMs, startMs + dur), from, to, fromScale: pos ? scale : toScale, toScale, arc: Math.min(240, 60 + d * 0.18), action, ...(airborne ? { airborne } : {}), ...(destination ? { destination } : {}) });
+    inFlightAt = null;
     pos = to;
     scale = toScale;
   };
-  const ensureAt = (segmentId: string, to: Point, toScale: number, startMs: number, action: WallabyAction | null): void => {
+  const ensureAt = (segmentId: string, to: Point, toScale: number, startMs: number, action: WallabyAction | null, destination?: ClipDestination): void => {
     holdUntil(segmentId, startMs);
-    if (!pos || dist(pos, to) > 24 || Math.abs(scale - toScale) > 0.01) travel(segmentId, to, toScale, Math.max(startMs, cursor), action);
+    if (!pos || dist(pos, to) > 24 || Math.abs(scale - toScale) > 0.01) travel(segmentId, to, toScale, Math.max(startMs, cursor), action, 0, destination);
   };
 
   for (const seg of timeline.segments) {
@@ -167,20 +210,23 @@ export function choreograph(timeline: Timeline, layouts: Map<string, SceneLayout
     const layout = layouts.get(seg.id);
     if (!layout) continue;
     const anchor = (id: string | undefined) => (id ? layout.anchors[id] : undefined) ?? layout.anchors['scene:entry']!;
+    /** The stand for a destination, chosen among the grammar's authored stands by support (fails closed). */
+    const stand = (a: Anchor): Point => standFor(a, layout);
 
     // Arrival: the first LAND/HOP beat is where the guide arrives; otherwise the scene entry.
     const first = seg.beats[0];
     const arrivalBeat = first && (first.beat.action === 'LAND' || first.beat.action === 'HOP') ? first : undefined;
     const arrival = anchor(arrivalBeat?.beat.target);
+    const arrivalStand = stand(arrival);
     if (seg.transitionIn.type === 'DEPTH_ENTER') {
       const start = Math.max(cursor, seg.contentStartMs - 300);
       holdUntil(seg.id, start);
-      pos = { x: arrival.stand.x, y: arrival.stand.y - 420 };
+      pos = { x: arrivalStand.x, y: arrivalStand.y - 420 };
       scale = arrival.scale;
-      push({ ...base(seg.id, 'DROP_IN', start, start + ACTION_MS.DROP_IN), to: arrival.stand, action: arrivalBeat ? arrivalBeat.beat.action : null });
-      pos = arrival.stand;
+      push({ ...base(seg.id, 'DROP_IN', start, start + ACTION_MS.DROP_IN), to: arrivalStand, action: arrivalBeat ? arrivalBeat.beat.action : null });
+      pos = arrivalStand;
     } else {
-      travel(seg.id, arrival.stand, arrival.scale, Math.max(cursor, seg.transitionIn.type === 'CUT' && seg.startMs === 0 ? 200 : seg.startMs), arrivalBeat?.beat.action ?? null, seg.contentStartMs - seg.startMs);
+      travel(seg.id, arrivalStand, arrival.scale, Math.max(cursor, seg.transitionIn.type === 'CUT' && seg.startMs === 0 ? 200 : seg.startMs), arrivalBeat?.beat.action ?? null, seg.contentStartMs - seg.startMs, destinationOf(arrival));
     }
     rest = { pose: 'LAND', expression: arrivalBeat?.beat.expression ?? 'NEUTRAL', lookAt: arrival.focus, lookAlt: null };
     if (arrivalBeat) rest = { ...ACTION_REST[arrivalBeat.beat.action], lookAt: arrival.focus, lookAlt: null, ...(arrivalBeat.beat.expression ? { expression: arrivalBeat.beat.expression } : {}) };
@@ -200,14 +246,15 @@ export function choreograph(timeline: Timeline, layouts: Map<string, SceneLayout
         case 'INSPECT':
         case 'RESOLVE': {
           const a = anchor(beat.target);
-          ensureAt(seg.id, a.stand, a.scale, t, beat.action);
+          ensureAt(seg.id, stand(a), a.scale, t, beat.action, destinationOf(a));
           restFor(a.focus);
           break;
         }
         case 'REVEAL': {
           const a = anchor(beat.target);
+          const at = stand(a);
           // Reveals point from where the guide stands unless the target is out of reach.
-          if (!pos || Math.abs(pos.x - a.stand.x) > 260) ensureAt(seg.id, a.stand, a.scale, t, beat.action);
+          if (!pos || Math.abs(pos.x - at.x) > 260) ensureAt(seg.id, at, a.scale, t, beat.action, destinationOf(a));
           else holdUntil(seg.id, t);
           rest = { pose: 'POINT', expression: beat.expression ?? 'CURIOUS', lookAt: a.focus, lookAlt: null };
           push({ ...base(seg.id, 'HOLD', cursor, cursor + ACTION_MS.REVEAL_POINT), action: 'REVEAL' });
@@ -217,7 +264,8 @@ export function choreograph(timeline: Timeline, layouts: Map<string, SceneLayout
         case 'COMPARE': {
           const a = anchor(beat.target);
           const b = anchor(beat.secondaryTarget);
-          ensureAt(seg.id, { x: (a.stand.x + b.stand.x) / 2, y: Math.min(a.stand.y, b.stand.y) }, a.scale, t, 'COMPARE');
+          const [sa, sb] = [stand(a), stand(b)];
+          ensureAt(seg.id, { x: (sa.x + sb.x) / 2, y: Math.min(sa.y, sb.y) }, a.scale, t, 'COMPARE');
           restFor(a.focus, b.focus);
           break;
         }
@@ -226,12 +274,13 @@ export function choreograph(timeline: Timeline, layouts: Map<string, SceneLayout
           if (!route) break;
           const fromA = anchor(`node:${route.from}`);
           const toA = anchor(`node:${route.to}`);
-          ensureAt(seg.id, fromA.stand, fromA.scale, t, null);
+          const [fromStand, toStand] = [stand(fromA), stand(toA)];
+          ensureAt(seg.id, fromStand, fromA.scale, t, null, destinationOf(fromA));
           const dur = route.selfLoop ? ACTION_MS.TRACE_LOOP : ACTION_MS.TRACE;
-          const path = route.selfLoop ? [fromA.stand, ...sampleCubic(route.points), toA.stand] : [fromA.stand, ...route.points, toA.stand];
+          const path = route.selfLoop ? [fromStand, ...sampleCubic(route.points), toStand] : [fromStand, ...route.points, toStand];
           rest = { pose: 'TEACH', expression: beat.expression ?? 'FOCUSED', lookAt: toA.focus, lookAlt: null };
-          push({ ...base(seg.id, 'TRAVERSE', cursor, cursor + dur), from: fromA.stand, to: toA.stand, fromScale: fromA.scale, toScale: toA.scale, path, action: 'TRACE', target: route.id });
-          pos = toA.stand;
+          push({ ...base(seg.id, 'TRAVERSE', cursor, cursor + dur), from: fromStand, to: toStand, fromScale: fromA.scale, toScale: toA.scale, path, action: 'TRACE', target: route.id });
+          pos = toStand;
           scale = toA.scale;
           restFor(toA.focus);
           break;
@@ -248,9 +297,10 @@ export function choreograph(timeline: Timeline, layouts: Map<string, SceneLayout
           const start = Math.max(t, seg.endMs - ACTION_MS.DIMENSION_JUMP);
           holdUntil(seg.id, start);
           const from = pos ?? OFFSCREEN_RIGHT;
-          const apex = { x: Math.min(from.x + 300, 1820), y: from.y - 300 };
+          const apex = { x: Math.min(from.x + 300, 1820), y: EXIT_APEX_Y };
           push({ ...base(seg.id, 'EXIT_JUMP', start, seg.endMs), from, to: apex, arc: 120, action: 'DIMENSION_JUMP' });
           pos = apex;
+          inFlightAt = apex;
           break;
         }
       }

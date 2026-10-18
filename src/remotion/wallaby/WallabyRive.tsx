@@ -53,7 +53,11 @@ function drawFrame(b: Bound, states: readonly WallabyState[]): void {
   }
 }
 
-export const WallabyRive: React.FC<{ states: readonly WallabyState[]; opacity?: number }> = ({ states, opacity = 1 }) => {
+/**
+ * `silhouette` (review renders only): every pixel the rig inks is drawn in solid charcoal, so a sheet of
+ * poses can be judged by outline alone. The pose and the drawing are unchanged; only the canvas is filtered.
+ */
+export const WallabyRive: React.FC<{ states: readonly WallabyState[]; opacity?: number; silhouette?: boolean }> = ({ states, opacity = 1, silhouette = false }) => {
   const { width, height } = useVideoConfig();
   const canvas = useRef<HTMLCanvasElement>(null);
   const [bound, setBound] = useState<Bound | null>(null);
@@ -86,5 +90,5 @@ export const WallabyRive: React.FC<{ states: readonly WallabyState[]; opacity?: 
     }
   }, [bound, states, handle]);
 
-  return <canvas ref={canvas} width={width} height={height} style={{ position: 'absolute', left: 0, top: 0, width, height, opacity }} />;
+  return <canvas ref={canvas} width={width} height={height} style={{ position: 'absolute', left: 0, top: 0, width, height, opacity, ...(silhouette ? { filter: 'brightness(0)' } : {}) }} />;
 };

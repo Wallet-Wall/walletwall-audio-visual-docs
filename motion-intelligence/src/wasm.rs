@@ -7,8 +7,8 @@
 //! |---|---|
 //! | `mi_abi_version() -> u32` | [`crate::ABI_VERSION`] |
 //! | `mi_input(len) -> ptr` | resets the arena and reserves `len` bytes for one input document (0 = refused) |
-//! | `mi_solve() -> status` | solves the reserved input: 0 = plan, 1 = refusal, 2 = no input reserved |
-//! | `mi_output_ptr() -> ptr` | the output document (plan or refusal JSON) |
+//! | `mi_solve() -> status` | answers the reserved input (a motion input or a support query): 0 = plan or report, 1 = refusal, 2 = no input reserved |
+//! | `mi_output_ptr() -> ptr` | the output document (plan, report, or refusal JSON) |
 //! | `mi_output_len() -> len` | its length in bytes |
 //!
 //! Memory is a bump arena reset by every `mi_input`, so each solve starts from the same state and
@@ -142,8 +142,8 @@ pub extern "C" fn mi_input(len: u32) -> u32 {
     ptr as u32
 }
 
-/// Solve the input written at the reserved address: 0 when the output is a plan, 1 when it is a
-/// refusal, 2 when no input was reserved. One solve per reservation.
+/// Answer the input written at the reserved address: 0 when the output is a plan or a report, 1 when
+/// it is a refusal, 2 when no input was reserved. One answer per reservation.
 #[unsafe(no_mangle)]
 pub extern "C" fn mi_solve() -> u32 {
     let len = IO.input_len.get();

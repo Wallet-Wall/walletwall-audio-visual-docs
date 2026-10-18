@@ -1,7 +1,8 @@
 //! The last gate before a plan leaves the engine. A plan that breaks any guarantee is refused, so
 //! a bug in the solver surfaces as an error, never as a frame:
 //!
-//! - the target echo is the input target, bit for bit, and so is every position from touchdown on;
+//! - the target is the authored stand the plan names, bit for bit, and so is every position from
+//!   touchdown on; that stand, the takeoff, and the landing are carried by the terrain;
 //! - every position before liftoff is the start, bit for bit, and the flight stays inside its arc;
 //! - phases are non-empty, contiguous, in traversal order, and cover the window exactly;
 //! - samples follow the phases in order and match the frame grid;
@@ -14,8 +15,8 @@ use alloc::format;
 
 use crate::error::{MotionError, MotionErrorCode, refuse};
 use crate::hop::{ARC_CANDIDATES, FLIGHT_SAMPLES};
+use crate::solver::Ends;
 use crate::state::{Contact, ContactEvent, ContactKind, MotionInput, MotionPhase, MotionPlan, MotionState};
-use crate::terrain::contact_with;
 
 fn finite_state(s: &MotionState) -> bool {
     [
@@ -41,12 +42,26 @@ fn finite_state(s: &MotionState) -> bool {
     .all(|v| v.is_finite())
 }
 
-/// Refuse a plan that breaks any of the module's guarantees for `input`.
-pub fn check_plan(plan: &MotionPlan, input: &MotionInput) -> Result<(), MotionError> {
-    use MotionErrorCode::{InvalidDuration, InvalidTarget, NonFiniteValue, OutOfBounds};
+/// Refuse a plan that breaks any of the module's guarantees for `input`, whose ends the solver
+/// resolved as `ends`.
+pub fn check_plan(plan: &MotionPlan, input: &MotionInput, ends: &Ends) -> Result<(), MotionError> {
+    use MotionErrorCode::{ImplausibleSupport, InvalidDuration, InvalidTarget, NonFiniteValue, OutOfBounds};
     let cfg = &input.config;
-    if !plan.target.bits_eq(input.target) {
-        return refuse(InvalidTarget, "the plan's target is not the authored target");
+    let support = &plan.support;
+    let chosen = input.destination.candidates.get(support.candidate as usize);
+    if !chosen.is_some_and(|c| plan.target.bits_eq(*c) && ends.target.bits_eq(*c)) {
+        return refuse(InvalidTarget, "the plan's target is not the authored stand it names");
+    }
+    if support.candidates.len() != input.destination.candidates.len()
+        || !support.candidates.get(support.candidate as usize).is_some_and(|v| v.ok)
+        || !support.landing.verdict.ok
+        || support.takeoff.as_ref().is_some_and(|t| !t.verdict.ok)
+        || support.takeoff.is_some() != input.stage.contains(input.start)
+    {
+        return refuse(
+            ImplausibleSupport,
+            "the plan's stand, takeoff, or landing is not carried",
+        );
     }
     if !plan.start.bits_eq(input.start) {
         return refuse(InvalidTarget, "the plan's start is not the input start");
@@ -85,7 +100,7 @@ pub fn check_plan(plan: &MotionPlan, input: &MotionInput) -> Result<(), MotionEr
     {
         return refuse(InvalidDuration, "the plan's key instants are out of order");
     }
-    check_events(plan, input)?;
+    check_events(plan, input, ends)?;
 
     // Phases: non-empty, contiguous, strictly in traversal order, covering [start, end).
     let (Some(first), Some(last)) = (plan.phases.first(), plan.phases.last()) else {
@@ -121,9 +136,10 @@ pub fn check_plan(plan: &MotionPlan, input: &MotionInput) -> Result<(), MotionEr
     if plan.samples.len() != plan.frames.count as usize || plan.frames.fps != input.fps {
         return refuse(InvalidDuration, "the samples do not match the frame grid");
     }
-    let apex_y = input.start.y.min(input.target.y) - plan.trajectory.apex_above_px;
-    let (x_lo, x_hi) = (input.start.x.min(input.target.x), input.start.x.max(input.target.x));
-    let y_hi = input.start.y.max(input.target.y);
+    let target = ends.target;
+    let apex_y = input.start.y.min(target.y) - plan.trajectory.apex_above_px;
+    let (x_lo, x_hi) = (input.start.x.min(target.x), input.start.x.max(target.x));
+    let y_hi = input.start.y.max(target.y);
     let mut prev = MotionPhase::Idle;
     for (k, s) in plan.samples.iter().enumerate() {
         let at = |what: &str| {
@@ -166,11 +182,11 @@ pub fn check_plan(plan: &MotionPlan, input: &MotionInput) -> Result<(), MotionEr
             return refuse(OutOfBounds, at("an angle exceeds its range of motion"));
         }
         if s.phase.before_liftoff() {
-            if !s.position.bits_eq(input.start) || s.contact != contact_with(input.terrain.start.as_ref()) {
+            if !s.position.bits_eq(input.start) || s.contact != ends.start_contact {
                 return refuse(InvalidTarget, at("the feet left the start before liftoff"));
             }
         } else if s.phase.after_contact() {
-            if !s.position.bits_eq(input.target) || s.contact != contact_with(input.terrain.target.as_ref()) {
+            if !s.position.bits_eq(target) || s.contact != ends.target_contact {
                 return refuse(
                     InvalidTarget,
                     at("after touchdown the feet are not on the authored target"),
@@ -216,7 +232,7 @@ pub fn check_plan(plan: &MotionPlan, input: &MotionInput) -> Result<(), MotionEr
 /// The contacts are exactly two, in order: the takeoff from the start at liftoff and the landing on
 /// the target at touchdown, each with a finite impulse in `[0, 1]`, the exact position and scale,
 /// and the contact the terrain declares there.
-fn check_events(plan: &MotionPlan, input: &MotionInput) -> Result<(), MotionError> {
+fn check_events(plan: &MotionPlan, input: &MotionInput, ends: &Ends) -> Result<(), MotionError> {
     use MotionErrorCode::{InvalidDuration, InvalidTarget, NonFiniteValue, OutOfBounds};
     let [takeoff, landing] = plan.events.as_slice() else {
         return refuse(
@@ -231,15 +247,15 @@ fn check_events(plan: &MotionPlan, input: &MotionInput) -> Result<(), MotionErro
             plan.timing.liftoff_ms,
             input.start,
             input.start_scale,
-            contact_with(input.terrain.start.as_ref()),
+            ends.start_contact,
         ),
         (
             landing,
             ContactKind::Landing,
             plan.timing.contact_ms,
-            input.target,
+            ends.target,
             input.target_scale,
-            contact_with(input.terrain.target.as_ref()),
+            ends.target_contact,
         ),
     ];
     for (e, kind, at_ms, position, scale, contact) in expected {

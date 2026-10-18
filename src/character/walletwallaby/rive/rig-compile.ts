@@ -9,7 +9,7 @@
 // Same source, same bytes. Isomorphic.
 
 import { mixTokens, TOKENS } from '../../../brand/tokens.ts';
-import { RIG_PALETTE } from '../rig.ts';
+import { FAMILY_COLORS, RIG_PALETTE, type ColorToken, type RigColor } from '../rig.ts';
 import { encodeRiv, packBytes, rivColor, type RivObject, type RivPropName, type RivValue } from './riv-format.ts';
 import { angleOf, apply, DEG, invert, local, mul, smoothContour, sub, type CubicVertexSpec, type Mat2D, type Vec } from './rig-math.ts';
 import {
@@ -25,6 +25,7 @@ import {
   RIG_IKS,
   RIG_ORIGIN,
   SHAPES,
+  type ContourSpec,
   type IkGroup,
   type PaintSlot,
   type PoseSpec,
@@ -105,10 +106,13 @@ const finiteVec = (v: Vec, what: string): Vec => {
   return v;
 };
 
-/** Paint slot -> opaque #RRGGBB, from the brand contract only (the shade is derived, never typed). */
+/** A rig colour name -> opaque #RRGGBB: the mascot family's coat, or a brand token. */
+const rigColor = (name: RigColor): string => (name in FAMILY_COLORS ? FAMILY_COLORS[name as keyof typeof FAMILY_COLORS] : TOKENS[name as ColorToken]);
+
+/** Paint slot -> opaque #RRGGBB (the shade is derived, never typed). */
 export function slotColor(slot: PaintSlot): string {
   const entry = RIG_PALETTE[slot];
-  return typeof entry === 'string' ? TOKENS[entry] : mixTokens(TOKENS[entry.from], TOKENS[entry.to], entry.t);
+  return typeof entry === 'string' ? rigColor(entry) : mixTokens(rigColor(entry.from), rigColor(entry.to), entry.t);
 }
 
 function buildSkeleton(): { bones: Record<RigBone, BoneModel>; controls: Record<RigControl, ControlModel> } {
@@ -259,45 +263,7 @@ function writeShape(w: ArtboardWriter, spec: ShapeSpec, bones: Record<RigBone, B
     const ring: Vec[] = Array.from({ length: 24 }, (_, i) => [g.center[0] + (g.width / 2) * Math.cos((i / 24) * 2 * Math.PI), g.center[1] + (g.height / 2) * Math.sin((i / 24) * 2 * Math.PI)]);
     outlines.push({ shape: spec.name, closed: true, attach: spec.attach, skinned: false, vertices: ring.map(toAttach).map((p) => ({ at: p, inHandle: p, outHandle: p })), inkPad });
   } else {
-    const verts = smoothContour(g.points, g.closed, g.roundness ?? 1);
-    const pathId = w.add('PointsPath', [['parentId', shapeId], ['isClosed', g.closed]]);
-    if (spec.skin) {
-      const chain = spec.skin;
-      for (let i = 1; i < chain.length; i++) {
-        const prev = bones[chain[i - 1]!];
-        const tipPrev = apply(prev.restWorld, [prev.length, 0]);
-        const startCur = apply(bones[chain[i]!].restWorld, [0, 0]);
-        if (!near(tipPrev, startCur) && Math.hypot(tipPrev[0] - startCur[0], tipPrev[1] - startCur[1]) > 1e-6) throw new RigCompileError(`shape ${spec.name}: skin chain ${chain.join(' > ')} is not connected`);
-      }
-      const tendonIndex = new Map(chain.map((b, i) => [b, i + 1]));
-      const pack = (infl: Influences, what: string): [number, number] => [packBytes(infl.map((f) => f.weight), `${what}.values`), packBytes(infl.map((f) => tendonIndex.get(f.bone)!), `${what}.indices`)];
-      const vertices: OutlineVertex[] = [];
-      verts.forEach((v, i) => {
-        const vp = vertexProps(v, (p) => p);
-        const vid = w.add(vp.straight ? 'StraightVertex' : 'CubicDetachedVertex', [['parentId', pathId], ...vp.props]);
-        const infl = chainWeights(v.at, chain, bones);
-        const inInfl = vp.straight ? infl : chainWeights(v.inHandle, chain, bones);
-        const outInfl = vp.straight ? infl : chainWeights(v.outHandle, chain, bones);
-        const [values, indices] = pack(infl, `${spec.name}.v${i}`);
-        vertices.push({ ...v, skin: { at: infl, inHandle: inInfl, outHandle: outInfl } });
-        if (vp.straight) w.add('Weight', [['parentId', vid], ['weightValues', values], ['weightIndices', indices]]);
-        else {
-          const [iv, ii] = pack(inInfl, `${spec.name}.v${i}.in`);
-          const [ov, oi] = pack(outInfl, `${spec.name}.v${i}.out`);
-          w.add('CubicWeight', [['parentId', vid], ['weightValues', values], ['weightIndices', indices], ['cubicInValues', iv], ['cubicInIndices', ii], ['cubicOutValues', ov], ['cubicOutIndices', oi]]);
-        }
-      });
-      const toArtboard: Mat2D = [1, 0, 0, 1, RIG_ORIGIN[0], RIG_ORIGIN[1]];
-      const skinId = w.add('Skin', [['parentId', pathId], ...matProps('skin', toArtboard)]);
-      for (const b of chain) w.add('Tendon', [['parentId', skinId], ['tendonBoneId', w.id(`bone:${b}`)], ...matProps('tendon', mul(toArtboard, bones[b].restWorld))]);
-      outlines.push({ shape: spec.name, closed: g.closed, attach: 'root', skinned: true, vertices, inkPad });
-    } else {
-      for (const v of verts) {
-        const vp = vertexProps(v, toAttach);
-        w.add(vp.straight ? 'StraightVertex' : 'CubicDetachedVertex', [['parentId', pathId], ...vp.props]);
-      }
-      outlines.push({ shape: spec.name, closed: g.closed, attach: spec.attach, skinned: false, vertices: verts.map((v) => ({ at: toAttach(v.at), inHandle: toAttach(v.inHandle), outHandle: toAttach(v.outHandle) })), inkPad });
-    }
+    for (const contour of g.kind === 'contours' ? g.contours : [g]) writePath(w, spec, shapeId, contour, bones, toAttach, outlines, inkPad);
   }
   if (spec.fill) {
     const fillId = w.add('Fill', [['parentId', shapeId], ['fillRule', 0], ['isVisible', true]]);
@@ -308,6 +274,58 @@ function writeShape(w: ArtboardWriter, spec: ShapeSpec, bones: Record<RigBone, B
     const strokeId = w.add('Stroke', [['parentId', shapeId], ['thickness', s.width], ['cap', capOf(s.cap)], ['join', joinOf(s.join)], ['transformAffectsStroke', true], ['isVisible', true]]);
     w.add('SolidColor', [['parentId', strokeId], ['colorValue', rivColor(slotColor(s.slot), s.alpha ?? 1)]]);
   }
+}
+
+/** One path of a shape: its vertices (skinned to the shape's bone chain when it has one) and its outline model. */
+function writePath(
+  w: ArtboardWriter,
+  spec: ShapeSpec,
+  shapeId: number,
+  g: ContourSpec,
+  bones: Record<RigBone, BoneModel>,
+  toAttach: (p: Vec) => Vec,
+  outlines: OutlineModel[],
+  inkPad: number,
+): void {
+  const verts = smoothContour(g.points, g.closed, g.roundness ?? 1);
+  const pathId = w.add('PointsPath', [['parentId', shapeId], ['isClosed', g.closed]]);
+  if (!spec.skin) {
+    for (const v of verts) {
+      const vp = vertexProps(v, toAttach);
+      w.add(vp.straight ? 'StraightVertex' : 'CubicDetachedVertex', [['parentId', pathId], ...vp.props]);
+    }
+    outlines.push({ shape: spec.name, closed: g.closed, attach: spec.attach, skinned: false, vertices: verts.map((v) => ({ at: toAttach(v.at), inHandle: toAttach(v.inHandle), outHandle: toAttach(v.outHandle) })), inkPad });
+    return;
+  }
+  const chain = spec.skin;
+  for (let i = 1; i < chain.length; i++) {
+    const prev = bones[chain[i - 1]!];
+    const tipPrev = apply(prev.restWorld, [prev.length, 0]);
+    const startCur = apply(bones[chain[i]!].restWorld, [0, 0]);
+    if (!near(tipPrev, startCur) && Math.hypot(tipPrev[0] - startCur[0], tipPrev[1] - startCur[1]) > 1e-6) throw new RigCompileError(`shape ${spec.name}: skin chain ${chain.join(' > ')} is not connected`);
+  }
+  const tendonIndex = new Map(chain.map((b, i) => [b, i + 1]));
+  const pack = (infl: Influences, what: string): [number, number] => [packBytes(infl.map((f) => f.weight), `${what}.values`), packBytes(infl.map((f) => tendonIndex.get(f.bone)!), `${what}.indices`)];
+  const vertices: OutlineVertex[] = [];
+  verts.forEach((v, i) => {
+    const vp = vertexProps(v, (p) => p);
+    const vid = w.add(vp.straight ? 'StraightVertex' : 'CubicDetachedVertex', [['parentId', pathId], ...vp.props]);
+    const infl = chainWeights(v.at, chain, bones);
+    const inInfl = vp.straight ? infl : chainWeights(v.inHandle, chain, bones);
+    const outInfl = vp.straight ? infl : chainWeights(v.outHandle, chain, bones);
+    const [values, indices] = pack(infl, `${spec.name}.v${i}`);
+    vertices.push({ ...v, skin: { at: infl, inHandle: inInfl, outHandle: outInfl } });
+    if (vp.straight) w.add('Weight', [['parentId', vid], ['weightValues', values], ['weightIndices', indices]]);
+    else {
+      const [iv, ii] = pack(inInfl, `${spec.name}.v${i}.in`);
+      const [ov, oi] = pack(outInfl, `${spec.name}.v${i}.out`);
+      w.add('CubicWeight', [['parentId', vid], ['weightValues', values], ['weightIndices', indices], ['cubicInValues', iv], ['cubicInIndices', ii], ['cubicOutValues', ov], ['cubicOutIndices', oi]]);
+    }
+  });
+  const toArtboard: Mat2D = [1, 0, 0, 1, RIG_ORIGIN[0], RIG_ORIGIN[1]];
+  const skinId = w.add('Skin', [['parentId', pathId], ...matProps('skin', toArtboard)]);
+  for (const b of chain) w.add('Tendon', [['parentId', skinId], ['tendonBoneId', w.id(`bone:${b}`)], ...matProps('tendon', mul(toArtboard, bones[b].restWorld))]);
+  outlines.push({ shape: spec.name, closed: g.closed, attach: 'root', skinned: true, vertices, inkPad });
 }
 
 export interface PoseValues {

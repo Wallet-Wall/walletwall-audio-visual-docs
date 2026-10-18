@@ -38,7 +38,12 @@ for (const e of plan.events.filter((x) => x.kind === 'LANDING')) {
 labPicks.sort((a, b) => a.frame - b.frame);
 const labJobs = labPicks.map((p, i) => ({ id: 'WalletWallabyMotionLab', name: `lab-${String(i).padStart(2, '0')}-${p.key}`, frame: p.frame }));
 
-const jobs = [{ id: 'WalletWallabyPoseSheet', name: 'pose-sheet', frame: 0 }, { id: 'WalletWallabyCloseup', name: 'closeup', frame: 0 }, ...labJobs].filter((j) => !only || j.name.startsWith(only));
+const jobs = [
+  { id: 'WalletWallabyPoseSheet', name: 'pose-sheet', frame: 0 },
+  { id: 'WalletWallabySilhouetteSheet', name: 'silhouette-sheet', frame: 0 },
+  { id: 'WalletWallabyCloseup', name: 'closeup', frame: 0 },
+  ...labJobs,
+].filter((j) => !only || j.name.startsWith(only));
 if (jobs.length === 0) throw new Error(`no review still matches ${only}`);
 stageRendererAssets();
 const serveUrl = await bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'review', 'index.ts'), publicDir: PUBLIC_DIR });

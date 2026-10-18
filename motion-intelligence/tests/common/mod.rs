@@ -3,7 +3,8 @@
 //! them. Regenerate all of them with `npm run motion:fixtures` after a deliberate behaviour change.
 #![allow(dead_code)]
 
-use motion_intelligence::{MotionError, MotionErrorCode, MotionInput, MotionPlan, solve_motion};
+use motion_intelligence::terrain::{Face, SupportClass, TerrainSurface};
+use motion_intelligence::{MotionError, MotionErrorCode, MotionInput, MotionPlan, Vec2, solve_motion};
 
 /// The takeaway hop: the natural arc onto the summit ledge (the default fixture below).
 pub const INPUT_JSON: &str = include_str!("../fixtures/takeaway-hop.input.json");
@@ -19,10 +20,10 @@ pub const FIXTURES: [(&str, &str, &[u8]); 4] = [
         include_bytes!("../fixtures/hook-hop.plan.json"),
     ),
     (
-        // A higher arc kept with stronger gravity, onto a graph node at a new scale.
-        "tiers-land",
-        include_str!("../fixtures/tiers-land.input.json"),
-        include_bytes!("../fixtures/tiers-land.plan.json"),
+        // A landing at a new scale whose takeoff stands on the outgoing scene's terrain.
+        "reading-land",
+        include_str!("../fixtures/reading-land.input.json"),
+        include_bytes!("../fixtures/reading-land.plan.json"),
     ),
     (
         // A perch that leans in to inspect: the tail settles into a curl.
@@ -44,6 +45,53 @@ pub fn fixture(name: &str) -> MotionInput {
         .find(|(n, _, _)| *n == name)
         .unwrap_or_else(|| panic!("no fixture {name}"));
     serde_json::from_str(json).expect("the fixture input parses")
+}
+
+/// The authored stand of a canonical input (each canonical destination authors exactly one).
+pub fn stand(i: &MotionInput) -> Vec2 {
+    assert_eq!(
+        i.destination.candidates.len(),
+        1,
+        "a canonical destination authors one stand"
+    );
+    i.destination.candidates[0]
+}
+
+/// Author `at` as the destination's only stand.
+pub fn set_stand(i: &mut MotionInput, at: Vec2) {
+    i.destination.candidates = vec![at];
+}
+
+/// A surface for hand-built terrain.
+pub fn surface(
+    id: &str,
+    face: Face,
+    support: SupportClass,
+    (x0, y0, x1, y1): (f64, f64, f64, f64),
+    thickness_px: f64,
+) -> TerrainSurface {
+    TerrainSurface {
+        id: id.into(),
+        element: id.split(':').next().unwrap_or(id).into(),
+        face,
+        support,
+        x0,
+        y0,
+        x1,
+        y1,
+        thickness_px,
+    }
+}
+
+/// Edge-to-edge ground with its line at `y` (down to the bottom of a 1080 px frame).
+pub fn ground(y: f64) -> TerrainSurface {
+    surface(
+        "ground:top",
+        Face::Top,
+        SupportClass::SupportedSurface,
+        (0.0, y, 1920.0, y),
+        1080.0 - y,
+    )
 }
 
 /// Solve the canonical input after `patch`.
