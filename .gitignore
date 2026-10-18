@@ -2,6 +2,7 @@
 node_modules/
 dist/
 coverage/
+motion-intelligence/target/
 
 # Rendered media never goes in git
 *.mp4

@@ -47,6 +47,7 @@ Report exact results in the PR:
 - `npm audit --audit-level=moderate`
 - `git diff --check`
 - for anything visual: `npm run render:stills migration-readiness`, with before/after stills attached
+- for anything under `motion-intelligence/` (in that directory): `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo clippy --target wasm32-unknown-unknown --lib -- -D warnings`, `cargo test`; then `npm run motion:build` and `npm run motion:check` on Linux or WSL (the committed WASM is a canonical Linux build), and `npm run motion:fixtures` after a deliberate behaviour change ([docs/MOTION_INTELLIGENCE.md](docs/MOTION_INTELLIGENCE.md))
 
 ## Copy
 

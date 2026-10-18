@@ -27,6 +27,10 @@
     "contracts:check": "node scripts/contracts-check.ts",
     "rive:build": "node scripts/build-rive.ts",
     "rive:check": "node scripts/build-rive.ts --check",
+    "motion:build": "bash motion-intelligence/build-wasm.sh dist/motion-intelligence/motion_intelligence.wasm && node scripts/motion-wasm.ts --write dist/motion-intelligence/motion_intelligence.wasm",
+    "motion:check": "bash motion-intelligence/build-wasm.sh dist/motion-intelligence/motion_intelligence.wasm && node scripts/motion-wasm.ts --check dist/motion-intelligence/motion_intelligence.wasm",
+    "motion:fixtures": "node scripts/motion-fixtures.ts",
+    "motion:bench": "node scripts/motion-bench.ts",
     "pipeline": "node scripts/pipeline.ts",
     "check": "npm run typecheck && npm test && npm run plan:check && npm run validate && npm run rive:check"
   },

@@ -1,0 +1,7 @@
+# The pinned toolchain for the Motion Intelligence crate. The committed WebAssembly artifact is a
+# byte-for-byte function of this toolchain, Cargo.lock, and the source (`npm run motion:check`).
+[toolchain]
+channel = "1.96.0"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"

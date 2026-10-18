@@ -19,6 +19,8 @@ import { contentAddress, sha256Hex } from '../src/core/hash.ts';
 import { IssueCollector } from '../src/core/issues.ts';
 import { buildIdentity } from '../src/manifest/build-identity.ts';
 import { buildProvenanceManifest } from '../src/manifest/provenance.ts';
+import { loadVerifiedArtifact } from '../src/motion/artifact.ts';
+import { readMotionIntelligenceConfig, typescriptEngineIdentity, type MotionEngineIdentity } from '../src/motion/engine-identity.ts';
 import { distDir, loadCommittedSpec, loadRegistry, validationContextFor } from '../src/pipeline/context.ts';
 import { loadSnapshot, synthesize } from '../src/pipeline/render-input.ts';
 import { emptyLineage, type Lineage } from '../src/publish/lineage.ts';
@@ -54,12 +56,24 @@ const cueSheet = buildCueSheet(timeline, config.sonic, spec.audio.musicBedId, mo
 writeFileSync(path.join(out, 'cue-sheet.json'), prettyJson(cueSheet));
 
 const renderInfoPath = path.join(out, 'render.json');
-const renderInfo = existsSync(renderInfoPath) ? readJson<{ engine: { name: string; version: string }; output: { path: string; sha256: string }; identity?: unknown }>(renderInfoPath) : null;
+const renderInfo = existsSync(renderInfoPath) ? readJson<{ engine: { name: string; version: string }; output: { path: string; sha256: string }; identity?: unknown; motionEngine?: MotionEngineIdentity }>(renderInfoPath) : null;
 // A render made by a different toolchain, configuration, or character version cannot be described by this one.
 const identity = buildIdentity();
 if (renderInfo && prettyJson(renderInfo.identity ?? null) !== prettyJson(identity)) {
   console.error(`[publish:dry-run] ${videoId}: dist render.json was produced with a different build identity; re-render before publishing.`);
   process.exit(1);
+}
+// Nor can a render whose motion came from an engine artifact or engine config this checkout no longer has.
+// (A render.json from before the field existed was made by the TypeScript solver.) The cue sheet below is
+// timed to the TypeScript plan's contacts, which the engine's paths are bound to equal exactly.
+const motionEngine: MotionEngineIdentity = renderInfo?.motionEngine ?? typescriptEngineIdentity();
+if (renderInfo && motionEngine.motionEngine === 'rust-wasm') {
+  // The bytes on disk, verified against their manifest (a swapped .wasm is refused here, not trusted).
+  const { manifest: artifact } = loadVerifiedArtifact();
+  if (motionEngine.wasm.sha256 !== artifact.sha256 || motionEngine.config.sha256 !== contentAddress(readMotionIntelligenceConfig())) {
+    console.error(`[publish:dry-run] ${videoId}: dist render.json was made with a different Motion Intelligence artifact or config; re-render before publishing.`);
+    process.exit(1);
+  }
 }
 const specHash = contentAddress(spec);
 const manifest = buildPublishManifest({
@@ -81,7 +95,7 @@ const provenance = buildProvenanceManifest({
   timeline,
   cueSheet,
   validation,
-  render: renderInfo ? { engine: renderInfo.engine.name, version: renderInfo.engine.version, output: renderInfo.output.path, sha256: renderInfo.output.sha256 } : null,
+  render: renderInfo ? { engine: renderInfo.engine.name, version: renderInfo.engine.version, output: renderInfo.output.path, sha256: renderInfo.output.sha256, motionEngine } : null,
   identity,
 });
 writeFileSync(path.join(out, 'provenance.json'), prettyJson(provenance));

@@ -1,0 +1,73 @@
+{
+  "schema": "walletwall.motion-intelligence-config/v1",
+  "id": "walletwallaby-motion-intelligence",
+  "version": 1,
+  "note": "Physics for the Rust/WASM Motion Intelligence engine (motion-intelligence/). Lengths are in body heights (bodyHeightPx x the character's scale), times in milliseconds, angles in degrees. The hop timing values must equal config/motion.json while the TypeScript solver remains the oracle (test/rust-motion-engine.test.ts enforces it). Changing any value requires a new version (pinned in src/motion/engine-identity.ts).",
+  "bodyHeightPx": 236,
+  "gravityBodyHeightsPerS2": 21,
+  "maxGravityBoost": 1.8,
+  "maxSpeedBodyHeightsPerS": 16,
+  "hop": {
+    "peakBase": 0.3,
+    "peakPerPx": 0.08,
+    "peakMin": 0.18,
+    "peakMax": 1,
+    "anticipationMs": 190,
+    "anticipationHoldFrac": 0.3,
+    "orientMaxMs": 160,
+    "minFlightMs": 110,
+    "settleReserveMs": 40,
+    "pushMs": 70,
+    "preloadSquash": 0.55,
+    "extensionFrac": 0.18,
+    "extensionReferenceBodyHeights": 0.3,
+    "airborneCrouch": 0
+  },
+  "landing": {
+    "contactMs": 34,
+    "compressionMs": 110,
+    "settleMs": 700,
+    "settleFreqHz": 2.6,
+    "settleDamping": 0.55,
+    "impulseReferenceBodyHeights": 0.6,
+    "crouchBase": 0.3,
+    "crouchGain": 0.32,
+    "compressionGain": 1,
+    "nodDeg": 5
+  },
+  "pitch": {
+    "maxDeg": 9,
+    "velocityGain": 1.3,
+    "headStabilization": 0.6
+  },
+  "tail": {
+    "freqHz": 2.4,
+    "damping": 0.45,
+    "loadDeg": 8,
+    "pitchCounter": 0.9,
+    "liftDeg": 1.4,
+    "impactDeg": 6,
+    "maxDeg": 30,
+    "curlFlightDeg": 1.5,
+    "curlLoadDeg": 1.5,
+    "maxCurlDeg": 6,
+    "tensionRest": 0.1,
+    "tensionLoad": 0.5,
+    "tensionLever": 0.85,
+    "tensionFlight": 0.55,
+    "tensionBrace": 0.8,
+    "tensionEffort": 0.5,
+    "tensionFollowMs": 80
+  },
+  "ears": {
+    "freqHz": 3.4,
+    "damping": 0.3,
+    "accelGainDeg": 2,
+    "maxDeg": 9
+  },
+  "limits": {
+    "maxHeadDeg": 6,
+    "maxWindowMs": 60000,
+    "maxApexBodyHeights": 2
+  }
+}
