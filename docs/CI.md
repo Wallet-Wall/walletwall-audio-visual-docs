@@ -12,7 +12,7 @@ This repository produces public-facing WalletWall videos, so CI checks two thing
 | CodeQL (code scanning) | `CodeQL` (the alert verdict on a pull request) | pull requests to `main` | yes |
 | Public Output (`public-output.yml`) | `Public surface` | pull requests, pushes to `main` | yes |
 | Public Output (`public-output.yml`) | `Render determinism` | pull requests, pushes to `main` | yes |
-| Public Output (`public-output.yml`) | `Dependency review` | pull requests | yes |
+| Public Output (`public-output.yml`) | `Dependency review` | pull requests | not yet: it needs the repository's dependency graph (Settings → Code security), and fails until that is enabled |
 | Publication Proof (`publication-proof.yml`) | `Publication proof` | manual dispatch; pushes to `main` that change render inputs | no |
 
 No required check is path-filtered: a required check that does not run on a pull request would block it forever.
@@ -81,6 +81,6 @@ It sets no license policy. The repository is MIT, and the installed tree is most
 `main` is protected by a repository ruleset:
 
 - Changes arrive through pull requests; direct pushes, force pushes, and deletion of `main` are blocked.
-- Every required check in the table above must pass, on a branch that is up to date with `main`. Workflow checks are bound to the GitHub Actions app, and `CodeQL` to GitHub code scanning, so a status from anywhere else cannot satisfy them.
+- Every check marked required in the table above must pass, on a branch that is up to date with `main`. Workflow checks are bound to the GitHub Actions app, and `CodeQL` to GitHub code scanning, so a status from anywhere else cannot satisfy them. `Dependency review` joins the required checks once the dependency graph is enabled and the check has passed once.
 - No approving review count is set, because the maintainer opens most pull requests and GitHub does not let an author approve their own. Anyone with write access can merge a pull request once every required check passes. Raising the count to 1 would put a second person on every merge; the maintainer's own pull requests would then need a collaborator's approval or a recorded bypass.
 - Repository administrators may bypass the rules on a pull request only, as a recorded owner-recovery path. They cannot push to `main` directly.
