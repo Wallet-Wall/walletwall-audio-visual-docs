@@ -1,13 +1,22 @@
 {
-  "schema": "walletwall.motion-input/v2",
+  "schema": "walletwall.motion-input/v3",
   "action": "HOP",
   "start": {
     "x": 335,
     "y": 650
   },
-  "target": {
-    "x": 1585,
-    "y": 650
+  "destination": {
+    "candidates": [
+      {
+        "x": 1585,
+        "y": 650
+      }
+    ],
+    "focus": {
+      "x": 1585,
+      "y": 735
+    },
+    "narrowAllowed": false
   },
   "startScale": 0.7,
   "targetScale": 0.7,
@@ -22,18 +31,261 @@
     "height": 1080
   },
   "terrain": {
-    "start": {
-      "kind": "NODE",
-      "topY": 650,
-      "leftX": 200,
-      "rightX": 470
-    },
-    "target": {
-      "kind": "NODE",
-      "topY": 650,
-      "leftX": 1450,
-      "rightX": 1720
-    },
+    "surfaces": [
+      {
+        "id": "node:tier:top",
+        "element": "node:tier",
+        "face": "TOP",
+        "support": "SUPPORTED_SURFACE",
+        "x0": 750,
+        "y0": 290,
+        "x1": 1170,
+        "y1": 290,
+        "thicknessPx": 160
+      },
+      {
+        "id": "node:tier:left",
+        "element": "node:tier",
+        "face": "LEFT",
+        "support": "SIDE_FACE",
+        "x0": 750,
+        "y0": 290,
+        "x1": 750,
+        "y1": 450,
+        "thicknessPx": 420
+      },
+      {
+        "id": "node:tier:right",
+        "element": "node:tier",
+        "face": "RIGHT",
+        "support": "SIDE_FACE",
+        "x0": 1170,
+        "y0": 290,
+        "x1": 1170,
+        "y1": 450,
+        "thicknessPx": 420
+      },
+      {
+        "id": "node:value-at-risk:top",
+        "element": "node:value-at-risk",
+        "face": "TOP",
+        "support": "SUPPORTED_SURFACE",
+        "x0": 200,
+        "y0": 650,
+        "x1": 470,
+        "y1": 650,
+        "thicknessPx": 170
+      },
+      {
+        "id": "node:value-at-risk:left",
+        "element": "node:value-at-risk",
+        "face": "LEFT",
+        "support": "SIDE_FACE",
+        "x0": 200,
+        "y0": 650,
+        "x1": 200,
+        "y1": 820,
+        "thicknessPx": 270
+      },
+      {
+        "id": "node:value-at-risk:right",
+        "element": "node:value-at-risk",
+        "face": "RIGHT",
+        "support": "SIDE_FACE",
+        "x0": 470,
+        "y0": 650,
+        "x1": 470,
+        "y1": 820,
+        "thicknessPx": 270
+      },
+      {
+        "id": "node:signature-exposure:top",
+        "element": "node:signature-exposure",
+        "face": "TOP",
+        "support": "SUPPORTED_SURFACE",
+        "x0": 616.6666666666666,
+        "y0": 650,
+        "x1": 886.6666666666666,
+        "y1": 650,
+        "thicknessPx": 170
+      },
+      {
+        "id": "node:signature-exposure:left",
+        "element": "node:signature-exposure",
+        "face": "LEFT",
+        "support": "SIDE_FACE",
+        "x0": 616.6666666666666,
+        "y0": 650,
+        "x1": 616.6666666666666,
+        "y1": 820,
+        "thicknessPx": 270
+      },
+      {
+        "id": "node:signature-exposure:right",
+        "element": "node:signature-exposure",
+        "face": "RIGHT",
+        "support": "SIDE_FACE",
+        "x0": 886.6666666666666,
+        "y0": 650,
+        "x1": 886.6666666666666,
+        "y1": 820,
+        "thicknessPx": 270
+      },
+      {
+        "id": "node:dormancy:top",
+        "element": "node:dormancy",
+        "face": "TOP",
+        "support": "SUPPORTED_SURFACE",
+        "x0": 1033.3333333333333,
+        "y0": 650,
+        "x1": 1303.3333333333333,
+        "y1": 650,
+        "thicknessPx": 170
+      },
+      {
+        "id": "node:dormancy:left",
+        "element": "node:dormancy",
+        "face": "LEFT",
+        "support": "SIDE_FACE",
+        "x0": 1033.3333333333333,
+        "y0": 650,
+        "x1": 1033.3333333333333,
+        "y1": 820,
+        "thicknessPx": 270
+      },
+      {
+        "id": "node:dormancy:right",
+        "element": "node:dormancy",
+        "face": "RIGHT",
+        "support": "SIDE_FACE",
+        "x0": 1303.3333333333333,
+        "y0": 650,
+        "x1": 1303.3333333333333,
+        "y1": 820,
+        "thicknessPx": 270
+      },
+      {
+        "id": "node:wallet-structure:top",
+        "element": "node:wallet-structure",
+        "face": "TOP",
+        "support": "SUPPORTED_SURFACE",
+        "x0": 1450,
+        "y0": 650,
+        "x1": 1720,
+        "y1": 650,
+        "thicknessPx": 170
+      },
+      {
+        "id": "node:wallet-structure:left",
+        "element": "node:wallet-structure",
+        "face": "LEFT",
+        "support": "SIDE_FACE",
+        "x0": 1450,
+        "y0": 650,
+        "x1": 1450,
+        "y1": 820,
+        "thicknessPx": 270
+      },
+      {
+        "id": "node:wallet-structure:right",
+        "element": "node:wallet-structure",
+        "face": "RIGHT",
+        "support": "SIDE_FACE",
+        "x0": 1720,
+        "y0": 650,
+        "x1": 1720,
+        "y1": 820,
+        "thicknessPx": 270
+      },
+      {
+        "id": "edge:value-at-risk->tier#0",
+        "element": "edge:value-at-risk->tier",
+        "face": "LINE",
+        "support": "NON_SUPPORTING",
+        "x0": 335,
+        "y0": 650,
+        "x1": 647.5,
+        "y1": 550,
+        "thicknessPx": 2
+      },
+      {
+        "id": "edge:value-at-risk->tier#1",
+        "element": "edge:value-at-risk->tier",
+        "face": "LINE",
+        "support": "NON_SUPPORTING",
+        "x0": 647.5,
+        "y0": 550,
+        "x1": 960,
+        "y1": 450,
+        "thicknessPx": 2
+      },
+      {
+        "id": "edge:signature-exposure->tier#0",
+        "element": "edge:signature-exposure->tier",
+        "face": "LINE",
+        "support": "NON_SUPPORTING",
+        "x0": 751.6666666666666,
+        "y0": 650,
+        "x1": 855.8333333333333,
+        "y1": 550,
+        "thicknessPx": 2
+      },
+      {
+        "id": "edge:signature-exposure->tier#1",
+        "element": "edge:signature-exposure->tier",
+        "face": "LINE",
+        "support": "NON_SUPPORTING",
+        "x0": 855.8333333333333,
+        "y0": 550,
+        "x1": 960,
+        "y1": 450,
+        "thicknessPx": 2
+      },
+      {
+        "id": "edge:dormancy->tier#0",
+        "element": "edge:dormancy->tier",
+        "face": "LINE",
+        "support": "NON_SUPPORTING",
+        "x0": 1168.3333333333333,
+        "y0": 650,
+        "x1": 1064.1666666666665,
+        "y1": 550,
+        "thicknessPx": 2
+      },
+      {
+        "id": "edge:dormancy->tier#1",
+        "element": "edge:dormancy->tier",
+        "face": "LINE",
+        "support": "NON_SUPPORTING",
+        "x0": 1064.1666666666665,
+        "y0": 550,
+        "x1": 960,
+        "y1": 450,
+        "thicknessPx": 2
+      },
+      {
+        "id": "edge:wallet-structure->tier#0",
+        "element": "edge:wallet-structure->tier",
+        "face": "LINE",
+        "support": "NON_SUPPORTING",
+        "x0": 1585,
+        "y0": 650,
+        "x1": 1272.5,
+        "y1": 550,
+        "thicknessPx": 2
+      },
+      {
+        "id": "edge:wallet-structure->tier#1",
+        "element": "edge:wallet-structure->tier",
+        "face": "LINE",
+        "support": "NON_SUPPORTING",
+        "x0": 1272.5,
+        "y0": 550,
+        "x1": 960,
+        "y1": 450,
+        "thicknessPx": 2
+      }
+    ],
     "protectedText": [
       {
         "x": 160,
@@ -90,6 +342,409 @@
         "h": 32
       }
     ],
+    "outgoing": {
+      "surfaces": [
+        {
+          "id": "ground:top",
+          "element": "ground",
+          "face": "TOP",
+          "support": "SUPPORTED_SURFACE",
+          "x0": 0,
+          "y0": 880,
+          "x1": 1920,
+          "y1": 880,
+          "thicknessPx": 200
+        },
+        {
+          "id": "pillar:monitor:left",
+          "element": "pillar:monitor",
+          "face": "LEFT",
+          "support": "SIDE_FACE",
+          "x0": 200,
+          "y0": 840,
+          "x1": 200,
+          "y1": 880,
+          "thicknessPx": 220
+        },
+        {
+          "id": "pillar:monitor:right",
+          "element": "pillar:monitor",
+          "face": "RIGHT",
+          "support": "SIDE_FACE",
+          "x0": 420,
+          "y0": 840,
+          "x1": 420,
+          "y1": 880,
+          "thicknessPx": 220
+        },
+        {
+          "id": "node:monitor:top",
+          "element": "node:monitor",
+          "face": "TOP",
+          "support": "SUPPORTED_SURFACE",
+          "x0": 160,
+          "y0": 640,
+          "x1": 460,
+          "y1": 640,
+          "thicknessPx": 200
+        },
+        {
+          "id": "node:monitor:left",
+          "element": "node:monitor",
+          "face": "LEFT",
+          "support": "SIDE_FACE",
+          "x0": 160,
+          "y0": 640,
+          "x1": 160,
+          "y1": 840,
+          "thicknessPx": 300
+        },
+        {
+          "id": "node:monitor:right",
+          "element": "node:monitor",
+          "face": "RIGHT",
+          "support": "SIDE_FACE",
+          "x0": 460,
+          "y0": 640,
+          "x1": 460,
+          "y1": 840,
+          "thicknessPx": 300
+        },
+        {
+          "id": "pillar:review:left",
+          "element": "pillar:review",
+          "face": "LEFT",
+          "support": "SIDE_FACE",
+          "x0": 633.3333333333334,
+          "y0": 750,
+          "x1": 633.3333333333334,
+          "y1": 880,
+          "thicknessPx": 220
+        },
+        {
+          "id": "pillar:review:right",
+          "element": "pillar:review",
+          "face": "RIGHT",
+          "support": "SIDE_FACE",
+          "x0": 853.3333333333334,
+          "y0": 750,
+          "x1": 853.3333333333334,
+          "y1": 880,
+          "thicknessPx": 220
+        },
+        {
+          "id": "node:review:top",
+          "element": "node:review",
+          "face": "TOP",
+          "support": "SUPPORTED_SURFACE",
+          "x0": 593.3333333333334,
+          "y0": 550,
+          "x1": 893.3333333333334,
+          "y1": 550,
+          "thicknessPx": 200
+        },
+        {
+          "id": "node:review:left",
+          "element": "node:review",
+          "face": "LEFT",
+          "support": "SIDE_FACE",
+          "x0": 593.3333333333334,
+          "y0": 550,
+          "x1": 593.3333333333334,
+          "y1": 750,
+          "thicknessPx": 300
+        },
+        {
+          "id": "node:review:right",
+          "element": "node:review",
+          "face": "RIGHT",
+          "support": "SIDE_FACE",
+          "x0": 893.3333333333334,
+          "y0": 550,
+          "x1": 893.3333333333334,
+          "y1": 750,
+          "thicknessPx": 300
+        },
+        {
+          "id": "pillar:migrate:left",
+          "element": "pillar:migrate",
+          "face": "LEFT",
+          "support": "SIDE_FACE",
+          "x0": 1066.6666666666667,
+          "y0": 660,
+          "x1": 1066.6666666666667,
+          "y1": 880,
+          "thicknessPx": 220
+        },
+        {
+          "id": "pillar:migrate:right",
+          "element": "pillar:migrate",
+          "face": "RIGHT",
+          "support": "SIDE_FACE",
+          "x0": 1286.6666666666667,
+          "y0": 660,
+          "x1": 1286.6666666666667,
+          "y1": 880,
+          "thicknessPx": 220
+        },
+        {
+          "id": "node:migrate:top",
+          "element": "node:migrate",
+          "face": "TOP",
+          "support": "SUPPORTED_SURFACE",
+          "x0": 1026.6666666666667,
+          "y0": 460,
+          "x1": 1326.6666666666667,
+          "y1": 460,
+          "thicknessPx": 200
+        },
+        {
+          "id": "node:migrate:left",
+          "element": "node:migrate",
+          "face": "LEFT",
+          "support": "SIDE_FACE",
+          "x0": 1026.6666666666667,
+          "y0": 460,
+          "x1": 1026.6666666666667,
+          "y1": 660,
+          "thicknessPx": 300
+        },
+        {
+          "id": "node:migrate:right",
+          "element": "node:migrate",
+          "face": "RIGHT",
+          "support": "SIDE_FACE",
+          "x0": 1326.6666666666667,
+          "y0": 460,
+          "x1": 1326.6666666666667,
+          "y1": 660,
+          "thicknessPx": 300
+        },
+        {
+          "id": "pillar:vault-candidate:left",
+          "element": "pillar:vault-candidate",
+          "face": "LEFT",
+          "support": "SIDE_FACE",
+          "x0": 1500,
+          "y0": 570,
+          "x1": 1500,
+          "y1": 880,
+          "thicknessPx": 220
+        },
+        {
+          "id": "pillar:vault-candidate:right",
+          "element": "pillar:vault-candidate",
+          "face": "RIGHT",
+          "support": "SIDE_FACE",
+          "x0": 1720,
+          "y0": 570,
+          "x1": 1720,
+          "y1": 880,
+          "thicknessPx": 220
+        },
+        {
+          "id": "node:vault-candidate:top",
+          "element": "node:vault-candidate",
+          "face": "TOP",
+          "support": "SUPPORTED_SURFACE",
+          "x0": 1460,
+          "y0": 370,
+          "x1": 1760,
+          "y1": 370,
+          "thicknessPx": 200
+        },
+        {
+          "id": "node:vault-candidate:left",
+          "element": "node:vault-candidate",
+          "face": "LEFT",
+          "support": "SIDE_FACE",
+          "x0": 1460,
+          "y0": 370,
+          "x1": 1460,
+          "y1": 570,
+          "thicknessPx": 300
+        },
+        {
+          "id": "node:vault-candidate:right",
+          "element": "node:vault-candidate",
+          "face": "RIGHT",
+          "support": "SIDE_FACE",
+          "x0": 1760,
+          "y0": 370,
+          "x1": 1760,
+          "y1": 570,
+          "thicknessPx": 300
+        },
+        {
+          "id": "edge:monitor->monitor#0",
+          "element": "edge:monitor->monitor",
+          "face": "LINE",
+          "support": "NON_SUPPORTING",
+          "x0": 230,
+          "y0": 640,
+          "x1": 200,
+          "y1": 520,
+          "thicknessPx": 2
+        },
+        {
+          "id": "edge:monitor->monitor#1",
+          "element": "edge:monitor->monitor",
+          "face": "LINE",
+          "support": "NON_SUPPORTING",
+          "x0": 200,
+          "y0": 520,
+          "x1": 420,
+          "y1": 520,
+          "thicknessPx": 2
+        },
+        {
+          "id": "edge:monitor->monitor#2",
+          "element": "edge:monitor->monitor",
+          "face": "LINE",
+          "support": "NON_SUPPORTING",
+          "x0": 420,
+          "y0": 520,
+          "x1": 390,
+          "y1": 640,
+          "thicknessPx": 2
+        },
+        {
+          "id": "edge:monitor->review#0",
+          "element": "edge:monitor->review",
+          "face": "LINE",
+          "support": "NON_SUPPORTING",
+          "x0": 460,
+          "y0": 686,
+          "x1": 526.6666666666667,
+          "y1": 578,
+          "thicknessPx": 2
+        },
+        {
+          "id": "edge:monitor->review#1",
+          "element": "edge:monitor->review",
+          "face": "LINE",
+          "support": "NON_SUPPORTING",
+          "x0": 526.6666666666667,
+          "y0": 578,
+          "x1": 593.3333333333334,
+          "y1": 596,
+          "thicknessPx": 2
+        },
+        {
+          "id": "edge:review->migrate#0",
+          "element": "edge:review->migrate",
+          "face": "LINE",
+          "support": "NON_SUPPORTING",
+          "x0": 893.3333333333334,
+          "y0": 596,
+          "x1": 960,
+          "y1": 488,
+          "thicknessPx": 2
+        },
+        {
+          "id": "edge:review->migrate#1",
+          "element": "edge:review->migrate",
+          "face": "LINE",
+          "support": "NON_SUPPORTING",
+          "x0": 960,
+          "y0": 488,
+          "x1": 1026.6666666666667,
+          "y1": 506,
+          "thicknessPx": 2
+        },
+        {
+          "id": "edge:migrate->vault-candidate#0",
+          "element": "edge:migrate->vault-candidate",
+          "face": "LINE",
+          "support": "NON_SUPPORTING",
+          "x0": 1326.6666666666667,
+          "y0": 506,
+          "x1": 1393.3333333333335,
+          "y1": 398,
+          "thicknessPx": 2
+        },
+        {
+          "id": "edge:migrate->vault-candidate#1",
+          "element": "edge:migrate->vault-candidate",
+          "face": "LINE",
+          "support": "NON_SUPPORTING",
+          "x0": 1393.3333333333335,
+          "y0": 398,
+          "x1": 1460,
+          "y1": 416,
+          "thicknessPx": 2
+        }
+      ],
+      "protectedText": [
+        {
+          "x": 160,
+          "y": 104,
+          "w": 1100,
+          "h": 32
+        },
+        {
+          "x": 160,
+          "y": 168,
+          "w": 900,
+          "h": 102
+        },
+        {
+          "x": 182,
+          "y": 662,
+          "w": 256,
+          "h": 74
+        },
+        {
+          "x": 182,
+          "y": 744,
+          "w": 256,
+          "h": 86
+        },
+        {
+          "x": 615.3333333333334,
+          "y": 572,
+          "w": 256,
+          "h": 74
+        },
+        {
+          "x": 615.3333333333334,
+          "y": 654,
+          "w": 256,
+          "h": 86
+        },
+        {
+          "x": 1048.6666666666667,
+          "y": 482,
+          "w": 256,
+          "h": 74
+        },
+        {
+          "x": 1048.6666666666667,
+          "y": 564,
+          "w": 256,
+          "h": 86
+        },
+        {
+          "x": 1482,
+          "y": 392,
+          "w": 256,
+          "h": 74
+        },
+        {
+          "x": 1482,
+          "y": 474,
+          "w": 256,
+          "h": 86
+        },
+        {
+          "x": 160,
+          "y": 104,
+          "w": 1100,
+          "h": 32
+        }
+      ],
+      "untilMs": 60489
+    },
     "figure": {
       "left": 150,
       "right": 100,
@@ -111,10 +766,10 @@
     }
   },
   "config": {
-    "schema": "walletwall.motion-intelligence-config/v2",
+    "schema": "walletwall.motion-intelligence-config/v3",
     "id": "walletwallaby-motion-intelligence",
-    "version": 2,
-    "note": "Physics for the Rust/WASM Motion Intelligence engine (motion-intelligence/). Lengths are in body heights (bodyHeightPx x the character's scale), times in milliseconds, angles in degrees. The hop timing values must equal config/motion.json while the TypeScript solver remains the oracle (test/rust-motion-engine.test.ts enforces it). Changing any value requires a new version (pinned in src/motion/engine-identity.ts).",
+    "version": 3,
+    "note": "Physics for the Rust/WASM Motion Intelligence engine (motion-intelligence/). Lengths are in body heights (bodyHeightPx x the character's scale), times in milliseconds, angles in degrees. The hop timing values and the support section must equal config/motion.json while the TypeScript solver remains the oracle (test/rust-motion-engine.test.ts enforces it). Changing any value requires a new version (pinned in src/motion/engine-identity.ts).",
     "bodyHeightPx": 236,
     "gravityBodyHeightsPerS2": 21,
     "maxGravityBoost": 1.8,
@@ -176,6 +831,23 @@
       "damping": 0.3,
       "accelGainDeg": 2,
       "maxDeg": 9
+    },
+    "support": {
+      "footprintBackBodyHeights": 0.16,
+      "footprintFrontBodyHeights": 0.19,
+      "comAheadBodyHeights": 0.02,
+      "comMarginBodyHeights": 0.08,
+      "stepComMarginBodyHeights": 0.04,
+      "narrowWidthBodyHeights": 0.6,
+      "broadWidthBodyHeights": 1,
+      "broadMarginBodyHeights": 0.1,
+      "tailReachBodyHeights": 0.82,
+      "contactHeightBodyHeights": 0.1,
+      "shoulderHeightBodyHeights": 0.62,
+      "shoulderAheadBodyHeights": 0.06,
+      "armReachBodyHeights": 0.3,
+      "minThicknessPx": 4,
+      "tolerancePx": 1
     },
     "limits": {
       "maxHeadDeg": 6,

@@ -2,7 +2,7 @@
 
 > The lesson decides WHERE WalletWallaby goes. The motion system decides HOW he gets there.
 
-WalletWallaby should read as a small, agile macropod physically crossing information terrain — not a sprite translated between coordinates. He has weight; jumps are physically plausible; landings have consequence; perches are supported by the surface. And the lesson stays fully deterministic.
+WalletWallaby should read as a small, agile macropod physically crossing information terrain — not a sprite translated between coordinates. He has weight; jumps are physically plausible; landings have consequence; perches are supported by the surface, and only by a surface that could really carry him. And the lesson stays fully deterministic.
 
 ## Layers
 
@@ -48,7 +48,11 @@ Restraint is part of the brand. No cartoon squash-and-stretch comedy, no spinnin
 7. **Settle**: one small rebound, then the rest pose.
 8. **Stable perch**: weight visibly supported; at most a slow, tiny breathing cycle.
 
-Other actions reuse the same parts: `PERCH` settles into a balanced stance with the tail stabilising; `INSPECT` leans in with a small stance adjustment; `TRACE` follows the drawn route as a chain of short, low hops that never fully reset; `PUSH_THROUGH` shifts weight back, then drives the body along the force direction into depth.
+Other actions reuse the same parts: `PERCH` settles into a balanced stance with the tail stabilising; `INSPECT` leans in with a small stance adjustment; `TRACE` bounds between supported footholds on the route's own nodes while the trail draws under the leap (the drawn route itself is information, never stood on); `PUSH_THROUGH` shifts weight back, then drives the body along the force direction into depth.
+
+## Terrain and support
+
+Content is terrain, but not every pixel is. The scene grammar declares what each drawn element offers a body (`src/layout/terrain.ts`): a card's or node's top is a `SUPPORTED_SURFACE`, the summit is a `LEDGE`, a block's sides are `SIDE_FACE`s (a hand may brace on one, a climbing hand may grip its lip, feet never stand on it), a UI capture offers only `OPTIONAL_BRACE` faces, and a route line, an underline, a hairline border, or a divider is `NON_SUPPORTING` or `DECORATIVE_EDGE`: never terrain. Every contact is judged (`src/character/walletwallaby/support.ts`): both feet on a solid level top, the centre of mass inside it with a margin, a top of meaningful thickness, no protected text where the feet touch, a narrow ledge only where the lesson authored a narrow perch, and the tail never carrying a body the feet do not. A grip needs a real lip within reach; a brace needs supported feet. Where an anchor authors several stands, the best-supported one is chosen (broad support, then a normal ledge, then narrow; then the tail resting on the support; then the authored order), and the choreography fails closed when none is plausible. Every render and the publish dry run judge every contact of the lesson against the terrain on screen at its instant and refuse a plan with one the terrain cannot carry (`src/character/walletwallaby/contacts.ts`). The Rust/WASM engine owns the same judge ([MOTION_INTELLIGENCE.md](MOTION_INTELLIGENCE.md)).
 
 ## Platform response
 
@@ -66,12 +70,16 @@ Cards, graph nodes, and ledges may acknowledge contact with a tiny, bounded sett
 
 No general-purpose physics or game engine (Matter.js, Rapier, Phaser), no Three.js conversion of the character, no collision world, pathfinding, procedural levels, particles, camera shake, character variants, or new mascots. If a concrete need ever proves one of these unavoidable, it is proposed and reviewed on its own.
 
-## Implementation (rig v3, motion v3)
+## Implementation (rig v4, motion v4)
 
 | Layer | Code |
 |---|---|
 | Where and when: anchors, order, time windows | `src/character/walletwallaby/choreography.ts` |
 | Motion intelligence: plan, phases, contacts, tail intent, mantles, landings | `src/character/walletwallaby/motion.ts` |
+| Terrain semantics: what each drawn element offers a body | `src/layout/terrain.ts` |
+| Support plausibility: stances, grips, braces, stand selection | `src/character/walletwallaby/support.ts` |
+| The contact audit (every contact of a plan, judged; the render and publish gates) | `src/character/walletwallaby/contacts.ts` |
+| Traces as bounds between supported footholds | `src/character/walletwallaby/trace.ts` |
 | Physics and behaviour constants (versioned) | `config/motion.json` |
 | Vocabulary poses as clip blends, expressions, palette slots | `src/character/walletwallaby/rig.ts` |
 | The rig as code: skeleton, IK, silhouette, draw order, clips | `src/character/walletwallaby/rive/rig-source.ts` |
@@ -80,19 +88,22 @@ No general-purpose physics or game engine (Matter.js, Rapier, Phaser), no Three.
 | Frame-pure posing on the Rive runtime | `rive/rig-apply.ts` |
 | Drawing in Remotion | `src/remotion/wallaby/WallabyRive.tsx`, `rive-loader.ts` |
 | Declared versions and pinned hashes | `src/character/walletwallaby/versions.ts` |
-| Rust/WASM Motion Intelligence (engine v2, opt-in: every hop that ends in a perch, its arc search, and the contacts the scene reacts to) | `motion-intelligence/`, `src/motion/`; see [MOTION_INTELLIGENCE.md](MOTION_INTELLIGENCE.md) |
+| Rust/WASM Motion Intelligence (engine v3, opt-in: every hop from a stance that ends in a perch, its stand selection and support verdicts, its arc search, the contacts the scene reacts to, and an audit of every lesson contact) | `motion-intelligence/`, `src/motion/`; see [MOTION_INTELLIGENCE.md](MOTION_INTELLIGENCE.md) |
 
 `planMotion(clips, layouts)` runs once per video; `sampleWallaby(plan, ms)` is a pure function of the plan and the absolute time. Neither can return a destination that the clip did not give it.
 
 ### Rive
 
-WalletWallaby is a Rive rig. The `.riv` (`assets/character/walletwallaby.riv`, about 24 KB) is compiled from `rig-source.ts` by a small writer for the Rive runtime format (major version 7), committed, and pinned by the sha256 of its bytes. `npm run rive:check` (also in CI) proves that the committed file, a fresh compile, and the pin agree. Authoring the rig as code keeps every bone, weight, and key reviewable in a diff. The asset contract (artboard, bone, control, clip, and IK names) is what any future editor-authored replacement must satisfy.
+WalletWallaby is a Rive rig, drawn as WalletWallrus's sibling: one silhouette in WalletWallrus's coat colour with charcoal linework, cream accents, an integrated brick belly, and a long tail as the signature feature (the walrus's tusks are its own). The `.riv` (`assets/character/walletwallaby.riv`, about 35 KB) is compiled from `rig-source.ts` by a small writer for the Rive runtime format (major version 7), committed, and pinned by the sha256 of its bytes. `npm run rive:check` (also in CI) proves that the committed file, a fresh compile, and the pin agree. Authoring the rig as code keeps every bone, weight, and key reviewable in a diff. The asset contract (artboard, bone, control, clip, and IK names) is what any future editor-authored replacement must satisfy.
 
 - **Skeleton:** 22 bones. Hip, chest, neck, head, jaw, two ears, a five-bone tail, two three-bone hind legs, and two two-bone forelimbs.
-- **Skinning:** the torso, belly, strap, and tail are single outlines skinned to their bone chains (linear-blend weights, 50/50 at each joint). The body bends and compresses as one surface, and the tail curves rather than hinging. Rigid parts (head, ears, limbs, feet) ride their bones.
+- **Silhouette:** every body part also draws a 6 px charcoal underlay behind all the fills, so only the outer contour of their union shows: one silhouette, however the parts overlap. Thinner interior lines (2 px) mark only what lies in front of the body (the near ear, the near forelimb, the haunch).
+- **Brick belly:** five courses of running-bond brick (27 px bricks, 13.5 px courses) in charcoal mortar on the terracotta belly, with a flank line where the field meets the coat. The mortar is skinned to the torso, so the bricks deform with the body (it compresses on landing, stretches in flight); there is no plate, no fill, and no brick anywhere else.
+- **Tail:** about 182 px from root to tip at rest, longer than the body is tall, tapering from 21 px; a cream underside band runs along it. It stays visible behind the body in every pose (`test/brand-identity.test.ts`).
+- **Skinning:** the torso, the brick belly's mortar, the cream chest, the tail, and its underside are skinned to their bone chains (linear-blend weights, 50/50 at each joint). The body bends and compresses as one surface, and the tail curves rather than hinging. Rigid parts (head, ears, limbs, feet) ride their bones.
 - **Clips:** a reset (`base`), a looping `idle_alert` (a 3.4 s breath), eleven key poses (`crouch_preload`, `takeoff`, `airborne`, `land_soft`, `land_hard`, `perch`, `inspect`, `trace`, `mantle`, `push`, `resolve`), and two control clips (`tail_free`, `point_near`). Every pose clip keys the full pose property set, so blending is order-stable.
 - **IK (Rive constraints):** two-bone legs plant each foot, with the heel set by the clip-keyed foot angle and the toes on the rig's ground point. Single-bone foot constraints aim each foot. Two-bone forelimbs grip a ledge lip in the mantle and point at what the lesson reveals. A two-bone tail tip rests on the surface. Strengths are keyed by the clips, so the clips decide when the feet plant (never in flight), and a blend of two clips blends their IK. A five-bone tail chain was tried first and rejected: the runtime's iterative solve missed its target by up to 16 px and folded the tail into a hook.
-- **Palette:** coat, tail, outer ears, and lids are the canonical WalletWall terracotta. Belly, the pale cheek stripe real wallabies carry, chin, and inner ears are cream. Outline, eyes, nose, and claws are charcoal. The shade is terracotta mixed 42% toward the dark terracotta, computed from the two tokens, and highlights are cream at 30% alpha. Colours are resolved from the brand contract at compile time; no source file types a colour.
+- **Palette:** coat, tail, outer ears, and lids are WalletWallrus's own coat colour (`#BA6F38`, the colour of the largest area of the walrus's coat in its avatar, reused exactly; `FAMILY_COLORS` in `rig.ts`). It is not a docs-theme token: the theme's terracotta, `#BF4E32`, is redder. The chest, muzzle, tail underside, and inner ears are cream. Outline, mortar, eyes, nose, and claws are charcoal. The shade (far limbs) is the coat mixed 20% toward charcoal, computed, never typed. There are no highlights and no tag: emblematic flat colour, as on WalletWallrus. The cream and charcoal are resolved from the brand contract at compile time.
 
 **Frame-authoritative integration.** `@remotion/rive`'s `<RemotionRiveCanvas>` is not used. It fetches the runtime WASM from unpkg at render time (the render path may not touch the network), and it advances its animation by frame deltas (a frame would depend on the previous one). WalletWallaby drives the same runtime that component pins, `@rive-app/canvas-advanced@2.31.5`, directly:
 
@@ -102,7 +113,7 @@ WalletWallaby is a Rive rig. The `.riv` (`assets/character/walletwallaby.riv`, a
 
 A fresh instance per frame is the guarantee, not an optimisation. Rive's IK writes the constrained bones' transforms, and a property re-set to an unchanged value does not invalidate them, so a reused instance let one frame's solve leak into the next: 527 of 591 shuffled frames differed before the fix, and 0 after. The re-dirty pass also makes a reused instance clean, and the tests check both. The cost is about 1.7 ms per character per frame.
 
-### Motion intelligence (v3)
+### Motion intelligence (v4)
 
 The motion layer now returns behaviour, not drawing parameters:
 
@@ -113,11 +124,13 @@ The motion layer now returns behaviour, not drawing parameters:
 - **Landings** are soft or hard by impact (a smoothstep from 0.55 to 0.95). A hard landing blends in `land_hard` (deeper compression, a wider stance, forelimbs out), recovers 2.5 times more slowly, and braces the tail. The brace carries into the following hold and relaxes there.
 - **Mantles.** A move becomes a climb when its destination is a platform top at least 0.55 body heights above a start beside that platform, the whole sequence fits the window under the speed and gravity limits, and it crosses no more protected text than the hop would. The climb: jump to a hang point below the lip; catch it (Rive's arm IK grips the lip, the body hangs outside the face with the legs against it, and the tail swings as a counterweight); pull the hindquarters up and over; settle exactly on the anchor. The committed lesson has no ledge that can be climbed without crossing text, so it keeps its hops; the motion lab shows the climb.
 - **The tail.** It rests on the surface behind as a third support whenever there is surface under it, and Rive's tail IK makes the contact exact. Past a platform's edge, `tail_free` releases it and it hangs. Where a pose holds it well clear (inspect, trace, flight), the release is smooth. On narrow perches it corrects the balance with a slow ±2° sway. It never sinks through a surface: if a pose would drive the tip below the surface line, the tail first swings up about its root, so the IK only has to close a few pixels instead of folding the tip.
-- **Pointing.** The near forelimb reaches for the subject with Rive's arm IK, weighted by the pose's reach. Presenting gestures stay as small rotation offsets.
+- **Pointing.** The near forelimb reaches for the subject with Rive's arm IK, weighted by the pose's reach, never past the rig's reach (a far subject is pointed at, not lunged for). Presenting gestures stay as small rotation offsets.
+- **Support (v4).** Every stand, takeoff, landing, trace foothold, grip, and brace is judged against the declared terrain (see "Terrain and support" above); a plan with one unsupported contact is refused.
+- **Exit leaps (v4)** leave the plane above the frame (the apex is out of view), and the next scene's arrival continues that flight: the body falls in from above and lands on its stand only once the new scene's content is on screen, never on the outgoing scene's geometry.
 
 ### Bounds
 
-`RIG_ENVELOPE` (rig space at scale 1: x −176..152, y −284..72) bounds the drawn ink of every pose the motion system can produce, measured on the runtime's own transforms. While holding, the drawn ink never overlaps protected text and stays inside title-safe (checked on the committed lesson's hold frames). The layout box `WALLABY_EXTENT` still describes the standing figure (the rest pose's ink is x −144..90), but a real lean exceeds it, as the v2 figure's did, so the guarantees above are checked on real geometry instead.
+`RIG_ENVELOPE` (rig space at scale 1: x −224..152, y −280..92) bounds the drawn ink of every pose the motion system can produce, measured on the runtime's own transforms (over every frame of the lesson and the lab: x −215.8..143.9, y −270.7..82.4). While holding, the drawn ink never overlaps protected text and stays inside title-safe (checked on the committed lesson's hold frames). The layout box `WALLABY_EXTENT` (x −150..100) is unchanged so that no scene's layout moves; the rest pose's ink now reaches x −197 behind the feet (the longer tail), so the guarantees above are checked on real geometry instead, as they were for leans.
 
 ### Model
 
@@ -130,9 +143,10 @@ The motion layer now returns behaviour, not drawing parameters:
 - **Surface awareness:** the solver samples each candidate arc (from 0.05× to 3× the natural height) against the scene's protected text and keeps the arc that crosses the least, preferring the natural one.
   - On a card top, where only about 6 px separate the ears from the eyebrow, a short move becomes a low skim.
   - A long move along one surface becomes chained low skips (one per 0.62 body heights), each lifted no higher than the measured clearance.
-- **Traces** chain short bounds along the drawn route, accelerating out and decelerating in, with brief ground contacts. The trail fills in under the feet.
+- **Traces** bound between supported footholds on the route's own nodes (`trace.ts`): low skips along one top, and one leap across from the nearest supported foothold on the start to the nearest on the destination, on the arc that crosses the least text without passing through any block (tested at the footprint's back, centre, and front). The drawn route is never stood on; the trail draws under the leap.
 - **Push-through** shifts the weight back onto the haunches, rolls it forward, then drives along the force direction into depth under constant acceleration.
 - **Drop-in** is a free fall to the authored anchor, then a landing.
+- **Falls** continue an exit leap into the next scene: airborne from the start, they land on the chosen stand at the end of their window.
 - **Secondary motion** (compression, tail, ears) is a sum of analytic damped-spring responses to the plan's own events (`TAKEOFF`, `LANDING`, `STEP`, `PUSH`, `SHIFT`). Each response peaks once, rebounds by under 35%, and is exactly zero outside its window.
 - **Platform response:** a landing on a card, graph node, or ledge depresses that platform by at most 3 px (cards by half as much) and returns it exactly to rest within 420 ms. The platform's text moves with it, and the feet ride it by the same quantised amount, so the character never floats or clips. UI captures never move.
 - **Sound:** `LANDING` now plays at the real contact rather than at the beat start, with quiet `TAKEOFF` (−30 dB) and `PUSH_CONTACT` cues. Steps and weight shifts are silent. All sonic assets are still unassigned, which means silence.
@@ -156,6 +170,8 @@ Tests live in `test/motion.test.ts`, `test/motion-intelligence.test.ts`, `test/r
 ### Known weaknesses
 
 - **Text crossings in flight are reduced, not eliminated:** 105 frames against the v1 ceiling of 109, for the reasons given for v2. Flight poses extend past the layout box, so that count, which uses the box, is an estimate.
+- **The layout box under-reserves the tail.** `WALLABY_EXTENT` still reserves 150 px behind the feet at scale 1; the rest pose's tail reaches 197. Growing it would move every scene's layout; the real-ink checks keep holds off text and inside title-safe meanwhile.
+- **Support is a flat-footed model.** A stance is the feet's span on a level top: no slopes, no partial footing, no per-paw placement. Rive's IK plants the drawn feet on the stand point.
 - **The rig is code-authored.** Its silhouette and clips were tuned by hand with probes, not by an animator in the Rive editor. The contract is stable, so an editor-authored `.riv` can replace it, but such a file must pass the same tests.
 - **Code changes in `motion.ts` are not covered by the definition hash.** Only the config and the timing table are hashed, so a behavioural code change must bump `MOTION.version` by review discipline. The rig is fully covered: its source is in the definition, and the asset is pinned by its bytes.
 - **The pinned runtime's IK quirks are handled, not removed.** The second zero-time pass and the reach clamp on the tail contact are needed on 2.31.5 and are checked by the tests. A runtime upgrade must re-run them.

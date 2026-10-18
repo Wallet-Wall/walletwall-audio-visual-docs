@@ -41,6 +41,8 @@ pub struct MotionConfig {
     pub tail: TailConfig,
     /// Ear follow-through.
     pub ears: EarConfig,
+    /// What a body can stand on, grip, or brace against ([`crate::support`]).
+    pub support: SupportConfig,
     /// Hard limits on windows and arcs.
     pub limits: Limits,
 }
@@ -175,6 +177,43 @@ pub struct EarConfig {
     pub max_deg: f64,
 }
 
+/// Support geometry, body heights unless named otherwise: the same section, with the same values and
+/// ranges, as the transitional TypeScript planner's `config/motion.json` `support`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SupportConfig {
+    /// Both feet's span behind the stand point (heels sprung back).
+    pub footprint_back_body_heights: f64,
+    /// Both feet's span ahead of the stand point (toes).
+    pub footprint_front_body_heights: f64,
+    /// The projected centre of mass, ahead of the stand point.
+    pub com_ahead_body_heights: f64,
+    /// Least distance from the centre of mass to the top's nearer end, holding a perch.
+    pub com_margin_body_heights: f64,
+    /// Least such distance touching down on the way.
+    pub step_com_margin_body_heights: f64,
+    /// A top narrower than this holds only an explicitly authored narrow perch.
+    pub narrow_width_body_heights: f64,
+    /// Broad support is at least this wide ...
+    pub broad_width_body_heights: f64,
+    /// ... with at least this much top beyond each foot, and the tail resting on it.
+    pub broad_margin_body_heights: f64,
+    /// Where the resting tail tip comes down, behind the stand point.
+    pub tail_reach_body_heights: f64,
+    /// How far above the top the feet reach: no protected text may sit there.
+    pub contact_height_body_heights: f64,
+    /// The shoulder's height above the stand point.
+    pub shoulder_height_body_heights: f64,
+    /// The shoulder's offset ahead of the stand point.
+    pub shoulder_ahead_body_heights: f64,
+    /// How far a hand reaches from the shoulder.
+    pub arm_reach_body_heights: f64,
+    /// A top thinner than this is a drawn line, not a solid, px.
+    pub min_thickness_px: f64,
+    /// How close a point must be to a surface to be on it, px.
+    pub tolerance_px: f64,
+}
+
 /// Hard limits.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -199,6 +238,78 @@ fn within(path: &str, v: f64, lo: f64, hi: f64) -> Result<(), MotionError> {
         );
     }
     Ok(())
+}
+
+impl SupportConfig {
+    /// Refuse any value that is non-finite, outside its range, or inconsistent with another.
+    pub fn validate(&self) -> Result<(), MotionError> {
+        use MotionErrorCode::InvalidConfig;
+        let s = self;
+        within(
+            "support.footprintBackBodyHeights",
+            s.footprint_back_body_heights,
+            0.02,
+            0.5,
+        )?;
+        within(
+            "support.footprintFrontBodyHeights",
+            s.footprint_front_body_heights,
+            0.02,
+            0.5,
+        )?;
+        within("support.comAheadBodyHeights", s.com_ahead_body_heights, -0.3, 0.3)?;
+        within("support.comMarginBodyHeights", s.com_margin_body_heights, 0.0, 0.5)?;
+        within(
+            "support.stepComMarginBodyHeights",
+            s.step_com_margin_body_heights,
+            0.0,
+            0.5,
+        )?;
+        within("support.narrowWidthBodyHeights", s.narrow_width_body_heights, 0.1, 3.0)?;
+        within("support.broadWidthBodyHeights", s.broad_width_body_heights, 0.1, 6.0)?;
+        within("support.broadMarginBodyHeights", s.broad_margin_body_heights, 0.0, 1.0)?;
+        within("support.tailReachBodyHeights", s.tail_reach_body_heights, 0.0, 1.5)?;
+        within(
+            "support.contactHeightBodyHeights",
+            s.contact_height_body_heights,
+            0.0,
+            0.5,
+        )?;
+        within(
+            "support.shoulderHeightBodyHeights",
+            s.shoulder_height_body_heights,
+            0.1,
+            1.2,
+        )?;
+        within(
+            "support.shoulderAheadBodyHeights",
+            s.shoulder_ahead_body_heights,
+            -0.5,
+            0.5,
+        )?;
+        within("support.armReachBodyHeights", s.arm_reach_body_heights, 0.05, 1.0)?;
+        within("support.minThicknessPx", s.min_thickness_px, 1.0, 64.0)?;
+        within("support.tolerancePx", s.tolerance_px, 0.0, 4.0)?;
+        if s.step_com_margin_body_heights > s.com_margin_body_heights {
+            return refuse(
+                InvalidConfig,
+                "config.support: a passing step cannot need more margin than a perch",
+            );
+        }
+        if s.narrow_width_body_heights >= s.broad_width_body_heights {
+            return refuse(
+                InvalidConfig,
+                "config.support: a narrow ledge must be narrower than broad support",
+            );
+        }
+        if s.narrow_width_body_heights < s.footprint_back_body_heights + s.footprint_front_body_heights {
+            return refuse(
+                InvalidConfig,
+                "config.support: the narrowest ledge must still hold both feet",
+            );
+        }
+        Ok(())
+    }
 }
 
 impl MotionConfig {
@@ -301,6 +412,8 @@ impl MotionConfig {
         within("ears.damping", e.damping, 0.1, 1.5)?;
         within("ears.accelGainDeg", e.accel_gain_deg, -10.0, 10.0)?;
         within("ears.maxDeg", e.max_deg, 1.0, 30.0)?;
+
+        self.support.validate()?;
 
         let m = &self.limits;
         within("limits.maxHeadDeg", m.max_head_deg, 1.0, 30.0)?;

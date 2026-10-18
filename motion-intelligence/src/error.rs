@@ -25,6 +25,9 @@ pub enum MotionErrorCode {
     InvalidConfig,
     /// An action this engine version does not perform (mantle, vault, push-through, ...).
     UnsupportedAction,
+    /// No authored stand is a plausible perch, or the takeoff or the landing is not carried by the
+    /// terrain on screen ([`crate::support`]).
+    ImplausibleSupport,
 }
 
 /// A refusal: the engine produced no plan.

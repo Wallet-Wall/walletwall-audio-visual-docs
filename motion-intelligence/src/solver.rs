@@ -1,6 +1,7 @@
-//! The solver: validate, solve the hop (with its surface-aware arc search), lay out the phases,
-//! simulate the secondary motion on a fixed time grid, sample one state per video frame, state the
-//! plan's contacts with the terrain, and check the plan before returning it.
+//! The solver: validate, choose the stand among the lesson's authored ones ([`crate::support`]),
+//! solve the hop (with its surface-aware arc search), judge its takeoff and landing for support, lay
+//! out the phases, simulate the secondary motion on a fixed time grid, sample one state per video
+//! frame, state the plan's contacts with the terrain, and check the plan before returning it.
 //!
 //! Kinematics and the body's postural channels are closed-form functions of time. The tail, the
 //! ears, and the tail's tension are damped responses, integrated once per plan on a fixed 1 ms grid
@@ -24,11 +25,12 @@ use crate::math::{
     sqrt,
 };
 use crate::state::{
-    ContactEvent, ContactKind, EngineId, FrameRange, MotionInput, MotionPhase, MotionPlan, MotionState, PhaseWindow,
-    PlanTiming, Stance, Trajectory,
+    Contact, ContactEvent, ContactKind, EngineId, FrameRange, JudgedContact, MotionInput, MotionPhase, MotionPlan,
+    MotionState, PhaseWindow, PlanSupport, PlanTiming, Stance, TerrainOf, Trajectory,
 };
+use crate::support::{ContactRole, Judge, StanceQuery, SupportChoice, evaluate_stance, select_support};
 use crate::tail::{Follower, TailSignals, desired_counterbalance, desired_curl, tension_target};
-use crate::terrain::{check_geometry, contact_with};
+use crate::terrain::{Rect, TerrainSurface, check_geometry, contact_at};
 use crate::{ENGINE_NAME, ENGINE_VERSION, INPUT_SCHEMA, PLAN_SCHEMA};
 
 /// Fixed step of the secondary-motion simulation, ms.
@@ -41,17 +43,144 @@ const PUSH_PRELOAD_FRAC: f64 = 0.4;
 const MAX_TIME_MS: f64 = 86_400_000.0;
 /// Largest character scale.
 const MAX_SCALE: f64 = 4.0;
+/// Most authored stands one destination may offer.
+pub const MAX_CANDIDATES: usize = 32;
 
-/// Solve `input`: a plan whose final position is the authored target, or a refusal.
+/// What the engine resolved before any physics: the stand it chose, and what the feet touch at
+/// either end of the hop.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Ends {
+    /// The chosen stand, px: one of the destination's candidates, bit for bit.
+    pub target: Vec2,
+    /// What the feet stand on before liftoff.
+    pub start_contact: Contact,
+    /// What they stand on from touchdown on.
+    pub target_contact: Contact,
+}
+
+impl Ends {
+    /// The chosen stand and the contacts the scene's own surfaces declare at both ends.
+    pub fn resolve(input: &MotionInput, target: Vec2) -> Self {
+        Self {
+            target,
+            start_contact: contact_at(input.start, &input.terrain.surfaces),
+            target_contact: contact_at(target, &input.terrain.surfaces),
+        }
+    }
+}
+
+/// The direction of travel, as the transitional planner's contact audit reads it.
+fn travel_facing(from: Vec2, to: Vec2) -> i8 {
+    if to.x < from.x - 4.0 { -1 } else { 1 }
+}
+
+/// The support judge over one set of surfaces and text, with the input's configuration and frame.
+fn judge_over<'a>(input: &'a MotionInput, surfaces: &'a [TerrainSurface], text: &'a [Rect]) -> Judge<'a> {
+    Judge {
+        surfaces,
+        text,
+        cfg: &input.config.support,
+        body_height_px: input.config.body_height_px,
+        frame_bottom: input.stage.height,
+    }
+}
+
+/// The lesson decides where (its authored stands); the engine picks the one the scene's terrain
+/// carries best, as a perch facing the lesson's subject, or refuses.
+fn choose_stand(input: &MotionInput) -> Result<SupportChoice, MotionError> {
+    let dest = &input.destination;
+    let t = &input.terrain;
+    select_support(
+        &dest.candidates,
+        input.target_scale,
+        dest.focus,
+        dest.narrow_allowed,
+        &judge_over(input, &t.surfaces, &t.protected_text),
+    )
+}
+
+/// Judge one of the plan's contacts against the terrain on screen at `at_ms`: the segment's own, and
+/// while it transitions in, the outgoing segment's (the first that carries the stance wins; refused,
+/// the verdict on the segment's own terrain stands).
+fn judge_contact(input: &MotionInput, q: &StanceQuery, at_ms: f64) -> Result<JudgedContact, MotionError> {
+    let t = &input.terrain;
+    let own = evaluate_stance(q, &judge_over(input, &t.surfaces, &t.protected_text))?;
+    if !own.ok && at_ms < t.outgoing.until_ms {
+        let outgoing = evaluate_stance(q, &judge_over(input, &t.outgoing.surfaces, &t.outgoing.protected_text))?;
+        if outgoing.ok {
+            return Ok(JudgedContact {
+                at_ms,
+                terrain: TerrainOf::Outgoing,
+                verdict: outgoing,
+            });
+        }
+    }
+    Ok(JudgedContact {
+        at_ms,
+        terrain: TerrainOf::Own,
+        verdict: own,
+    })
+}
+
+/// The plan's support: the chosen stand, and its own takeoff (a passing step, judged at liftoff, unless
+/// the start is off the stage) and landing (a perch, judged at contact), both facing the direction of
+/// travel. Refuses (`ImplausibleSupport`) when the terrain on screen does not carry either one.
+fn judge_support(
+    input: &MotionInput,
+    choice: SupportChoice,
+    ends: &Ends,
+    hop: &HopSolution,
+) -> Result<PlanSupport, MotionError> {
+    let facing = travel_facing(input.start, ends.target);
+    let takeoff = if input.stage.contains(input.start) {
+        let q = StanceQuery {
+            at: input.start,
+            scale: input.start_scale,
+            facing,
+            role: ContactRole::Step,
+            narrow_allowed: false,
+        };
+        Some(judge_contact(input, &q, hop.liftoff_ms)?)
+    } else {
+        None
+    };
+    let q = StanceQuery {
+        at: ends.target,
+        scale: input.target_scale,
+        facing,
+        role: ContactRole::Perch,
+        narrow_allowed: input.destination.narrow_allowed,
+    };
+    let landing = judge_contact(input, &q, hop.contact_ms)?;
+    for (what, judged) in [("takeoff", takeoff.as_ref()), ("landing", Some(&landing))] {
+        if let Some(j) = judged.filter(|j| !j.verdict.ok) {
+            return refuse(
+                MotionErrorCode::ImplausibleSupport,
+                format!("the {what} at {} ms is not carried: {:?}", j.at_ms, j.verdict.code),
+            );
+        }
+    }
+    Ok(PlanSupport {
+        candidate: choice.index as u32,
+        candidates: choice.verdicts,
+        takeoff,
+        landing,
+    })
+}
+
+/// Solve `input`: a plan whose final position is the authored stand the terrain carries best, or a
+/// refusal.
 pub fn solve_motion(input: &MotionInput) -> Result<MotionPlan, MotionError> {
     validate_input(input)?;
     let cfg = &input.config;
     let timing = input.timing;
     let terrain = &input.terrain;
+    let choice = choose_stand(input)?;
+    let ends = Ends::resolve(input, choice.at);
     let hop = solve_hop(
         &HopRequest {
             from: input.start,
-            to: input.target,
+            to: ends.target,
             from_scale: input.start_scale,
             to_scale: input.target_scale,
             start_ms: timing.start_ms,
@@ -61,7 +190,8 @@ pub fn solve_motion(input: &MotionInput) -> Result<MotionPlan, MotionError> {
         },
         cfg,
     )?;
-    let (takeoff_impulse, landing_impulse) = hop::impulses(&hop, input.start, input.target, cfg);
+    let support = judge_support(input, choice, &ends, &hop)?;
+    let (takeoff_impulse, landing_impulse) = hop::impulses(&hop, input.start, ends.target, cfg);
     let (first, count) = frame_grid(input)?;
     // The last frame this plan performs: the body must be back in its stance by then.
     let landing = Landing::within(hop.contact_ms, &cfg.landing, frame_ms(first + count - 1, input.fps))?;
@@ -71,7 +201,7 @@ pub fn solve_motion(input: &MotionInput) -> Result<MotionPlan, MotionError> {
         .min((hop.liftoff_ms - hop.orient_end_ms) * PUSH_PRELOAD_FRAC);
     let push_start_ms = hop.liftoff_ms - push_ms;
     let phases = phase_windows(input, &hop, push_start_ms, &landing);
-    let body = Body::new(input, hop, landing, push_start_ms, phases, landing_impulse);
+    let body = Body::new(input, ends, hop, landing, push_start_ms, phases, landing_impulse);
     let sim = Sim::run(&body);
     let samples: Vec<MotionState> = (first..first + count)
         .map(|f| body.sample(frame_ms(f, input.fps), &sim))
@@ -85,7 +215,8 @@ pub fn solve_motion(input: &MotionInput) -> Result<MotionPlan, MotionError> {
         },
         action: input.action,
         start: input.start,
-        target: input.target,
+        target: ends.target,
+        support,
         timing: PlanTiming {
             start_ms: timing.start_ms,
             arrive_by_ms: timing.arrive_by_ms,
@@ -112,15 +243,15 @@ pub fn solve_motion(input: &MotionInput) -> Result<MotionPlan, MotionError> {
                 impulse: takeoff_impulse,
                 position: input.start,
                 scale: input.start_scale,
-                contact: contact_with(terrain.start.as_ref()),
+                contact: ends.start_contact,
             },
             ContactEvent {
                 kind: ContactKind::Landing,
                 at_ms: hop.contact_ms,
                 impulse: landing_impulse,
-                position: input.target,
+                position: ends.target,
                 scale: input.target_scale,
-                contact: contact_with(terrain.target.as_ref()),
+                contact: ends.target_contact,
             },
         ],
         phases: body.phases,
@@ -131,7 +262,7 @@ pub fn solve_motion(input: &MotionInput) -> Result<MotionPlan, MotionError> {
         },
         samples,
     };
-    check_plan(&plan, input)?;
+    check_plan(&plan, input, &ends)?;
     Ok(plan)
 }
 
@@ -153,8 +284,8 @@ fn validate_input(input: &MotionInput) -> Result<(), MotionError> {
     let numbers = [
         ("start.x", input.start.x),
         ("start.y", input.start.y),
-        ("target.x", input.target.x),
-        ("target.y", input.target.y),
+        ("destination.focus.x", input.destination.focus.x),
+        ("destination.focus.y", input.destination.focus.y),
         ("startScale", input.start_scale),
         ("targetScale", input.target_scale),
         ("timing.startMs", t.start_ms),
@@ -173,6 +304,22 @@ fn validate_input(input: &MotionInput) -> Result<(), MotionError> {
         if !v.is_finite() {
             return refuse(NonFiniteValue, format!("input.{name} is not finite"));
         }
+    }
+    let candidates = &input.destination.candidates;
+    if let Some(k) = candidates.iter().position(|c| !c.is_finite()) {
+        return refuse(
+            NonFiniteValue,
+            format!("input.destination.candidates[{k}] is not finite"),
+        );
+    }
+    if candidates.is_empty() || candidates.len() > MAX_CANDIDATES {
+        return refuse(
+            InvalidInput,
+            format!(
+                "input.destination authors {} stands; it needs 1..={MAX_CANDIDATES}",
+                candidates.len()
+            ),
+        );
     }
     input.config.validate()?;
     if !(1..=240).contains(&input.fps) {
@@ -246,7 +393,7 @@ fn validate_input(input: &MotionInput) -> Result<(), MotionError> {
             );
         }
     }
-    check_geometry(input.start, input.target, &input.stage, &input.terrain)
+    check_geometry(input.start, candidates, &input.stage, &input.terrain)
 }
 
 /// Every phase window in order (an empty orient is omitted). Contiguous by construction.
@@ -309,6 +456,7 @@ fn frame_grid(input: &MotionInput) -> Result<(u64, u64), MotionError> {
 struct Body<'a> {
     input: &'a MotionInput,
     cfg: &'a MotionConfig,
+    ends: Ends,
     hop: HopSolution,
     landing: Landing,
     push_start_ms: f64,
@@ -323,6 +471,7 @@ struct Body<'a> {
 impl<'a> Body<'a> {
     fn new(
         input: &'a MotionInput,
+        ends: Ends,
         hop: HopSolution,
         landing: Landing,
         push_start_ms: f64,
@@ -334,13 +483,14 @@ impl<'a> Body<'a> {
         Self {
             input,
             cfg,
+            ends,
             hop,
             landing,
             push_start_ms,
             phases,
             landing_impulse,
             extension_peak: clamp01(hop.apex_above_px / (cfg.hop.extension_reference_body_heights * from_body)),
-            forward_speed: (input.target.x - input.start.x).abs() / hop.flight_s(),
+            forward_speed: (ends.target.x - input.start.x).abs() / hop.flight_s(),
         }
     }
 
@@ -361,8 +511,8 @@ impl<'a> Body<'a> {
 
     /// Body pitch in flight: the velocity direction drives it, nose up rising, nose down falling.
     fn flight_pitch(&self, s: f64) -> f64 {
-        let vy = (self.input.target.y - self.input.start.y) - self.hop.depth_px * (1.0 - 2.0 * s);
-        let vx = (self.input.target.x - self.input.start.x).abs();
+        let vy = (self.ends.target.y - self.input.start.y) - self.hop.depth_px * (1.0 - 2.0 * s);
+        let vx = (self.ends.target.x - self.input.start.x).abs();
         let dir = vy / sqrt(vx * vx + vy * vy).max(1.0);
         self.cfg.pitch.max_deg * clamp(self.cfg.pitch.velocity_gain * dir, -1.0, 1.0)
     }
@@ -462,7 +612,7 @@ impl<'a> Body<'a> {
     /// it up from rest, the flight is ballistic, the impact window brings it back to rest.
     fn rise(&self, t: f64, phase: MotionPhase, progress: f64) -> f64 {
         let flight_s = self.hop.flight_s();
-        let speed_at = |s: f64| velocity_at(self.input.start, self.input.target, self.hop.depth_px, s, flight_s).y;
+        let speed_at = |s: f64| velocity_at(self.input.start, self.ends.target, self.hop.depth_px, s, flight_s).y;
         let body = self.hop.body_px;
         match phase {
             MotionPhase::Takeoff => -speed_at(0.0) / body * progress,
@@ -515,15 +665,16 @@ impl<'a> Body<'a> {
 
     fn kinematics(&self, t: f64, phase: MotionPhase) -> (Vec2, Vec2, f64) {
         let input = self.input;
+        let target = self.ends.target;
         if phase.before_liftoff() {
             (input.start, Vec2::ZERO, input.start_scale)
         } else if phase.after_contact() {
-            (input.target, Vec2::ZERO, input.target_scale)
+            (target, Vec2::ZERO, input.target_scale)
         } else {
             let s = self.flight_fraction(t);
             (
-                feet_at(input.start, input.target, self.hop.depth_px, s),
-                velocity_at(input.start, input.target, self.hop.depth_px, s, self.hop.flight_s()),
+                feet_at(input.start, target, self.hop.depth_px, s),
+                velocity_at(input.start, target, self.hop.depth_px, s, self.hop.flight_s()),
                 lerp(input.start_scale, input.target_scale, s),
             )
         }
@@ -562,9 +713,9 @@ impl<'a> Body<'a> {
             _ => (tail, curl, tension, ears),
         };
         let contact = match phase {
-            MotionPhase::Airborne => crate::state::Contact::None,
-            p if p.before_liftoff() => contact_with(self.input.terrain.start.as_ref()),
-            _ => contact_with(self.input.terrain.target.as_ref()),
+            MotionPhase::Airborne => Contact::None,
+            p if p.before_liftoff() => self.ends.start_contact,
+            _ => self.ends.target_contact,
         };
         let landing_impulse = match phase {
             MotionPhase::Contact | MotionPhase::Compression | MotionPhase::Settle => self.landing_impulse,

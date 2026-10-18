@@ -1,8 +1,8 @@
 {
-  "schema": "walletwall.motion-intelligence-config/v2",
+  "schema": "walletwall.motion-intelligence-config/v3",
   "id": "walletwallaby-motion-intelligence",
-  "version": 2,
-  "note": "Physics for the Rust/WASM Motion Intelligence engine (motion-intelligence/). Lengths are in body heights (bodyHeightPx x the character's scale), times in milliseconds, angles in degrees. The hop timing values must equal config/motion.json while the TypeScript solver remains the oracle (test/rust-motion-engine.test.ts enforces it). Changing any value requires a new version (pinned in src/motion/engine-identity.ts).",
+  "version": 3,
+  "note": "Physics for the Rust/WASM Motion Intelligence engine (motion-intelligence/). Lengths are in body heights (bodyHeightPx x the character's scale), times in milliseconds, angles in degrees. The hop timing values and the support section must equal config/motion.json while the TypeScript solver remains the oracle (test/rust-motion-engine.test.ts enforces it). Changing any value requires a new version (pinned in src/motion/engine-identity.ts).",
   "bodyHeightPx": 236,
   "gravityBodyHeightsPerS2": 21,
   "maxGravityBoost": 1.8,
@@ -64,6 +64,23 @@
     "damping": 0.3,
     "accelGainDeg": 2,
     "maxDeg": 9
+  },
+  "support": {
+    "footprintBackBodyHeights": 0.16,
+    "footprintFrontBodyHeights": 0.19,
+    "comAheadBodyHeights": 0.02,
+    "comMarginBodyHeights": 0.08,
+    "stepComMarginBodyHeights": 0.04,
+    "narrowWidthBodyHeights": 0.6,
+    "broadWidthBodyHeights": 1,
+    "broadMarginBodyHeights": 0.1,
+    "tailReachBodyHeights": 0.82,
+    "contactHeightBodyHeights": 0.1,
+    "shoulderHeightBodyHeights": 0.62,
+    "shoulderAheadBodyHeights": 0.06,
+    "armReachBodyHeights": 0.3,
+    "minThicknessPx": 4,
+    "tolerancePx": 1
   },
   "limits": {
     "maxHeadDeg": 6,

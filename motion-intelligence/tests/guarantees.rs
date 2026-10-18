@@ -3,7 +3,7 @@
 mod common;
 
 use motion_intelligence::state::{Contact, ContactKind, MotionAction, MotionPhase};
-use motion_intelligence::terrain::contact_with;
+use motion_intelligence::terrain::contact_at;
 use motion_intelligence::{MotionInput, MotionPlan, solve_motion};
 
 fn plan() -> MotionPlan {
@@ -23,11 +23,11 @@ fn fixtures() -> Vec<(&'static str, MotionInput, MotionPlan)> {
 }
 
 #[test]
-fn from_touchdown_on_the_feet_are_on_the_authored_target_bit_for_bit() {
+fn from_touchdown_on_the_feet_are_on_the_authored_stand_bit_for_bit() {
     for (name, input, p) in fixtures() {
         assert!(
-            p.target.bits_eq(input.target),
-            "{name}: the target echo is the input target"
+            p.target.bits_eq(common::stand(&input)) && p.support.candidate == 0,
+            "{name}: the plan's stand is the authored one"
         );
         let landed: Vec<_> = p.samples.iter().filter(|s| s.phase.after_contact()).collect();
         assert!(
@@ -37,13 +37,13 @@ fn from_touchdown_on_the_feet_are_on_the_authored_target_bit_for_bit() {
         );
         for s in &landed {
             assert!(
-                s.position.bits_eq(input.target),
+                s.position.bits_eq(p.target),
                 "{name} {:?} at ({}, {})",
                 s.phase,
                 s.position.x,
                 s.position.y
             );
-            assert_eq!(s.contact, contact_with(input.terrain.target.as_ref()), "{name}");
+            assert_eq!(s.contact, contact_at(p.target, &input.terrain.surfaces), "{name}");
         }
         assert_eq!(p.samples.last().unwrap().phase, MotionPhase::Perch, "{name}");
     }
@@ -61,7 +61,7 @@ fn before_liftoff_the_feet_stay_on_the_start_bit_for_bit() {
     for (name, input, p) in fixtures() {
         for s in p.samples.iter().filter(|s| s.phase.before_liftoff()) {
             assert!(s.position.bits_eq(input.start), "{name} {:?}", s.phase);
-            assert_eq!(s.contact, contact_with(input.terrain.start.as_ref()), "{name}");
+            assert_eq!(s.contact, contact_at(input.start, &input.terrain.surfaces), "{name}");
             assert_eq!((s.velocity.x, s.velocity.y), (0.0, 0.0), "{name}");
         }
     }
@@ -88,13 +88,17 @@ fn the_plan_states_its_contacts_exactly_where_and_when_they_happen() {
             "{name}: at touchdown"
         );
         assert!(
-            takeoff.position.bits_eq(input.start) && landing.position.bits_eq(input.target),
+            takeoff.position.bits_eq(input.start) && landing.position.bits_eq(p.target),
             "{name}"
         );
         assert_eq!(takeoff.scale.to_bits(), input.start_scale.to_bits(), "{name}");
         assert_eq!(landing.scale.to_bits(), input.target_scale.to_bits(), "{name}");
-        assert_eq!(takeoff.contact, contact_with(input.terrain.start.as_ref()), "{name}");
-        assert_eq!(landing.contact, contact_with(input.terrain.target.as_ref()), "{name}");
+        assert_eq!(
+            takeoff.contact,
+            contact_at(input.start, &input.terrain.surfaces),
+            "{name}"
+        );
+        assert_eq!(landing.contact, contact_at(p.target, &input.terrain.surfaces), "{name}");
         // The landing the samples perform is the one the plan states.
         let landed = p.samples.iter().find(|s| s.phase == MotionPhase::Contact).unwrap();
         assert_eq!(landed.landing_impulse, landing.impulse, "{name}");
@@ -295,9 +299,9 @@ fn the_solver_cannot_change_where_the_lesson_goes() {
     ];
     for (k, patch) in variants.iter().enumerate() {
         let p = common::solve_with(patch).unwrap_or_else(|e| panic!("variant {k}: {e}"));
-        assert!(p.target.bits_eq(input.target), "variant {k}");
+        assert!(p.target.bits_eq(common::stand(&input)), "variant {k}");
         assert!(
-            p.samples.last().unwrap().position.bits_eq(input.target),
+            p.samples.last().unwrap().position.bits_eq(common::stand(&input)),
             "variant {k} ends on the target"
         );
         assert!(

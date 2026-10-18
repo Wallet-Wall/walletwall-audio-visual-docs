@@ -4,16 +4,20 @@
 // validateMotionPlan, which fails closed. No trajectory mathematics lives here: a plan is data,
 // one state per video frame. Isomorphic (used by the Node adapter and inside the composition).
 
-export const INPUT_SCHEMA = 'walletwall.motion-input/v2';
-export const PLAN_SCHEMA = 'walletwall.motion-plan/v2';
-export const CONFIG_SCHEMA = 'walletwall.motion-intelligence-config/v2';
+import { SUPPORT_CLASSES, type SupportClass, type TerrainSurface } from '../layout/terrain.ts';
+import { HAND_CODES, SUPPORT_CODES, type ContactRole, type HandCode, type HandVerdict, type SupportCode, type SupportConfig, type SupportGrade, type SupportVerdict } from '../character/walletwallaby/support.ts';
+
+export const INPUT_SCHEMA = 'walletwall.motion-input/v3';
+export const PLAN_SCHEMA = 'walletwall.motion-plan/v3';
+export const CONFIG_SCHEMA = 'walletwall.motion-intelligence-config/v3';
+export const SUPPORT_QUERY_SCHEMA = 'walletwall.support-query/v1';
+export const SUPPORT_REPORT_SCHEMA = 'walletwall.support-report/v1';
 export const ENGINE_NAME = 'motion-intelligence';
 
 export const MOTION_PHASES = ['IDLE', 'PRELOAD', 'TAKEOFF', 'AIRBORNE', 'CONTACT', 'COMPRESSION', 'SETTLE', 'PERCH'] as const;
 export type MotionPhase = (typeof MOTION_PHASES)[number];
 export type MotionAction = 'IDLE' | 'HOP' | 'LAND' | 'PERCH' | 'INSPECT' | 'TRACE' | 'MANTLE' | 'VAULT' | 'PUSH_THROUGH';
 export type MotionContact = 'NONE' | 'GROUND' | 'PLATFORM';
-export type SurfaceKind = 'CARD' | 'NODE' | 'PILLAR' | 'LEDGE';
 /** Flight samples the engine tests against the protected text (motion-intelligence/src/hop.rs). */
 export const FLIGHT_SAMPLES = 32;
 
@@ -26,12 +30,6 @@ export interface MotionRect {
   y: number;
   w: number;
   h: number;
-}
-export interface MotionSurface {
-  kind: SurfaceKind;
-  topY: number;
-  leftX: number;
-  rightX: number;
 }
 /** The standing figure's layout box at scale 1, px from the feet (WALLABY_EXTENT). */
 export interface MotionFigure {
@@ -78,24 +76,83 @@ export interface MotionIntelligenceConfig {
   pitch: { maxDeg: number; velocityGain: number; headStabilization: number };
   tail: { freqHz: number; damping: number; loadDeg: number; pitchCounter: number; liftDeg: number; impactDeg: number; maxDeg: number; curlFlightDeg: number; curlLoadDeg: number; maxCurlDeg: number; tensionLoad: number; tensionLever: number; tensionFlight: number; tensionBrace: number; tensionEffort: number; tensionFollowMs: number };
   ears: { freqHz: number; damping: number; accelGainDeg: number; maxDeg: number };
+  /** Support plausibility: equal to config/motion.json `support` (test/rust-motion-engine.test.ts enforces it). */
+  support: SupportConfig;
   limits: { maxHeadDeg: number; maxWindowMs: number; maxApexBodyHeights: number };
+}
+
+/** The lesson's authored destination: its stands (in order of preference), the subject a perch faces, and whether a narrow perch was authored. */
+export interface MotionDestination {
+  candidates: Vec2[];
+  focus: Vec2;
+  narrowAllowed: boolean;
+}
+
+/** Declared terrain: what each drawn surface offers (src/layout/terrain.ts), and the text no flight crosses and no contact touches. */
+export interface MotionTerrain {
+  surfaces: TerrainSurface[];
+  protectedText: MotionRect[];
+  /** The previous segment's terrain, on screen under the feet until `untilMs` (empty lists when there is none). */
+  outgoing: { surfaces: TerrainSurface[]; protectedText: MotionRect[]; untilMs: number };
+  figure: MotionFigure;
 }
 
 export interface MotionInput {
   schema: typeof INPUT_SCHEMA;
   action: MotionAction;
   start: Vec2;
-  /** Where the lesson decided the feet must end. The engine can only reach it. */
-  target: Vec2;
+  /** Where the lesson sends the feet. The engine can only choose one of its stands. */
+  destination: MotionDestination;
   startScale: number;
   targetScale: number;
   timing: { startMs: number; arriveByMs: number; endMs: number };
   fps: number;
   stage: { width: number; height: number };
-  /** The surfaces under both ends, the text the flight should not cross (empty: the natural arc), and the figure's box. */
-  terrain: { start: MotionSurface | null; target: MotionSurface | null; protectedText: MotionRect[]; figure: MotionFigure };
+  terrain: MotionTerrain;
   stance: { initial: MotionStance; rest: MotionStance };
   config: MotionIntelligenceConfig;
+}
+
+/** The engine's verdict on a stance: the TypeScript judge's, without its prose (`reason`). */
+export type EngineSupportVerdict = Omit<SupportVerdict, 'reason'>;
+
+/** The engine's verdict on a hand: the TypeScript judge's, without its prose (and, for a brace, without the feet's verdict). */
+export type EngineHandVerdict = Omit<HandVerdict, 'reason'>;
+
+/** A `walletwall.support-query/v1` document: stances, grips, and braces for the engine to judge against one terrain. */
+export interface SupportQuery {
+  schema: typeof SUPPORT_QUERY_SCHEMA;
+  config: SupportConfig;
+  bodyHeightPx: number;
+  stage: { width: number; height: number };
+  terrain: { surfaces: TerrainSurface[]; protectedText: MotionRect[] };
+  stances: { at: Vec2; scale: number; facing: 1 | -1; role: ContactRole; narrowAllowed: boolean }[];
+  grips: { corner: Vec2; shoulder: Vec2; scale: number }[];
+  braces: { stance: SupportQuery['stances'][number]; hand: Vec2 }[];
+}
+
+/** The engine's answer to a SupportQuery: one verdict per query, in order. */
+export interface SupportReport {
+  schema: typeof SUPPORT_REPORT_SCHEMA;
+  engine: { name: string; version: string };
+  stances: EngineSupportVerdict[];
+  grips: EngineHandVerdict[];
+  braces: EngineHandVerdict[];
+}
+
+/** One of the engine's own contacts, judged at its instant against the terrain on screen. */
+export interface MotionJudgedContact {
+  atMs: number;
+  terrain: 'OWN' | 'OUTGOING';
+  verdict: EngineSupportVerdict;
+}
+
+/** How a plan is carried: the stand chosen among the authored ones, every stand's verdict, and the takeoff (null off stage) and landing verdicts. */
+export interface MotionPlanSupport {
+  candidate: number;
+  candidates: EngineSupportVerdict[];
+  takeoff: MotionJudgedContact | null;
+  landing: MotionJudgedContact;
 }
 
 /** A contact the engine makes with the terrain: the push-off from the start, the touchdown on the target. */
@@ -139,7 +196,9 @@ export interface MotionPlan {
   engine: { name: string; version: string };
   action: MotionAction;
   start: Vec2;
+  /** The chosen stand: one of the destination's candidates, exactly. */
   target: Vec2;
+  support: MotionPlanSupport;
   timing: { startMs: number; arriveByMs: number; endMs: number; orientEndMs: number; pushMs: number; liftoffMs: number; contactMs: number; settledMs: number };
   /** `arcFraction`: the arc the surface-aware search kept, as a fraction of the natural apex; `textCrossings`: flight samples (of 32) crossing protected text. */
   trajectory: { depthPx: number; gravityPxPerS2: number; gravityBoost: number; flightMs: number; apexAbovePx: number; arcFraction: number; textCrossings: number };
@@ -160,13 +219,15 @@ export type MotionErrorCode =
   | 'OUT_OF_BOUNDS'
   | 'INVALID_CONFIG'
   | 'UNSUPPORTED_ACTION'
+  | 'IMPLAUSIBLE_SUPPORT'
   | 'ENGINE_UNAVAILABLE'
   | 'ENGINE_FAULT'
   | 'INVALID_PLAN'
   | 'INELIGIBLE_PATH'
-  | 'BINDING_MISMATCH';
+  | 'BINDING_MISMATCH'
+  | 'SUPPORT_MISMATCH';
 
-export const ENGINE_REFUSAL_CODES: readonly MotionErrorCode[] = ['INVALID_INPUT', 'NON_FINITE_VALUE', 'INVALID_DURATION', 'INVALID_TARGET', 'UNSOLVABLE_TRAJECTORY', 'OUT_OF_BOUNDS', 'INVALID_CONFIG', 'UNSUPPORTED_ACTION'];
+export const ENGINE_REFUSAL_CODES: readonly MotionErrorCode[] = ['INVALID_INPUT', 'NON_FINITE_VALUE', 'INVALID_DURATION', 'INVALID_TARGET', 'UNSOLVABLE_TRAJECTORY', 'OUT_OF_BOUNDS', 'INVALID_CONFIG', 'UNSUPPORTED_ACTION', 'IMPLAUSIBLE_SUPPORT'];
 
 /** Any refusal on the motion engine path. Nothing on this path falls back silently. */
 export class MotionEngineError extends Error {
@@ -184,15 +245,30 @@ export class MotionEngineError extends Error {
 export interface PlanExpectation {
   action: MotionAction;
   start: Vec2;
-  target: Vec2;
+  /** The lesson's authored stands for the destination. */
+  candidates: readonly Vec2[];
+  /** The stand the plan must have chosen (the composition's clip), or null to accept the engine's choice among `candidates`. */
+  target: Vec2 | null;
   startScale: number;
   targetScale: number;
   timing: { startMs: number; arriveByMs: number; endMs: number };
   fps: number;
+  /** The visible frame: a takeoff is judged only when the start is on it. */
+  stage: { width: number; height: number };
   rest: MotionStance;
   contactAtStart: MotionContact;
-  contactAtTarget: MotionContact;
+  /** What the feet touch at the chosen stand. */
+  contactAt: (stand: Vec2) => MotionContact;
   limits: { pitchDeg: number; tailDeg: number; curlDeg: number; earDeg: number; headDeg: number };
+}
+
+/**
+ * What the feet touch at `p`: a platform when a solid top that carries feet (other than the ground) is
+ * level with the point and spans it, otherwise the ground (motion-intelligence/src/terrain.rs `contact_at`).
+ */
+export function contactAt(p: Vec2, surfaces: readonly TerrainSurface[]): 'PLATFORM' | 'GROUND' {
+  const on = surfaces.some((s) => s.face === 'TOP' && (s.support === 'SUPPORTED_SURFACE' || s.support === 'LEDGE' || s.support === 'NARROW_LEDGE') && s.element !== 'ground' && Math.abs(s.y0 - p.y) <= 1 && p.x >= s.x0 && p.x <= s.x1);
+  return on ? 'PLATFORM' : 'GROUND';
 }
 
 export function expectationFor(input: MotionInput): PlanExpectation {
@@ -200,19 +276,23 @@ export function expectationFor(input: MotionInput): PlanExpectation {
   return {
     action: input.action,
     start: input.start,
-    target: input.target,
+    candidates: input.destination.candidates,
+    target: null,
     startScale: input.startScale,
     targetScale: input.targetScale,
     timing: input.timing,
     fps: input.fps,
+    stage: input.stage,
     rest: input.stance.rest,
-    contactAtStart: input.terrain.start ? 'PLATFORM' : 'GROUND',
-    contactAtTarget: input.terrain.target ? 'PLATFORM' : 'GROUND',
+    contactAtStart: contactAt(input.start, input.terrain.surfaces),
+    contactAt: (stand) => contactAt(stand, input.terrain.surfaces),
     limits: limitsOf(c),
   };
 }
 
-const PLAN_KEYS = ['schema', 'engine', 'action', 'start', 'target', 'timing', 'trajectory', 'events', 'phases', 'frames', 'samples'];
+const PLAN_KEYS = ['schema', 'engine', 'action', 'start', 'target', 'support', 'timing', 'trajectory', 'events', 'phases', 'frames', 'samples'];
+const VERDICT_KEYS = ['ok', 'code', 'surface', 'support', 'grade', 'widthPx', 'feet', 'comX', 'marginBackPx', 'marginFrontPx', 'comMarginPx', 'tail'];
+const GRADES: readonly SupportGrade[] = ['BROAD', 'LEDGE', 'NARROW'];
 const TIMING_KEYS = ['startMs', 'arriveByMs', 'endMs', 'orientEndMs', 'pushMs', 'liftoffMs', 'contactMs', 'settledMs'];
 const TRAJECTORY_KEYS = ['depthPx', 'gravityPxPerS2', 'gravityBoost', 'flightMs', 'apexAbovePx', 'arcFraction', 'textCrossings'];
 const EVENT_KEYS = ['kind', 'atMs', 'impulse', 'position', 'scale', 'contact'];
@@ -246,6 +326,66 @@ function point(v: unknown, at: string): Vec2 {
   const o = object(v, ['x', 'y'], at);
   return { x: finite(o.x, `${at}.x`), y: finite(o.y, `${at}.y`) };
 }
+/** An engine support verdict, structurally checked (its numbers finite, its codes known, `ok` exactly when SUPPORTED with a grade). */
+function verdict(v: unknown, at: string): EngineSupportVerdict {
+  const o = object(v, VERDICT_KEYS, at);
+  if (typeof o.ok !== 'boolean') invalid(`${at}.ok is not a boolean`);
+  if (!SUPPORT_CODES.includes(o.code as SupportCode)) invalid(`${at}.code is unknown`);
+  if (o.surface !== null && typeof o.surface !== 'string') invalid(`${at}.surface is not a surface id`);
+  if (o.support !== null && !SUPPORT_CLASSES.includes(o.support as SupportClass)) invalid(`${at}.support is unknown`);
+  if (o.grade !== null && !GRADES.includes(o.grade as SupportGrade)) invalid(`${at}.grade is unknown`);
+  if (o.tail !== 'ON_SUPPORT' && o.tail !== 'FREE') invalid(`${at}.tail is unknown`);
+  if (o.ok !== (o.code === 'SUPPORTED') || o.ok !== (o.grade !== null)) invalid(`${at} is inconsistent`);
+  const feet = object(o.feet, ['x0', 'x1'], `${at}.feet`);
+  return {
+    ok: o.ok,
+    code: o.code as SupportCode,
+    surface: o.surface as string | null,
+    support: o.support as SupportClass | null,
+    grade: o.grade as SupportGrade | null,
+    widthPx: finite(o.widthPx, `${at}.widthPx`),
+    feet: { x0: finite(feet.x0, `${at}.feet.x0`), x1: finite(feet.x1, `${at}.feet.x1`) },
+    comX: finite(o.comX, `${at}.comX`),
+    marginBackPx: finite(o.marginBackPx, `${at}.marginBackPx`),
+    marginFrontPx: finite(o.marginFrontPx, `${at}.marginFrontPx`),
+    comMarginPx: finite(o.comMarginPx, `${at}.comMarginPx`),
+    tail: o.tail,
+  };
+}
+function hand(v: unknown, at: string): EngineHandVerdict {
+  const o = object(v, ['ok', 'code', 'surface', 'reachPx', 'limitPx'], at);
+  if (typeof o.ok !== 'boolean') invalid(`${at}.ok is not a boolean`);
+  if (!HAND_CODES.includes(o.code as HandCode)) invalid(`${at}.code is unknown`);
+  if (o.surface !== null && typeof o.surface !== 'string') invalid(`${at}.surface is not a surface id`);
+  if (o.ok !== (o.code === 'GRIPPED' || o.code === 'BRACED')) invalid(`${at} is inconsistent`);
+  return { ok: o.ok, code: o.code as HandCode, surface: o.surface as string | null, reachPx: finite(o.reachPx, `${at}.reachPx`), limitPx: finite(o.limitPx, `${at}.limitPx`) };
+}
+
+/** Check a support report structurally against the query it answers (one verdict per query, every field known and finite); returns it deep-frozen. */
+export function validateSupportReport(raw: unknown, query: SupportQuery): SupportReport {
+  const r = object(raw, ['schema', 'engine', 'stances', 'grips', 'braces'], 'report');
+  if (r.schema !== SUPPORT_REPORT_SCHEMA) invalid(`report.schema must be ${SUPPORT_REPORT_SCHEMA}`);
+  const engine = object(r.engine, ['name', 'version'], 'report.engine');
+  if (engine.name !== ENGINE_NAME || typeof engine.version !== 'string') invalid('report.engine is not a motion-intelligence release');
+  const list = <T>(v: unknown, n: number, at: string, read: (x: unknown, at: string) => T): T[] => {
+    if (!Array.isArray(v) || v.length !== n) invalid(`${at} is not one verdict per query`);
+    return v.map((x, i) => read(x, `${at}[${i}]`));
+  };
+  return deepFreeze({
+    schema: SUPPORT_REPORT_SCHEMA,
+    engine: { name: engine.name as string, version: engine.version as string },
+    stances: list(r.stances, query.stances.length, 'report.stances', verdict),
+    grips: list(r.grips, query.grips.length, 'report.grips', hand),
+    braces: list(r.braces, query.braces.length, 'report.braces', hand),
+  });
+}
+
+function judged(v: unknown, at: string): MotionJudgedContact {
+  const o = object(v, ['atMs', 'terrain', 'verdict'], at);
+  if (o.terrain !== 'OWN' && o.terrain !== 'OUTGOING') invalid(`${at}.terrain is unknown`);
+  return { atMs: finite(o.atMs, `${at}.atMs`), terrain: o.terrain, verdict: verdict(o.verdict, `${at}.verdict`) };
+}
+
 /** Exact equality: the guarantee is "the same number", not "close". */
 const same = (a: number, b: number): boolean => Object.is(a, b) || (a === 0 && b === 0);
 const samePoint = (a: Vec2, b: Vec2): boolean => same(a.x, b.x) && same(a.y, b.y);
@@ -261,11 +401,29 @@ export function validateMotionPlan(raw: unknown, expect: PlanExpectation): Motio
   if (engine.name !== ENGINE_NAME || typeof engine.version !== 'string' || !/^\d+\.\d+\.\d+$/.test(engine.version)) invalid('plan.engine is not a motion-intelligence release');
   if (plan.action !== expect.action) invalid(`plan.action ${String(plan.action)} is not ${expect.action}`);
   if (!samePoint(point(plan.start, 'plan.start'), expect.start)) invalid('plan.start is not the input start');
-  if (!samePoint(point(plan.target, 'plan.target'), expect.target)) invalid('plan.target is not the authored target');
+
+  // The stand: one of the lesson's, exactly, judged a plausible perch; and the takeoff and landing carried.
+  const sup = object(plan.support, ['candidate', 'candidates', 'takeoff', 'landing'], 'plan.support');
+  const k = sup.candidate;
+  if (typeof k !== 'number' || !Number.isInteger(k) || k < 0 || k >= expect.candidates.length) invalid('plan.support.candidate is not one of the authored stands');
+  const target = { x: expect.candidates[k]!.x, y: expect.candidates[k]!.y };
+  if (!samePoint(point(plan.target, 'plan.target'), target)) invalid('plan.target is not the authored stand it names');
+  if (expect.target && !samePoint(target, expect.target)) invalid('the engine chose another of the authored stands than the lesson performs');
+  if (!Array.isArray(sup.candidates) || sup.candidates.length !== expect.candidates.length) invalid('plan.support.candidates is not one verdict per authored stand');
+  const candidates = sup.candidates.map((v: unknown, i: number) => verdict(v, `plan.support.candidates[${i}]`));
+  if (!candidates[k]!.ok) invalid('plan.support names a stand the terrain does not carry');
+  const s0 = expect.start;
+  const onStage = s0.x >= 0 && s0.x <= expect.stage.width && s0.y >= 0 && s0.y <= expect.stage.height;
+  const takeoff = sup.takeoff === null ? null : judged(sup.takeoff, 'plan.support.takeoff');
+  if ((takeoff === null) === onStage || (takeoff && !takeoff.verdict.ok)) invalid('plan.support.takeoff is not a carried takeoff from the stage');
+  const landing = judged(sup.landing, 'plan.support.landing');
+  if (!landing.verdict.ok) invalid('plan.support.landing is not carried');
+  const contactAtTarget = expect.contactAt(target);
 
   const timing = object(plan.timing, TIMING_KEYS, 'plan.timing');
   const t = Object.fromEntries(TIMING_KEYS.map((k) => [k, finite(timing[k], `plan.timing.${k}`)])) as MotionPlan['timing'];
   if (!same(t.startMs, expect.timing.startMs) || !same(t.arriveByMs, expect.timing.arriveByMs) || !same(t.endMs, expect.timing.endMs)) invalid('plan.timing does not echo the window');
+  if ((takeoff && !same(takeoff.atMs, t.liftoffMs)) || !same(landing.atMs, t.contactMs)) invalid('plan.support does not judge the takeoff and landing at their own instants');
   if (!(t.startMs <= t.orientEndMs && t.orientEndMs < t.pushMs && t.pushMs < t.liftoffMs && t.liftoffMs < t.contactMs && t.contactMs <= t.arriveByMs && t.contactMs < t.settledMs && t.settledMs < t.endMs)) invalid('plan.timing instants are out of order');
   const trajectory = object(plan.trajectory, TRAJECTORY_KEYS, 'plan.trajectory');
   for (const k of TRAJECTORY_KEYS) finite(trajectory[k], `plan.trajectory.${k}`);
@@ -277,7 +435,7 @@ export function validateMotionPlan(raw: unknown, expect: PlanExpectation): Motio
   if (!Array.isArray(plan.events) || plan.events.length !== 2) invalid('plan.events is not one takeoff and one landing');
   const ends = [
     { kind: 'TAKEOFF', atMs: t.liftoffMs, position: expect.start, scale: expect.startScale, contact: expect.contactAtStart },
-    { kind: 'LANDING', atMs: t.contactMs, position: expect.target, scale: expect.targetScale, contact: expect.contactAtTarget },
+    { kind: 'LANDING', atMs: t.contactMs, position: target, scale: expect.targetScale, contact: contactAtTarget },
   ] as const;
   const events = plan.events.map((raw: unknown, i: number): MotionContactEvent => {
     const at = `plan.events[${i}]`;
@@ -313,9 +471,9 @@ export function validateMotionPlan(raw: unknown, expect: PlanExpectation): Motio
   if (!Array.isArray(plan.samples) || plan.samples.length !== count) invalid('plan.samples does not have one state per frame');
 
   const order = (p: MotionPhase): number => MOTION_PHASES.indexOf(p);
-  const apexY = Math.min(expect.start.y, expect.target.y) - (trajectory.apexAbovePx as number);
-  const [xLo, xHi] = [Math.min(expect.start.x, expect.target.x), Math.max(expect.start.x, expect.target.x)];
-  const yHi = Math.max(expect.start.y, expect.target.y);
+  const apexY = Math.min(expect.start.y, target.y) - (trajectory.apexAbovePx as number);
+  const [xLo, xHi] = [Math.min(expect.start.x, target.x), Math.max(expect.start.x, target.x)];
+  const yHi = Math.max(expect.start.y, target.y);
   let w = 0;
   const samples = plan.samples.map((raw: unknown, k: number): MotionState => {
     const at = `plan.samples[${k}]`;
@@ -352,7 +510,7 @@ export function validateMotionPlan(raw: unknown, expect: PlanExpectation): Motio
     if (order(phase) < order('AIRBORNE')) {
       if (!samePoint(state.position, expect.start) || state.contact !== expect.contactAtStart) invalid(`${at}: the feet left the start before liftoff`);
     } else if (order(phase) > order('AIRBORNE')) {
-      if (!samePoint(state.position, expect.target) || state.contact !== expect.contactAtTarget) invalid(`${at}: after touchdown the feet are not on the authored target`);
+      if (!samePoint(state.position, target) || state.contact !== contactAtTarget) invalid(`${at}: after touchdown the feet are not on the chosen stand`);
     } else {
       const p = state.position;
       if (state.contact !== 'NONE' || p.x < xLo || p.x > xHi || p.y < apexY - 1e-6 || p.y > yHi + 1e-6) invalid(`${at}: the flight leaves its arc`);
@@ -374,7 +532,8 @@ export function validateMotionPlan(raw: unknown, expect: PlanExpectation): Motio
     engine: { name: engine.name as string, version: engine.version as string },
     action: expect.action,
     start: { ...expect.start },
-    target: { ...expect.target },
+    target,
+    support: { candidate: k, candidates, takeoff, landing },
     timing: t,
     trajectory: Object.fromEntries(TRAJECTORY_KEYS.map((k) => [k, trajectory[k]])) as MotionPlan['trajectory'],
     events,

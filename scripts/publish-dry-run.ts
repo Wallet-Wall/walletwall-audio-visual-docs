@@ -11,6 +11,7 @@ import path from 'node:path';
 import { buildCaptions, checkCaptions, toSrt, toWebVtt } from '../src/audio/captions.ts';
 import { buildCueSheet } from '../src/audio/cue-sheet.ts';
 import { choreograph, layoutsFor } from '../src/character/walletwallaby/choreography.ts';
+import { assertSupported, auditLesson } from '../src/character/walletwallaby/contacts.ts';
 import { planMotion } from '../src/character/walletwallaby/motion.ts';
 import { FixtureVoiceProvider } from '../src/audio/voice-provider.ts';
 import { loadPipelineConfig, readJson, VIDEO_ROOT } from '../src/config/load.ts';
@@ -53,6 +54,14 @@ writeFileSync(path.join(out, `${videoId}.en.srt`), toSrt(cues));
 const headings: Record<string, string> = Object.fromEntries(source.sections.map((s) => [s.id, s.heading]));
 const layouts = layoutsFor(timeline, (id) => headings[id] ?? '');
 const motion = planMotion(choreograph(timeline, layouts), layouts);
+// Nothing is published while WalletWallaby would stand, grip, or brace on anything the terrain cannot carry.
+const judged = auditLesson(timeline, layouts, motion);
+try {
+  assertSupported(judged);
+} catch (err) {
+  console.error(`[publish:dry-run] ${videoId}: ${(err as Error).message}`);
+  process.exit(1);
+}
 
 const renderInfoPath = path.join(out, 'render.json');
 const renderInfo = existsSync(renderInfoPath) ? readJson<{ specHash?: string; engine: { name: string; version: string }; output: { path: string; sha256: string }; identity?: unknown; motionEngine?: MotionEngineIdentity }>(renderInfoPath) : null;

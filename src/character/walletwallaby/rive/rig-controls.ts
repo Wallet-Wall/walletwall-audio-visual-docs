@@ -35,8 +35,12 @@ export interface RigControls {
 const JAW_DEG: Record<Viseme, number> = { REST: 0, CLOSED: 0, SMALL: 5, OPEN: 10 };
 const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
 
-/** Furthest a pointing target is placed from the feet (rig px): far subjects are pointed at, not reached for. */
+/** Furthest a pointing target is placed from the shoulder (rig px): far subjects are pointed at, not reached for. */
 const POINT_RADIUS = 300;
+/** Height of the shoulder the point is aimed from, above the feet (rig px). */
+const SHOULDER_UP = 146;
+/** Furthest a pointing target may be from the feet (rig px): inside the rig's IK reach limit in every direction. */
+const POINT_REACH = 380;
 
 /** The near forelimb points at the subject in front of WalletWallaby, by the pose's reach. */
 function pointAt(s: WallabyState): RigControls['point'] {
@@ -46,10 +50,15 @@ function pointAt(s: WallabyState): RigControls['point'] {
   if (x < 20) return null; // never point backwards through the body
   // Aim from the shoulder's height; clamp the distance so the arm reads as a point, not a lunge.
   const dx = x;
-  const dy = y + 146;
-  const d = Math.hypot(dx, dy);
-  const k = d > POINT_RADIUS ? POINT_RADIUS / d : 1;
-  return { target: [dx * k, dy * k - 146], amount: Math.min(1, s.pose.reach) };
+  const dy = y + SHOULDER_UP;
+  const d2 = dx * dx + dy * dy;
+  let k = d2 > POINT_RADIUS * POINT_RADIUS ? POINT_RADIUS / Math.sqrt(d2) : 1;
+  // Along the same direction from the shoulder, stop where the target would leave the rig's reach from the
+  // feet (pointing steeply up, the shoulder's own height adds to the distance): |(dx k, dy k - up)| = reach.
+  const b = SHOULDER_UP * dy;
+  const kReach = (b + Math.sqrt(b * b - d2 * (SHOULDER_UP * SHOULDER_UP - POINT_REACH * POINT_REACH))) / d2;
+  if (kReach < k) k = kReach;
+  return { target: [dx * k, dy * k - SHOULDER_UP], amount: Math.min(1, s.pose.reach) };
 }
 
 /** Map one sampled motion state to the rig's controls. */

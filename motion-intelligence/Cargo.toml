@@ -1,6 +1,6 @@
 [package]
 name = "motion-intelligence"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.96"
 description = "WalletWallaby Motion Intelligence: a small, deterministic traversal engine (hop with a surface-aware arc search, land, perch, tail counterbalance) compiled to WebAssembly."

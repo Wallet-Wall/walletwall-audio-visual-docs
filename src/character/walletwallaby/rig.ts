@@ -11,22 +11,34 @@ import type { WallabyExpression, WallabyPose } from '../../spec/vocabulary.ts';
 import type { PoseClip } from './rive/rig-source.ts';
 
 /**
- * Which brand token paints each part of the figure. Names only: values live in
- * the brand contract. WalletWallaby wears WalletWall terracotta: the coat, tail,
- * and outer ears are the canonical terracotta; belly, muzzle, and inner ears are
- * cream; outline, eyes, nose, and claws are charcoal. The shade is derived from
- * two canonical tokens (terracotta toward the dark terracotta), never typed in;
- * the highlight is a restrained cream.
+ * WalletWallrus's coat, reused as WalletWallaby's so the two read as one family: the colour of the largest
+ * area of the walrus's coat in its avatar (#BA6F38, measured from the image, not picked by eye). The docs
+ * theme does not define it (the theme's terracotta is redder), so the mascot family keeps it here.
+ */
+export const FAMILY_COLORS = { wallrusCoat: '#BA6F38' } as const;
+
+/** The brand tokens that are colours (not radii or alpha helpers). */
+export type ColorToken = { [K in keyof typeof TOKENS]: (typeof TOKENS)[K] extends string ? K : never }[keyof typeof TOKENS];
+
+/** A colour the rig may paint: a brand colour token, or the mascot family's own coat. */
+export type RigColor = ColorToken | keyof typeof FAMILY_COLORS;
+
+/**
+ * Which colour paints each part of the figure. Names only: values live in the
+ * brand contract (and, for the coat, in FAMILY_COLORS). WalletWallaby shares
+ * WalletWallrus's three-colour grammar: the coat (body, tail, outer ears, and
+ * the bricks of the belly) is WalletWallrus's own coat; the cream accents are on
+ * the face (muzzle, chin, eye glint) and the inner ear; outline, mortar, eyes,
+ * nose, and claws are charcoal. The far-side shade is the coat darkened toward
+ * charcoal, derived, never typed in. Flat colour: no highlights.
  */
 export const RIG_PALETTE = {
-  fur: 'terracotta',
-  furShade: { from: 'terracotta', to: 'terracottaDark', t: 0.42 },
-  belly: 'cream',
+  fur: 'wallrusCoat',
+  furShade: { from: 'wallrusCoat', to: 'charcoal', t: 0.2 },
+  accent: 'cream',
   innerEar: 'cream',
   ink: 'charcoal',
-  highlight: 'cream',
-  tag: 'tan',
-} as const satisfies Record<string, keyof typeof TOKENS | { from: keyof typeof TOKENS; to: keyof typeof TOKENS; t: number }>;
+} as const satisfies Record<string, RigColor | { from: RigColor; to: RigColor; t: number }>;
 
 /** Weights over the rig's pose clips. Non-negative; a resolved pose sums to 1. */
 export type ClipMix = Readonly<Partial<Record<PoseClip, number>>>;

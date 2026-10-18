@@ -20,6 +20,7 @@ import { MOTION } from '../src/character/walletwallaby/versions.ts';
 import { VIDEO_ROOT } from '../src/config/load.ts';
 import { contentAddress, sha256Hex } from '../src/core/hash.ts';
 import { WALLABY_EXTENT } from '../src/layout/scene-layout.ts';
+import { terrainsFor, type TerrainSurface } from '../src/layout/terrain.ts';
 import { buildIdentity } from '../src/manifest/build-identity.ts';
 import { buildProvenanceManifest } from '../src/manifest/provenance.ts';
 import { ABI_FUNCTIONS, assertHermetic, crateSourceSha256, crateVersion, inspectWasm, loadVerifiedArtifact, MOTION_CRATE_DIR, readArtifactManifest, verifyArtifactBytes } from '../src/motion/artifact.ts';
@@ -45,7 +46,7 @@ const FIXTURES = path.join(MOTION_CRATE_DIR, 'tests', 'fixtures');
 const FIXTURE_PATHS = [
   { name: 'takeaway-hop', segmentId: 'takeaway' },
   { name: 'hook-hop', segmentId: 'hook' },
-  { name: 'tiers-land', segmentId: 'tiers' },
+  { name: 'reading-land', segmentId: 'reading' },
   { name: 'signals-hop', segmentId: 'signals' },
 ] as const;
 const readFixture = (name: string): { input: MotionInput; plan: Uint8Array } => ({
@@ -54,8 +55,16 @@ const readFixture = (name: string): { input: MotionInput; plan: Uint8Array } => 
 });
 const fixtureInput = readFixture('takeaway-hop').input;
 const fixturePlan = readFixture('takeaway-hop').plan;
-/** Every TRAVEL clip of the committed lesson that the transitional solver performs as a hop ending in a perch. */
-const HOPS_TO_PERCHES = [1, 4, 7, 14, 28, 33, 40, 42, 44, 48, 50, 52, 54];
+/** Every TRAVEL clip of the committed lesson that the transitional solver performs as a hop from a stance ending in a perch. */
+const HOPS_TO_PERCHES = [1, 4, 7, 28, 33, 40, 42, 44, 48, 50, 52, 54];
+/** The tiers arrival: the fall that continues the previous scene's exit leap (no takeoff), which stays TypeScript. */
+const FALL = 14;
+const terrains = terrainsFor(timeline.segments, layouts);
+/** Two level tops spanning (and overhanging) the frame at the two heights of a synthetic hop: open terrain under both ends. */
+const openTerrain = (a: { y: number }, b: { y: number }): TerrainSurface[] => [
+  { id: 'from:top', element: 'from', face: 'TOP', support: 'SUPPORTED_SURFACE', x0: -200, y0: a.y, x1: 2120, y1: a.y, thicknessPx: 1080 - a.y },
+  ...(b.y === a.y ? [] : [{ id: 'to:top', element: 'to', face: 'TOP', support: 'SUPPORTED_SURFACE', x0: -200, y0: b.y, x1: 2120, y1: b.y, thicknessPx: 1080 - b.y } as const]),
+];
 const frameMs = (f: number): number => (f * 1000) / fps;
 const maxResponseWindow = Math.max(...Object.values(ts.config.response).map((r) => r.windowMs));
 
@@ -122,6 +131,9 @@ describe('TS -> WASM -> TS', () => {
     const travel = ts.clips.find((c) => c.segmentId === 'takeaway' && c.kind === 'TRAVEL' && c.action === 'HOP')!;
     const { plan } = engine.solve(input);
     assert.deepEqual(plan.target, travel.to);
+    assert.deepEqual(input.destination.candidates[plan.support.candidate], travel.to, 'the stand the lesson authored and the transitional layer chose');
+    assert.equal(plan.support.landing.verdict.grade, 'BROAD');
+    assert.equal(plan.support.takeoff?.terrain, 'OUTGOING', 'the takeoff stands on the card still on screen from the previous scene');
     assert.deepEqual(plan.samples.at(-1)!.position, travel.to);
     assert.equal(plan.samples.at(-1)!.phase, 'PERCH');
     assert.equal(plan.frames.fps, fps);
@@ -137,11 +149,15 @@ describe('TS -> WASM -> TS', () => {
     }
   });
 
-  test('the engine reads the same terrain the transitional solver avoids: its text, in its order, and the figure box', () => {
+  test('the engine reads the same terrain the transitional solver avoids and judges: its surfaces, its text in its order, the outgoing scene, and the figure box', () => {
     for (const { selection, input: i } of inputs) {
       const layout = layouts.get(selection.segmentId);
       const expected = layout ? [...layout.texts.map((t) => t.rect), { x: 160, y: 104, w: 1100, h: 32 }] : [];
       assert.deepEqual(i.terrain.protectedText, expected.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h })), `${selection.segmentId} clip ${selection.clip}`);
+      assert.deepEqual(i.terrain.surfaces, terrains.get(selection.segmentId)!.surfaces, 'every declared surface, as declared');
+      const k = timeline.segments.findIndex((x) => x.id === selection.segmentId);
+      const previous = k > 0 ? terrains.get(timeline.segments[k - 1]!.id) : undefined;
+      assert.deepEqual(i.terrain.outgoing, { surfaces: previous?.surfaces ?? [], protectedText: previous?.protectedText.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h })) ?? [], untilMs: timeline.segments[k]!.contentStartMs });
       assert.deepEqual(i.terrain.figure, { left: WALLABY_EXTENT.left, right: WALLABY_EXTENT.right, top: WALLABY_EXTENT.top });
     }
     assert.ok(inputs.some((i) => i.input.terrain.protectedText.length > 1) && inputs.some((i) => i.input.terrain.protectedText.length === 0), 'control: scenes protect text, brand segments do not');
@@ -160,7 +176,7 @@ describe('TS -> WASM -> TS', () => {
     const frozen = Object.freeze(clone(input));
     const { plan } = engine.solve(frozen);
     assert.deepEqual(input, before, 'the input is untouched');
-    assert.deepEqual(plan.target, input.target);
+    assert.deepEqual(plan.target, input.destination.candidates[plan.support.candidate]);
     assert.ok(Object.isFrozen(plan) && Object.isFrozen(plan.target) && Object.isFrozen(plan.samples.at(-1)!.position) && Object.isFrozen(plan.events[1]!), 'the plan cannot be edited after validation');
     assert.throws(() => {
       (plan.target as { x: number }).x = 0;
@@ -170,7 +186,8 @@ describe('TS -> WASM -> TS', () => {
 
 describe('fail closed', () => {
   test('the adapter refuses what JSON would silently corrupt, before the engine sees it', () => {
-    assert.equal(refusal(() => engine.solve(variant((i) => (i.target.x = Number.NaN)))), 'NON_FINITE_VALUE');
+    assert.equal(refusal(() => engine.solve(variant((i) => (i.destination.candidates[0].x = Number.NaN)))), 'NON_FINITE_VALUE');
+    assert.equal(refusal(() => engine.solve(variant((i) => (i.terrain.surfaces[1].y0 = Number.NaN)))), 'NON_FINITE_VALUE');
     assert.equal(refusal(() => engine.solve(variant((i) => (i.timing.endMs = Number.POSITIVE_INFINITY)))), 'NON_FINITE_VALUE');
     assert.equal(refusal(() => engine.solve(variant((i) => (i.config.tail.freqHz = Number.NEGATIVE_INFINITY)))), 'NON_FINITE_VALUE');
     assert.equal(refusal(() => engine.solve(variant((i) => (i.terrain.protectedText[0].y = Number.NaN)))), 'NON_FINITE_VALUE');
@@ -182,7 +199,10 @@ describe('fail closed', () => {
   test('the engine refuses malformed, impossible, or unsupported input with its own codes', () => {
     const cases: [string, (i: Record<string, any>) => void, MotionErrorCode][] = [
       ['unknown field', (i) => (i.wobble = 1), 'INVALID_INPUT'],
-      ['string number', (i) => (i.target.x = '1600'), 'INVALID_INPUT'],
+      ['string number', (i) => (i.destination.candidates[0].x = '1600'), 'INVALID_INPUT'],
+      ['the v2 target in place of a destination', (i) => ((i.target = i.destination.candidates[0]), delete i.destination), 'INVALID_INPUT'],
+      ['an unknown support class', (i) => (i.terrain.surfaces[0].support = 'TRAMPOLINE'), 'INVALID_INPUT'],
+      ['no authored stand', (i) => (i.destination.candidates = []), 'INVALID_INPUT'],
       ['missing field', (i) => delete i.stance, 'INVALID_INPUT'],
       ['omitted protected text', (i) => delete i.terrain.protectedText, 'INVALID_INPUT'],
       ['omitted figure', (i) => delete i.terrain.figure, 'INVALID_INPUT'],
@@ -198,9 +218,11 @@ describe('fail closed', () => {
       ['zero window', (i) => (i.timing.arriveByMs = i.timing.startMs), 'INVALID_DURATION'],
       ['window closes before the landing can settle', (i) => (i.timing.endMs = i.timing.arriveByMs + 100), 'INVALID_DURATION'],
       ['unsupported action', (i) => (i.action = 'MANTLE'), 'UNSUPPORTED_ACTION'],
-      ['target off its ledge', (i) => (i.target.x = 1900), 'INVALID_TARGET'],
-      ['unreachable in the window', (i) => ((i.terrain.target = null), (i.start.x = 0), (i.target.x = 1920), (i.timing.arriveByMs = i.timing.startMs + 400)), 'UNSOLVABLE_TRAJECTORY'],
-      ['target off stage', (i) => ((i.terrain.target = null), (i.target.y = 1200)), 'OUT_OF_BOUNDS'],
+      ['a stand off its ledge', (i) => (i.destination.candidates = [{ x: 1900, y: 600 }]), 'IMPLAUSIBLE_SUPPORT'],
+      ['a stand inside its ledge', (i) => (i.destination.candidates = [{ x: 1600, y: 700 }]), 'IMPLAUSIBLE_SUPPORT'],
+      ['a takeoff from terrain no longer on screen', (i) => (i.terrain.outgoing.surfaces = []), 'IMPLAUSIBLE_SUPPORT'],
+      ['unreachable in the window', (i) => ((i.start.x = 0), (i.destination.candidates = [{ x: 1850, y: 880 }]), (i.timing.arriveByMs = i.timing.startMs + 400)), 'UNSOLVABLE_TRAJECTORY'],
+      ['a stand off stage', (i) => (i.destination.candidates = [{ x: 1600, y: 1200 }]), 'OUT_OF_BOUNDS'],
     ];
     for (const [name, patch, code] of cases) assert.equal(refusal(() => engine.solve(variant(patch))), code, name);
   });
@@ -227,6 +249,13 @@ describe('fail closed', () => {
     const landed = (p: Record<string, any>) => p.samples.find((s: { phase: string }) => s.phase === 'SETTLE');
     const cases: [string, (p: Record<string, any>) => void][] = [
       ['target moved', (p) => (p.target.x += 1)],
+      ['another stand named', (p) => (p.support.candidate = 1)],
+      ['a refused landing', (p) => ((p.support.landing.verdict.ok = false), (p.support.landing.verdict.code = 'NO_SURFACE'), (p.support.landing.verdict.grade = null))],
+      ['an ok verdict with a refusal code', (p) => (p.support.candidates[0].code = 'TAIL_ONLY')],
+      ['an unknown support code', (p) => (p.support.landing.verdict.code = 'FLOATING')],
+      ['the takeoff left unjudged on stage', (p) => (p.support.takeoff = null)],
+      ['the landing judged a moment late', (p) => (p.support.landing.atMs += 1)],
+      ['a verdict number turned null', (p) => (p.support.landing.verdict.comMarginPx = null)],
       ['a landed foot moved by a hair', (p) => (landed(p).position.x += 1e-9)],
       ['a channel turned null (a NaN through JSON)', (p) => (p.samples[30].tailAngle = null)],
       ['an extra field', (p) => (p.samples[3].wobble = 0)],
@@ -246,7 +275,7 @@ describe('fail closed', () => {
       ['an arc the search cannot choose', (p) => (p.trajectory.textCrossings = 32)],
       ['not at rest when handed back', (p) => (p.samples.at(-1).tailAngle = 0.5)],
       ['handed back out of its stance\'s curl', (p) => (p.samples.at(-1).tailCurl = 0.5)],
-      ['wrong schema', (p) => (p.schema = 'walletwall.motion-plan/v1')],
+      ['wrong schema', (p) => (p.schema = 'walletwall.motion-plan/v2')],
       ['another engine', (p) => (p.engine.name = 'something-else')],
     ];
     for (const [name, tamper] of cases) {
@@ -272,8 +301,11 @@ describe('the engine performs every hop that ends in a perch, in the composition
       if (c.kind !== 'TRAVEL' || HOPS_TO_PERCHES.includes(i)) continue;
       const next = ts.clips[i + 1];
       const perch = next?.kind === 'HOLD' && next.from.x === c.to.x && next.from.y === c.to.y;
-      assert.ok(ts.motions[i]!.kind !== 'HOP' || !perch, `clip ${i} stays on the TypeScript solver only because it is not a hop to a perch`);
+      const m = ts.motions[i]!;
+      assert.ok(m.kind !== 'HOP' || !perch || m.airborneStart, `clip ${i} stays on the TypeScript solver only because it is not a hop from a stance to a perch`);
     }
+    const fall = ts.motions[FALL]!;
+    assert.ok(fall.kind === 'HOP' && fall.airborneStart && ts.clips[FALL]!.segmentId === 'tiers', 'control: the tiers arrival is a fall that continues the exit leap, and stays TypeScript');
     assert.equal(ts.motions[37]!.kind, 'TRACE', 'control: a chained skip stays TypeScript');
     assert.equal(ts.clips[31]!.kind, 'TRAVERSE', 'control: the hop at clip 30 runs straight into a trace and stays TypeScript');
     assert.deepEqual(bindMotionEngine(undefined, ts, fps, spec.id), { engine: 'typescript', transitional: ts, paths: [], contacts: ts.events, muted: new Set() });
@@ -317,20 +349,26 @@ describe('the engine performs every hop that ends in a perch, in the composition
   });
 
   test('another move\'s tail and ear follow-through carries on over the engine\'s own; a landing\'s never runs into an engine path', () => {
-    const tiers = bound.paths.find((p) => p.travel.segmentId === 'tiers')!;
+    // On the committed lesson no engine path begins while another move still swings the tail.
+    for (const p of bound.paths) {
+      for (let f = p.first; f < p.end; f++) assert.equal(sampleWithEngine(bound, ts, f, frameMs(f), 'REST').motion.tailLag, 0, `${p.travel.segmentId} frame ${f}`);
+    }
+    // Carry one in: a takeoff 100 ms before the takeaway hop (findRustPath admits a takeoff's follow-through).
+    const travel = ts.clips[takeaway.travelIndex]!;
+    const kick: MotionEvent = { kind: 'TAKEOFF', atMs: travel.startMs - 100, impulse: 0.8, scale: travel.fromScale, at: travel.from, segmentId: 'takeaway', surface: null };
+    const kicked: TsMotionPlan = { ...ts, events: [...ts.events, kick].sort((a, b) => a.atMs - b.atMs) };
+    const rebound = bindMotionEngine(rust.props, kicked, fps, spec.id);
+    const path0 = rebound.paths.find((p) => p.travel.segmentId === 'takeaway')!;
     let carried = 0;
-    for (let f = tiers.first; f < tiers.end; f++) {
-      const a = sampleWithEngine(bound, ts, f, frameMs(f), 'REST');
-      const s = tiers.plan.samples[f - tiers.first]!;
-      const b = sampleWallaby(ts, frameMs(f), 'REST', bound.muted, bound.contacts);
+    for (let f = path0.first; f < path0.end; f++) {
+      const a = sampleWithEngine(rebound, kicked, f, frameMs(f), 'REST');
+      const s = path0.plan.samples[f - path0.first]!;
+      const b = sampleWallaby(kicked, frameMs(f), 'REST', rebound.muted, rebound.contacts);
       assert.equal(a.motion.tailLag, b.motion.tailLag);
       assert.equal(a.motion.earLag, Math.min(ts.config.limits.maxEarLagDeg, Math.max(-ts.config.limits.maxEarLagDeg, s.earLag + b.motion.earLag)));
       if (b.motion.tailLag !== 0) carried++;
     }
-    assert.ok(carried > 10, `control: the exit leap's takeoff still swings the tail as the tiers hop begins (${carried} frames)`);
-    for (const p of bound.paths.filter((x) => x !== tiers)) {
-      for (let f = p.first; f < p.end; f++) assert.equal(sampleWithEngine(bound, ts, f, frameMs(f), 'REST').motion.tailLag, 0, `${p.travel.segmentId} frame ${f}`);
-    }
+    assert.ok(carried > 10, `control: the carried-in takeoff still swings the tail as the takeaway hop begins (${carried} frames)`);
   });
 
   test('the scene reacts to the engine\'s own contacts: each platform\'s dip, the feet riding it, and the contact cues', () => {
@@ -484,6 +522,7 @@ describe('the engine performs every hop that ends in a perch, in the composition
     assert.equal(refusal(() => findRustPath(ts, sel('nowhere', 999))), 'INELIGIBLE_PATH');
     assert.equal(refusal(() => findRustPath(ts, sel('vault-conditional', 37, 'LAND'))), 'INELIGIBLE_PATH', 'a chained skip, not a hop');
     assert.equal(refusal(() => findRustPath(ts, sel('signals', 30))), 'INELIGIBLE_PATH', 'a hop that runs straight into a trace');
+    assert.equal(refusal(() => findRustPath(ts, sel('tiers', FALL))), 'INELIGIBLE_PATH', 'a fall that continues a flight (no takeoff)');
     assert.equal(refusal(() => findRustPath(ts, sel('takeaway', 44, 'LAND'))), 'INELIGIBLE_PATH', 'the lesson asks for a HOP there');
     assert.doesNotThrow(() => findRustPath(ts, sel('takeaway', 44)), 'control: the takeaway hop is eligible');
     // Variations of the takeaway path, each refused for one reason.
@@ -527,9 +566,9 @@ describe('oracle parity with the transitional TypeScript solver', () => {
         assert.deepEqual(e.position, own.at);
       }
     }
-    // The search did real work on the lesson: arcs lowered, raised, and kept.
+    // The search did real work on the lesson: arcs lowered and kept (the synthetic sweep below also raises them).
     const fractions = bound.paths.map((p) => p.plan.trajectory.arcFraction);
-    assert.ok(fractions.some((f) => f < 1) && fractions.some((f) => f > 1) && fractions.some((f) => f === 1), fractions.join(' '));
+    assert.ok(fractions.some((f) => f < 1) && fractions.some((f) => f === 1), fractions.join(' '));
   });
 
   test('the arc search is an exact port: a sweep of synthetic hops flies the same arc, bit for bit, or both refuse', () => {
@@ -537,7 +576,8 @@ describe('oracle parity with the transitional TypeScript solver', () => {
       [],
       [{ x: 800, y: 380, w: 200, h: 40 }],
       [{ x: 860, y: 600, w: 40, h: 50 }],
-      [{ x: 0, y: 0, w: 1920, h: 1080 }],
+      // Text over the whole frame above the feet (no stand may have text where its feet touch).
+      [{ x: 0, y: 0, w: 1920, h: 480 }],
       [{ x: 500, y: 520, w: 600, h: 60 }, { x: 160, y: 104, w: 1100, h: 32 }],
     ];
     let solved = 0;
@@ -549,8 +589,8 @@ describe('oracle parity with the transitional TypeScript solver', () => {
           for (const [fromScale, toScale] of [[0.78, 0.78], [0.5, 0.78], [1, 0.95]] as const) {
             for (const text of texts) {
               const i = variant((x) => {
-                Object.assign(x, { start: from, target: to, startScale: fromScale, targetScale: toScale, timing: { startMs: 1000, arriveByMs: 1000 + dur, endMs: 3000 + dur } });
-                Object.assign(x.terrain, { start: null, target: null, protectedText: text });
+                Object.assign(x, { start: from, destination: { candidates: [to], focus: { x: to.x + 100, y: to.y - 200 }, narrowAllowed: false }, startScale: fromScale, targetScale: toScale, timing: { startMs: 1000, arriveByMs: 1000 + dur, endMs: 3000 + dur } });
+                Object.assign(x.terrain, { surfaces: openTerrain(from, to), protectedText: text, outgoing: { surfaces: [], protectedText: [], untilMs: 0 } });
               });
               const at = `${JSON.stringify([from, to, dur, fromScale, toScale])} text ${texts.indexOf(text)}`;
               let hop: HopMotion | null = null;
@@ -598,14 +638,15 @@ describe('oracle parity with the transitional TypeScript solver', () => {
     const hop = planHop({ from, to, fromScale: 0.5, toScale: 0.5, startMs: 1000, endMs: 2500 }, MOTION_CONFIG);
     const limit = MOTION_INTELLIGENCE_CONFIG.limits.maxApexBodyHeights * WALLABY_HEIGHT * 0.5;
     assert.ok(hop.apexAbovePx > limit, `the oracle flies it ${hop.apexAbovePx.toFixed(1)} px high`);
+    const open = { surfaces: openTerrain(from, to), protectedText: [], outgoing: { surfaces: [], protectedText: [], untilMs: 0 } };
     const i = variant((x) => {
-      Object.assign(x, { start: from, target: to, startScale: 0.5, targetScale: 0.5, timing: { startMs: 1000, arriveByMs: 2500, endMs: 4500 } });
-      Object.assign(x.terrain, { start: null, target: null, protectedText: [] });
+      Object.assign(x, { start: from, destination: { candidates: [to], focus: { x: 1920, y: 600 }, narrowAllowed: false }, startScale: 0.5, targetScale: 0.5, timing: { startMs: 1000, arriveByMs: 2500, endMs: 4500 } });
+      Object.assign(x.terrain, open);
     });
     assert.equal(refusal(() => engine.solve(i)), 'UNSOLVABLE_TRAJECTORY', 'the engine fails closed instead');
     const lower = variant((x) => {
-      Object.assign(x, { start: { x: 300, y: 800 }, target: { x: 1500, y: 800 }, startScale: 0.5, targetScale: 0.5, timing: { startMs: 1000, arriveByMs: 2500, endMs: 4500 } });
-      Object.assign(x.terrain, { start: null, target: null, protectedText: [] });
+      Object.assign(x, { start: { x: 300, y: 800 }, destination: { candidates: [{ x: 1500, y: 800 }], focus: { x: 1920, y: 600 }, narrowAllowed: false }, startScale: 0.5, targetScale: 0.5, timing: { startMs: 1000, arriveByMs: 2500, endMs: 4500 } });
+      Object.assign(x.terrain, open);
     });
     assert.doesNotThrow(() => engine.solve(lower), 'control: a shorter hop at the same scale stays under the limit');
   });
@@ -624,6 +665,7 @@ describe('oracle parity with the transitional TypeScript solver', () => {
     assert.equal(c.tail.maxCurlDeg, m.limits.maxTailCurlDeg);
     assert.equal(c.ears.maxDeg, m.limits.maxEarLagDeg);
     assert.equal(c.limits.maxHeadDeg, m.limits.maxHeadStabDeg);
+    assert.deepEqual(c.support, m.support, 'one support judge: the same geometry on both sides');
     // The engine has no resting tension of its own: a plain standing stance carries the transitional
     // layer's, and an inspecting perch its lifted, curled counterweight.
     assert.equal(input.stance.rest.tailTension, m.tail.restTension);
@@ -651,7 +693,7 @@ describe('motion engine provenance', () => {
     assert.equal(identity.wasm.sha256, sha256Hex(readFileSync(path.join(VIDEO_ROOT, identity.wasm.path))));
     assert.equal(identity.wasm.sha256, manifest.sha256);
     assert.equal(identity.toolchain.rustc, manifest.build.rustc);
-    assert.deepEqual(identity.config, { path: 'config/motion-intelligence.json', schema: 'walletwall.motion-intelligence-config/v2', id: 'walletwallaby-motion-intelligence', version: 2, sha256: contentAddress(readMotionIntelligenceConfig()) });
+    assert.deepEqual(identity.config, { path: 'config/motion-intelligence.json', schema: 'walletwall.motion-intelligence-config/v3', id: 'walletwallaby-motion-intelligence', version: 3, sha256: contentAddress(readMotionIntelligenceConfig()) });
     assert.deepEqual(identity.paths.map((p) => p.clip), HOPS_TO_PERCHES);
     for (const f of FIXTURE_PATHS) assert.equal(identity.paths.find((p) => p.segmentId === f.segmentId)!.planSha256, sha256Hex(readFixture(f.name).plan), `the plan the render used for ${f.name} is the canonical plan`);
     assert.deepEqual(planRustMotion(args, engine).identity, identity, 'deterministic');

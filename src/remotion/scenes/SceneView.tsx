@@ -14,7 +14,7 @@ export const SceneView: React.FC<{ scene: SceneSpec; state: SceneState; spec: Vi
   const eyebrow = regionFor(state.layout, 'eyebrow');
   return (
     <AbsoluteFill>
-      {scene.plane === 'SURFACE' ? <Ground /> : null}
+      {state.layout.ground ? <Ground /> : null}
       {eyebrow ? <div style={{ ...rectStyle(EYEBROW_RECT), ...textStyle('eyebrow'), color: TOKENS.terracotta }}>{eyebrow.text}</div> : null}
       {scene.type === 'CARD' ? <CardView scene={scene} state={state} /> : null}
       {scene.type === 'GRAPH' && scene.layout !== 'LAYERED' ? <RouteView scene={scene} state={state} /> : null}

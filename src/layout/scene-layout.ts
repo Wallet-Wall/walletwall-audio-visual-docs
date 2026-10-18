@@ -44,8 +44,16 @@ export interface Platform {
 }
 
 export interface Anchor {
-  /** Where WalletWallaby's feet go. */
+  /** Where WalletWallaby's feet go: the grammar's first choice. */
   stand: Point;
+  /**
+   * Every stand the grammar authors for this destination, in its order of preference (the first is
+   * `stand`). All are on the same element, so any of them is the same lesson destination; Motion
+   * Intelligence takes the best-supported one and never moves any of them. Absent: `stand` alone.
+   */
+  candidates?: readonly Point[];
+  /** The grammar authors a narrow perch here (a top that only just holds the feet). */
+  narrow?: boolean;
   /** What WalletWallaby looks or points at. */
   focus: Point;
   /** Character scale at this anchor (depth planes shrink with distance). */
@@ -73,9 +81,14 @@ export interface SceneLayout {
   anchors: Record<string, Anchor>;
   routes: Route[];
   slabs: Slab[];
+  /** The scene draws the ground line (terrain between and beside its platforms). */
+  ground: boolean;
   /** Hard limits the planner must respect for this scene grammar. */
   limits: { maxItems: number };
 }
+
+/** What a scene grammar lays out; layoutScene adds the ground flag from the scene's plane. */
+type Grammar = Omit<SceneLayout, 'ground'>;
 
 export const EYEBROW_RECT: Rect = { x: 160, y: 104, w: 1100, h: 32 };
 /**
@@ -128,7 +141,7 @@ function lineHeightPx(styleKey: TextStyleKey, lines: number): number {
 
 /** `eyebrowText` is the heading of the cited source section (provenance shown on screen). */
 export function layoutScene(scene: SceneSpec, eyebrowText: string): SceneLayout {
-  const base = ((): SceneLayout => {
+  const grammar = ((): Grammar => {
     switch (scene.type) {
       case 'CARD':
         return scene.layout === 'SPLIT' ? layoutSplitCard(scene) : layoutStackCard(scene);
@@ -140,6 +153,8 @@ export function layoutScene(scene: SceneSpec, eyebrowText: string): SceneLayout 
         return layoutTakeaway(scene);
     }
   })();
+  // Surface-plane scenes stand on the ground line; the depth plane stands on its slabs' nodes only.
+  const base: SceneLayout = { ...grammar, ground: scene.plane === 'SURFACE' };
   base.texts.unshift(eyebrowRegion(eyebrowText));
   base.anchors['scene:entry'] = entryAnchor(scene, base);
   return base;
@@ -150,7 +165,7 @@ export function layoutScene(scene: SceneSpec, eyebrowText: string): SceneLayout 
 const CARD_RECT: Rect = { x: 160, y: 370, w: 1120, h: GROUND_Y - 370 };
 const CARD_PAD = 50;
 
-function layoutStackCard(scene: CardScene): SceneLayout {
+function layoutStackCard(scene: CardScene): Grammar {
   const inner = CARD_RECT.w - CARD_PAD * 2;
   const headingH = lineHeightPx('cardHeading', 2);
   const texts: TextRegion[] = [
@@ -173,7 +188,7 @@ function layoutStackCard(scene: CardScene): SceneLayout {
 
 const SPLIT_RECT: Rect = { x: 160, y: 370, w: 1340, h: GROUND_Y - 370 };
 
-function layoutSplitCard(scene: CardScene): SceneLayout {
+function layoutSplitCard(scene: CardScene): Grammar {
   const inner = SPLIT_RECT.w - CARD_PAD * 2;
   const headingH = lineHeightPx('cardHeading', 2);
   const texts: TextRegion[] = [
@@ -212,7 +227,7 @@ function nodeTexts(node: GraphNode, rect: Rect, labelLines: number, detailLines:
   return out;
 }
 
-function layoutRoute(scene: GraphScene): SceneLayout {
+function layoutRoute(scene: GraphScene): Grammar {
   const n = scene.nodes.length;
   const gap = n > 1 ? (ROUTE_SPAN.x1 - ROUTE_SPAN.x0 - n * NODE_W) / (n - 1) : 0;
   const step = scene.layout === 'ASCENDING_ROUTE' && n > 1 ? Math.min(90, 270 / (n - 1)) : 0;
@@ -280,7 +295,7 @@ const LOWER_SLAB: Slab = {
   ],
 };
 
-function layoutLayered(scene: GraphScene): SceneLayout {
+function layoutLayered(scene: GraphScene): Grammar {
   const texts: TextRegion[] = [];
   const platforms: Platform[] = [];
   const anchors: Record<string, Anchor> = {};
@@ -297,7 +312,10 @@ function layoutLayered(scene: GraphScene): SceneLayout {
     rects.set(node.id, rect);
     platforms.push({ id: `node:${node.id}`, kind: 'NODE', rect });
     texts.push(...nodeTexts(node, rect, 1, 2));
-    anchors[`node:${node.id}`] = { stand: { x: rect.x + 60, y: rect.y }, focus: center(rect), scale: WALLABY_SCALE.depthFar };
+    // Near the left end first (clear of where the evidence edges converge), then further onto the node:
+    // all the same destination; the support decides which carries the body (and its tail) best.
+    const stands = [rect.x + 60, rect.x + rect.w * 0.3, rect.x + rect.w / 2].map((x) => ({ x, y: rect.y }));
+    anchors[`node:${node.id}`] = { stand: stands[0]!, candidates: stands, focus: center(rect), scale: WALLABY_SCALE.depthFar };
   });
   const lowerW = 270;
   const span = { x0: 200, x1: 1720 };
@@ -329,12 +347,13 @@ function layoutLayered(scene: GraphScene): SceneLayout {
 
 const UI_FRAME: Rect = { x: 160, y: 370, w: 1280, h: GROUND_Y - 370 };
 
-function layoutUi(scene: UiScene): SceneLayout {
+function layoutUi(scene: UiScene): Grammar {
   const caption = region(scene.caption, { x: 160, y: 168, w: 1000, h: lineHeightPx('uiCaption', 2) }, 'uiCaption', 2);
   return {
     texts: [caption],
     platforms: [{ id: 'ui:frame', kind: 'FRAME', rect: UI_FRAME }],
-    anchors: { 'ui:capture': { stand: { x: UI_FRAME.x + UI_FRAME.w - 120, y: UI_FRAME.y }, focus: center(UI_FRAME), scale: WALLABY_SCALE.surface } },
+    // A capture is evidence, not terrain: the guide stands on the ground beside it, never on its frame.
+    anchors: { 'ui:capture': { stand: { x: UI_FRAME.x + UI_FRAME.w + 200, y: GROUND_Y }, focus: center(UI_FRAME), scale: WALLABY_SCALE.surface } },
     routes: [],
     slabs: [],
     limits: { maxItems: 1 },
@@ -346,7 +365,7 @@ function layoutUi(scene: UiScene): SceneLayout {
 /** The summit ledge: the end of the route, where the takeaway is delivered. */
 export const SUMMIT_LEDGE: Rect = { x: 1440, y: 600, w: 320, h: GROUND_Y - 600 };
 
-function layoutTakeaway(scene: TakeawayScene): SceneLayout {
+function layoutTakeaway(scene: TakeawayScene): Grammar {
   const statementRect: Rect = { x: 160, y: 250, w: 1180, h: lineHeightPx('takeawayStatement', 3) };
   const texts: TextRegion[] = [region(scene.statement, statementRect, 'takeawayStatement', 3)];
   const stand = { x: SUMMIT_LEDGE.x + SUMMIT_LEDGE.w / 2, y: SUMMIT_LEDGE.y };

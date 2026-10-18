@@ -17,7 +17,7 @@ export const LAB_PLATFORMS: Platform[] = [
   { id: 'node', kind: 'NODE', rect: { x: 1600, y: 740, w: 150, h: GROUND_Y - 740 } },
 ];
 
-export const LAB_LAYOUT: SceneLayout = { texts: [], platforms: LAB_PLATFORMS, anchors: {}, routes: [], slabs: [], limits: { maxItems: 0 } };
+export const LAB_LAYOUT: SceneLayout = { texts: [], platforms: LAB_PLATFORMS, anchors: {}, routes: [], slabs: [], ground: true, limits: { maxItems: 0 } };
 
 const clip = (kind: Clip['kind'], startMs: number, endMs: number, from: Point, to: Point, pose: WallabyPose, extra: Partial<Clip> = {}): Clip => ({
   kind,

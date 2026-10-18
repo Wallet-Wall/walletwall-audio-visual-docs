@@ -4,10 +4,11 @@
 
 mod common;
 
-use common::{code, solve_with};
+use common::{code, set_stand, solve_with};
+use motion_intelligence::solver::MAX_CANDIDATES;
 use motion_intelligence::state::MotionAction;
 use motion_intelligence::terrain::{MAX_PROTECTED_TEXT, Rect};
-use motion_intelligence::{MotionErrorCode as E, MotionInput, solve_json, solve_motion};
+use motion_intelligence::{MotionErrorCode as E, MotionInput, Vec2, solve_json, solve_motion};
 
 type Field = fn(&mut MotionInput) -> &mut f64;
 /// One adversarial edit of the fixture input.
@@ -17,8 +18,10 @@ type Patch = fn(&mut MotionInput);
 const FIELDS: &[(&str, Field)] = &[
     ("start.x", |i| &mut i.start.x),
     ("start.y", |i| &mut i.start.y),
-    ("target.x", |i| &mut i.target.x),
-    ("target.y", |i| &mut i.target.y),
+    ("destination.candidates[0].x", |i| &mut i.destination.candidates[0].x),
+    ("destination.candidates[0].y", |i| &mut i.destination.candidates[0].y),
+    ("destination.focus.x", |i| &mut i.destination.focus.x),
+    ("destination.focus.y", |i| &mut i.destination.focus.y),
     ("startScale", |i| &mut i.start_scale),
     ("targetScale", |i| &mut i.target_scale),
     ("timing.startMs", |i| &mut i.timing.start_ms),
@@ -41,13 +44,17 @@ const FIELDS: &[(&str, Field)] = &[
     ("terrain.figure.left", |i| &mut i.terrain.figure.left),
     ("terrain.figure.right", |i| &mut i.terrain.figure.right),
     ("terrain.figure.top", |i| &mut i.terrain.figure.top),
-    ("terrain.target.topY", |i| &mut i.terrain.target.as_mut().unwrap().top_y),
-    ("terrain.target.leftX", |i| {
-        &mut i.terrain.target.as_mut().unwrap().left_x
+    ("terrain.surfaces[1].x0", |i| &mut i.terrain.surfaces[1].x0),
+    ("terrain.surfaces[1].y0", |i| &mut i.terrain.surfaces[1].y0),
+    ("terrain.surfaces[1].x1", |i| &mut i.terrain.surfaces[1].x1),
+    ("terrain.surfaces[1].y1", |i| &mut i.terrain.surfaces[1].y1),
+    ("terrain.surfaces[1].thicknessPx", |i| {
+        &mut i.terrain.surfaces[1].thickness_px
     }),
-    ("terrain.target.rightX", |i| {
-        &mut i.terrain.target.as_mut().unwrap().right_x
+    ("terrain.outgoing.surfaces[1].x0", |i| {
+        &mut i.terrain.outgoing.surfaces[1].x0
     }),
+    ("terrain.outgoing.untilMs", |i| &mut i.terrain.outgoing.until_ms),
     ("config.bodyHeightPx", |i| &mut i.config.body_height_px),
     ("config.gravityBodyHeightsPerS2", |i| {
         &mut i.config.gravity_body_heights_per_s2
@@ -73,6 +80,13 @@ const FIELDS: &[(&str, Field)] = &[
     ("config.ears.freqHz", |i| &mut i.config.ears.freq_hz),
     ("config.limits.maxHeadDeg", |i| &mut i.config.limits.max_head_deg),
     ("config.limits.maxWindowMs", |i| &mut i.config.limits.max_window_ms),
+    ("config.support.footprintBackBodyHeights", |i| {
+        &mut i.config.support.footprint_back_body_heights
+    }),
+    ("config.support.comMarginBodyHeights", |i| {
+        &mut i.config.support.com_margin_body_heights
+    }),
+    ("config.support.tolerancePx", |i| &mut i.config.support.tolerance_px),
 ];
 
 #[test]
@@ -119,44 +133,47 @@ fn impossible_windows_fail_closed() {
 #[test]
 fn unreachable_or_unsupported_destinations_fail_closed() {
     assert_eq!(
-        code(solve_with(|i| i.target.x = 1900.0), "far target"),
-        E::InvalidTarget,
+        code(solve_with(|i| set_stand(i, Vec2::new(1900.0, 600.0))), "far stand"),
+        E::ImplausibleSupport,
         "off its declared ledge"
     );
-    let cases: [(&str, Patch, E); 6] = [
+    let cases: [(&str, Patch, E); 8] = [
         (
             "too far for the window",
             |i| {
-                i.terrain.target = None;
                 i.start.x = 0.0;
-                i.target.x = 1920.0;
+                set_stand(i, Vec2::new(1850.0, 880.0));
                 i.timing.arrive_by_ms = i.timing.start_ms + 400.0
             },
             E::UnsolvableTrajectory,
         ),
         (
-            "target off stage",
-            |i| {
-                i.terrain.target = None;
-                i.target.y = 1200.0
-            },
+            "stand off stage",
+            |i| set_stand(i, Vec2::new(1600.0, 1200.0)),
             E::OutOfBounds,
         ),
         (
-            "negative target",
-            |i| {
-                i.terrain.target = None;
-                i.target.x = -1.0
-            },
+            "negative stand",
+            |i| set_stand(i, Vec2::new(-1.0, 600.0)),
             E::OutOfBounds,
         ),
         ("start far off stage", |i| i.start.x = 9000.0, E::OutOfBounds),
-        ("target above its ledge", |i| i.target.y = 590.0, E::InvalidTarget),
         (
-            "inverted ledge",
-            |i| i.terrain.target.as_mut().unwrap().right_x = 1000.0,
-            E::InvalidInput,
+            "stand above its ledge",
+            |i| set_stand(i, Vec2::new(1600.0, 590.0)),
+            E::ImplausibleSupport,
         ),
+        (
+            "stand inside the ledge",
+            |i| set_stand(i, Vec2::new(1600.0, 700.0)),
+            E::ImplausibleSupport,
+        ),
+        (
+            "a takeoff the terrain on screen does not carry",
+            |i| i.terrain.outgoing.surfaces.clear(),
+            E::ImplausibleSupport,
+        ),
+        ("inverted ledge", |i| i.terrain.surfaces[1].x1 = 1000.0, E::InvalidInput),
     ];
     for (name, patch, want) in cases {
         assert_eq!(code(solve_with(patch), name), want, "{name}");
@@ -165,7 +182,12 @@ fn unreachable_or_unsupported_destinations_fail_closed() {
 
 #[test]
 fn out_of_range_scalars_fail_closed() {
-    let cases: [(&str, Patch); 15] = [
+    let cases: [(&str, Patch); 18] = [
+        ("no authored stand", |i| i.destination.candidates.clear()),
+        ("more stands than a destination authors", |i| {
+            i.destination.candidates = vec![i.destination.candidates[0]; MAX_CANDIDATES + 1]
+        }),
+        ("a face that is not vertical", |i| i.terrain.surfaces[2].x1 = 1441.0),
         ("zero scale", |i| i.start_scale = 0.0),
         ("negative scale", |i| i.target_scale = -0.5),
         ("absurd scale", |i| i.target_scale = 50.0),
@@ -218,7 +240,19 @@ fn out_of_range_scalars_fail_closed() {
 
 #[test]
 fn invalid_configurations_fail_closed() {
-    let cases: [(&str, Patch); 11] = [
+    let cases: [(&str, Patch); 15] = [
+        ("a passing step that needs more margin than a perch", |i| {
+            i.config.support.step_com_margin_body_heights = 0.1
+        }),
+        ("a narrow ledge as wide as broad support", |i| {
+            i.config.support.narrow_width_body_heights = 1.0
+        }),
+        ("a narrowest ledge that cannot hold both feet", |i| {
+            i.config.support.narrow_width_body_heights = 0.3
+        }),
+        ("a contact tolerance out of range", |i| {
+            i.config.support.tolerance_px = 10.0
+        }),
         ("gravity out of range", |i| i.config.gravity_body_heights_per_s2 = 500.0),
         ("a minimum settle longer than the settle", |i| {
             i.config.landing.min_settle_ms = 800.0
@@ -294,9 +328,34 @@ fn malformed_documents_fail_closed() {
             }),
         ),
         (
-            "omitted surface (not read as open ground)",
+            "omitted outgoing terrain (not read as none)",
             document(|v| {
-                v["terrain"].as_object_mut().unwrap().remove("start");
+                v["terrain"].as_object_mut().unwrap().remove("outgoing");
+            }),
+        ),
+        (
+            "omitted narrow authorization (not read as false)",
+            document(|v| {
+                v["destination"].as_object_mut().unwrap().remove("narrowAllowed");
+            }),
+        ),
+        (
+            "unknown support class",
+            document(|v| v["terrain"]["surfaces"][0]["support"] = "TRAMPOLINE".into()),
+        ),
+        (
+            "unknown face",
+            document(|v| v["terrain"]["surfaces"][0]["face"] = "BOTTOM".into()),
+        ),
+        (
+            "stands that are not a list",
+            document(|v| v["destination"]["candidates"] = serde_json::json!({"x": 1, "y": 2})),
+        ),
+        (
+            "the v2 target in place of a destination",
+            document(|v| {
+                let d = v.as_object_mut().unwrap().remove("destination").unwrap();
+                v["target"] = d["candidates"][0].clone();
             }),
         ),
         ("empty terrain", document(|v| v["terrain"] = serde_json::json!({}))),
@@ -330,7 +389,10 @@ fn malformed_documents_fail_closed() {
                 v["stance"]["rest"].as_object_mut().unwrap().remove("tailCurl");
             }),
         ),
-        ("string number", document(|v| v["target"]["x"] = "1600".into())),
+        (
+            "string number",
+            document(|v| v["destination"]["candidates"][0]["x"] = "1600".into()),
+        ),
         (
             "null number",
             document(|v| v["timing"]["endMs"] = serde_json::Value::Null),
@@ -341,6 +403,10 @@ fn malformed_documents_fail_closed() {
         (
             "wrong schema",
             document(|v| v["schema"] = "walletwall.motion-input/v0".into()),
+        ),
+        (
+            "the v2 schema",
+            document(|v| v["schema"] = "walletwall.motion-input/v2".into()),
         ),
         ("not json", b"{\"schema\": ".to_vec()),
         ("empty", Vec::new()),
@@ -443,7 +509,8 @@ fn no_object_is_read_positionally() {
         assert_eq!(code(solve_json(&bytes), &p), E::InvalidInput, "{p}");
     }
 
-    // Positive controls: the one declared list is accepted, full or empty.
+    // Positive controls: the declared lists are accepted, full or (where the lesson allows it) empty.
     assert!(solve_json(common::INPUT_JSON.as_bytes()).is_ok());
     assert!(solve_json(&document(|v| v["terrain"]["protectedText"] = json!([]))).is_ok());
+    assert!(solve_json(&document(|v| v["terrain"]["outgoing"]["protectedText"] = json!([]))).is_ok());
 }

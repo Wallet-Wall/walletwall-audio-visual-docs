@@ -24,7 +24,7 @@ import {
   type MotionConfig,
   type MotionPlan,
 } from '../src/character/walletwallaby/motion.ts';
-import { RIG_PALETTE } from '../src/character/walletwallaby/rig.ts';
+import { FAMILY_COLORS, RIG_PALETTE } from '../src/character/walletwallaby/rig.ts';
 import { SHAPES } from '../src/character/walletwallaby/rive/rig-source.ts';
 import { MOTION } from '../src/character/walletwallaby/versions.ts';
 import { VIDEO_ROOT } from '../src/config/load.ts';
@@ -209,6 +209,12 @@ describe('the committed video', () => {
     assert.ok(hops.length >= 10);
     for (const { c, m } of hops) {
       if (m.kind !== 'HOP') continue;
+      if (m.airborneStart) {
+        // A fall that continues an exit leap has nothing to push off from: no anticipation, airborne until contact.
+        assert.equal(sampleWallaby(plan, m.takeoffMs - 1).motion.contact, 'NONE', 'a fall is airborne before it lands');
+        assert.notEqual(sampleWallaby(plan, m.contactMs + 50).motion.contact, 'NONE', 'grounded after contact');
+        continue;
+      }
       const before = sampleWallaby(plan, m.takeoffMs - 1);
       assert.equal(before.x, c.from.x, 'feet stay put until takeoff');
       assert.notEqual(before.motion.contact, 'NONE');
@@ -314,19 +320,21 @@ describe('the committed video', () => {
 });
 
 describe('terracotta character', () => {
-  test('the coat is the canonical WalletWall terracotta; the shade is derived, not invented', () => {
-    assert.equal(RIG_PALETTE.fur, 'terracotta');
+  test('the coat is WalletWallrus\'s own coat; the shade is derived from it, not invented', () => {
+    assert.equal(RIG_PALETTE.fur, 'wallrusCoat');
+    assert.equal(FAMILY_COLORS.wallrusCoat, '#BA6F38', 'the colour of the largest area of the WalletWallrus avatar\'s coat');
     const contract = JSON.parse(readFileSync(path.join(VIDEO_ROOT, 'contracts', 'walletwall-brand.json'), 'utf8')) as { theme: Record<string, string> };
-    assert.equal(TOKENS[RIG_PALETTE.fur], contract.theme['COLORS.brand.terracotta']);
-    assert.equal(RIG_PALETTE.belly, 'cream');
+    assert.notEqual(FAMILY_COLORS.wallrusCoat, contract.theme['COLORS.brand.terracotta'], 'control: the docs theme\'s terracotta is a different, redder colour');
+    assert.equal(RIG_PALETTE.accent, 'cream');
     assert.equal(RIG_PALETTE.ink, 'charcoal');
-    const shade = mixTokens(TOKENS[RIG_PALETTE.furShade.from], TOKENS[RIG_PALETTE.furShade.to], RIG_PALETTE.furShade.t);
+    assert.deepEqual(RIG_PALETTE.furShade, { from: 'wallrusCoat', to: 'charcoal', t: 0.2 });
+    const shade = mixTokens(FAMILY_COLORS.wallrusCoat, TOKENS.charcoal, RIG_PALETTE.furShade.t);
     assert.match(shade, /^#[0-9A-F]{6}$/);
     const ch = (hex: string, k: number) => parseInt(hex.slice(1 + 2 * k, 3 + 2 * k), 16);
     for (let k = 0; k < 3; k++) {
-      const lo = Math.min(ch(TOKENS.terracotta, k), ch(TOKENS.terracottaDark, k));
-      const hi = Math.max(ch(TOKENS.terracotta, k), ch(TOKENS.terracottaDark, k));
-      assert.ok(ch(shade, k) >= lo && ch(shade, k) <= hi, 'between the two canonical tokens');
+      const lo = Math.min(ch(FAMILY_COLORS.wallrusCoat, k), ch(TOKENS.charcoal, k));
+      const hi = Math.max(ch(FAMILY_COLORS.wallrusCoat, k), ch(TOKENS.charcoal, k));
+      assert.ok(ch(shade, k) >= lo && ch(shade, k) <= hi, 'between the coat and charcoal');
     }
     assert.throws(() => mixTokens(TOKENS.terracotta, 'orange', 0.5), 'refuses a non-token colour');
   });
