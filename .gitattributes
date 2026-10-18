@@ -6,7 +6,7 @@
 *.riv binary
 # The Motion Intelligence engine is pinned by the sha256 in motion-intelligence/wasm/artifact.json.
 *.wasm binary
-# The engine's canonical plan fixture is compared byte for byte.
+# The engine's canonical plan fixtures are compared byte for byte.
 motion-intelligence/tests/fixtures/*.plan.json -text
 
 # Canonical fixtures are byte-identical copies bound to their WalletWall git blob ids:

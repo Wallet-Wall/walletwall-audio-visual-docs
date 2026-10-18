@@ -56,7 +56,7 @@ mkdirSync(out, { recursive: true });
 // stops the render now. The composition receives the plans as data and samples them per frame.
 const rust = engineArg === 'rust-wasm' ? planRustMotion({ spec, track, templates: config.templates, headings: Object.fromEntries(source.sections.map((s) => [s.id, s.heading])) }) : null;
 const motionEngine: MotionEngineIdentity = rust ? rust.identity : typescriptEngineIdentity();
-if (rust) for (const p of rust.identity.paths) console.log(`[render] rust-wasm ${rust.identity.wasm.sha256.slice(0, 12)}: ${p.segmentId} ${p.action} frames ${p.frames.first}..${p.frames.first + p.frames.count - 1}, plan ${p.planSha256.slice(0, 12)}`);
+if (rust) for (const p of rust.identity.paths) console.log(`[render] rust-wasm ${rust.identity.wasm.sha256.slice(0, 12)}: ${p.segmentId} clip ${p.clip} ${p.action} frames ${p.frames.first}..${p.frames.first + p.frames.count - 1}, plan ${p.planSha256.slice(0, 12)}`);
 const withEngine = <T extends object>(props: T): T => (rust ? { ...props, motionEngine: rust.props } : props);
 
 stageDeclaredAssets(spec);

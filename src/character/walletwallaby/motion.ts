@@ -539,6 +539,14 @@ export function planMantle(args: PlanMantleArgs, config: MotionConfig = MOTION_C
   };
 }
 
+/**
+ * Text a move should not cross (surface awareness): the scene's text blocks, then its eyebrow row.
+ * A segment without a scene layout protects nothing. The Rust/WASM engine receives exactly this list.
+ */
+export function protectedText(layout: SceneLayout | undefined): Rect[] | undefined {
+  return layout ? [...layout.texts.map((t) => t.rect), EYEBROW_RECT] : undefined;
+}
+
 /** Platform whose top edge carries this point (the information terrain under the feet). */
 function surfaceUnder(layout: SceneLayout | undefined, at: Point): Surface | null {
   if (!layout) return null;
@@ -630,8 +638,7 @@ export function planMotion(clips: Clip[], layouts: Map<string, SceneLayout>, con
         motions.push({ kind: 'HIDDEN' });
         break;
       case 'TRAVEL': {
-        const layout = layouts.get(clip.segmentId);
-        const avoid = layout ? [...layout.texts.map((t) => t.rect), EYEBROW_RECT] : undefined;
+        const avoid = protectedText(layouts.get(clip.segmentId));
         const here = surfaces[motions.length]!;
         const stride = config.trace.strideBodyHeights * bodyHeight(clip.fromScale);
         const dur = clip.endMs - clip.startMs;
@@ -686,8 +693,8 @@ export function planMotion(clips: Clip[], layouts: Map<string, SceneLayout>, con
         const { lengths, total } = polylineLengths(path);
         const stride = config.trace.strideBodyHeights * bodyHeight(clip.fromScale);
         const steps = Math.max(1, Math.round(total / stride));
-        const layout = layouts.get(clip.segmentId);
-        const clear = layout ? clearanceAbove(path, clip.fromScale, [...layout.texts.map((t) => t.rect), EYEBROW_RECT]) - 1 : Infinity;
+        const avoid = protectedText(layouts.get(clip.segmentId));
+        const clear = avoid ? clearanceAbove(path, clip.fromScale, avoid) - 1 : Infinity;
         const peakPx = Math.max(0, Math.min(config.trace.stepPeakBodyHeights * bodyHeight(clip.fromScale), clear));
         const trace: TraceMotion = { kind: 'TRACE', mode: 'ROUTE', path, steps, lengths, total, startMs: clip.startMs, endMs: clip.endMs - Math.min(SETTLE_RESERVE_MS, (clip.endMs - clip.startMs) * 0.05), peakPx };
         motions.push(trace);
@@ -849,7 +856,7 @@ function clipIndexAt(clips: Clip[], ms: number): number {
 const MAX_RESPONSE_MS = 3000;
 
 /** First event index whose response could still be running at `ms`. */
-function firstLiveEvent(events: MotionEvent[], ms: number): number {
+function firstLiveEvent(events: readonly MotionEvent[], ms: number): number {
   let lo = 0;
   let hi = events.length;
   while (lo < hi) {
@@ -915,12 +922,16 @@ function responsesAt(plan: MotionPlan, ms: number, muted?: ReadonlySet<MotionEve
   return out;
 }
 
-/** Platform displacement for every platform in a segment at `ms` (renderer applies it to the surface and its text). */
-export function platformOffsets(plan: MotionPlan, segmentId: string, ms: number): Record<string, number> {
+/**
+ * Platform displacement for every platform in a segment at `ms` (renderer applies it to the surface and its text).
+ * `contacts`: the contact events the scene reacts to, sorted by time. Default: the plan's own; on the paths the
+ * Rust/WASM engine performs, the composition passes the engine's contacts instead.
+ */
+export function platformOffsets(plan: MotionPlan, segmentId: string, ms: number, contacts: readonly MotionEvent[] = plan.events): Record<string, number> {
   const out: Record<string, number> = {};
   const { response, gains, limits } = plan.config;
-  for (let i = firstLiveEvent(plan.events, ms); i < plan.events.length; i++) {
-    const e = plan.events[i]!;
+  for (let i = firstLiveEvent(contacts, ms); i < contacts.length; i++) {
+    const e = contacts[i]!;
     if (e.atMs > ms) break;
     if (!e.surface || e.segmentId !== segmentId || (e.kind !== 'LANDING' && e.kind !== 'STEP')) continue;
     const weight = e.surface.kind === 'CARD' ? 0.5 : 1;
@@ -979,8 +990,10 @@ function flightPose(s: number, reach: PoseParams = POSES.LAND): PoseParams {
 /**
  * `mutedResponses`: events whose spring responses (crouch, compression, head tilt, tail and ear
  * follow-through) are left out because another engine produces that secondary motion. Default: none.
+ * `contacts`: the contact events the platform under the feet reacts to (see platformOffsets), so the
+ * feet ride the platform by exactly the amount the scene moves it. Default: the plan's own.
  */
-export function sampleWallaby(plan: MotionPlan, ms: number, mouth: Viseme = 'REST', mutedResponses?: ReadonlySet<MotionEvent>): WallabyState {
+export function sampleWallaby(plan: MotionPlan, ms: number, mouth: Viseme = 'REST', mutedResponses?: ReadonlySet<MotionEvent>, contacts: readonly MotionEvent[] = plan.events): WallabyState {
   if (!Number.isFinite(ms)) return HIDDEN_STATE;
   const idx = clipIndexAt(plan.clips, ms);
   if (idx < 0) return HIDDEN_STATE;
@@ -1008,7 +1021,7 @@ export function sampleWallaby(plan: MotionPlan, ms: number, mouth: Viseme = 'RES
     const gaze = gazeToward(x, y, scale, look);
     const onSurface = b.grounded;
     // The feet ride the exact platform they stand on, by the same displacement the renderer applies to it.
-    const dip = onSurface && b.surface ? (platformOffsets(plan, clip.segmentId, ms)[b.surface.id] ?? 0) : 0;
+    const dip = onSurface && b.surface ? (platformOffsets(plan, clip.segmentId, ms, contacts)[b.surface.id] ?? 0) : 0;
     const rotation = clamp(b.rotation ?? 0, -limits.maxRotationDeg, limits.maxRotationDeg);
     const face: 1 | -1 = facing ?? (look && look.x < x - 12 ? -1 : 1);
     // Narrow perches (graph nodes, pillar tops): the tail corrects the balance in a slow, small sway.

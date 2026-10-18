@@ -16,6 +16,7 @@ export const MOTION_INTELLIGENCE_CONFIG_REL = 'config/motion-intelligence.json';
 /** config version -> content address of the config at that version. Append-only. */
 export const MOTION_INTELLIGENCE_CONFIG_PINS: Readonly<Record<number, string>> = {
   1: '0b5de144aed204ab3353368681d459876a871de824a38a284d0f7e69d888b6c5',
+  2: 'f89a15fde5a3c5d4af43fc543acf348997b158539731968990465a7902279f00',
 };
 
 export interface RustMotionEngineIdentity {
@@ -25,8 +26,8 @@ export interface RustMotionEngineIdentity {
   wasm: { path: string; sha256: string; bytes: number };
   toolchain: { rustc: string; target: string };
   config: { path: string; schema: string; id: string; version: number; sha256: string };
-  /** The plans the engine performed: which frames, and the content address of the exact bytes it returned. */
-  paths: { segmentId: string; action: string; frames: { first: number; count: number }; planSha256: string }[];
+  /** The plans the engine performed, in clip order: which clip, which frames, and the content address of the exact bytes it returned. */
+  paths: { segmentId: string; clip: number; action: string; frames: { first: number; count: number }; planSha256: string }[];
 }
 
 export interface TypescriptMotionEngineIdentity {

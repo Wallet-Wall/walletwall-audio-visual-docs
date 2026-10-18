@@ -15,7 +15,7 @@ import { buildTimeline, type NarrationTrack } from '../timeline/timeline.ts';
 import { ABI_FUNCTIONS, ABI_VERSION, assertHermetic, loadVerifiedArtifact, MOTION_WASM_REL, type ArtifactManifest } from './artifact.ts';
 import { rustEngineIdentity, type RustMotionEngineIdentity } from './engine-identity.ts';
 import { assertJsonSafe, ENGINE_REFUSAL_CODES, expectationFor, MotionEngineError, validateMotionPlan, type MotionErrorCode, type MotionInput, type MotionPlan } from './plan.ts';
-import { bindMotionEngine, findRustPath, motionInputForPath, MOTION_INTELLIGENCE_CONFIG, RUST_MOTION_PATHS, type MotionEngineProps, type RustPathSelection } from './rust-path.ts';
+import { bindMotionEngine, engineOwnedEvents, findRustPaths, motionInputForPath, MOTION_INTELLIGENCE_CONFIG, type BoundMotionEngine, type MotionEngineProps, type RustPathSelection } from './rust-path.ts';
 
 interface EngineExports {
   memory: WebAssembly.Memory;
@@ -109,20 +109,23 @@ export interface RustPathInput {
   input: MotionInput;
 }
 
-/** The engine input for every path the video selects (fails closed on an ineligible path). */
+/** The engine input for every path the video selects, in clip order (fails closed on an ineligible path). */
 export function rustInputsFor(args: { spec: VideoSpec; track: NarrationTrack; templates: CopyTemplates; headings: Record<string, string> }): { inputs: RustPathInput[]; ts: ReturnType<typeof planMotion>; fps: number } {
   const timeline = buildTimeline(args.spec, args.track, args.templates);
   const layouts = layoutsFor(timeline, (id) => args.headings[id] ?? '');
   const ts = planMotion(choreograph(timeline, layouts), layouts);
-  const selections = RUST_MOTION_PATHS.filter((s) => s.videoId === args.spec.id);
-  if (!selections.length) throw new MotionEngineError('INELIGIBLE_PATH', `${args.spec.id} selects no path for the Rust engine`);
-  const inputs = selections.map((selection) => ({ selection, input: motionInputForPath(findRustPath(ts, selection), ts, layouts, args.spec.output, MOTION_INTELLIGENCE_CONFIG) }));
+  const paths = findRustPaths(ts, args.spec.id);
+  if (!paths.length) throw new MotionEngineError('INELIGIBLE_PATH', `${args.spec.id} selects no path for the Rust engine`);
+  const muted = engineOwnedEvents(paths);
+  const inputs = paths.map((p) => ({ selection: p.selection, input: motionInputForPath(p, ts, layouts, args.spec.output, muted, MOTION_INTELLIGENCE_CONFIG) }));
   return { inputs, ts, fps: timeline.fps };
 }
 
 export interface RustMotion {
   props: MotionEngineProps;
   identity: RustMotionEngineIdentity;
+  /** The plans bound exactly as the composition binds them (its contacts time the scene's reactions, the cue sheet included). */
+  bound: BoundMotionEngine;
 }
 
 /**
@@ -134,16 +137,17 @@ export function planRustMotion(args: { spec: VideoSpec; track: NarrationTrack; t
   const { inputs, ts, fps } = rustInputsFor(args);
   const solved = inputs.map(({ selection, input }) => ({ selection, ...engine.solve(input) }));
   const props: MotionEngineProps = {
-    schema: 'walletwall.motion-engine-props/v1',
+    schema: 'walletwall.motion-engine-props/v2',
     engine: 'rust-wasm',
-    paths: solved.map((s) => ({ segmentId: s.selection.segmentId, action: s.selection.action, plan: s.plan })),
+    paths: solved.map((s) => ({ segmentId: s.selection.segmentId, clip: s.selection.clip, action: s.selection.action, plan: s.plan })),
   };
-  bindMotionEngine(props, ts, fps, args.spec.id);
+  const bound = bindMotionEngine(props, ts, fps, args.spec.id);
   return {
     props,
     identity: rustEngineIdentity(
       engine.manifest,
-      solved.map((s) => ({ segmentId: s.selection.segmentId, action: s.selection.action, frames: { first: s.plan.frames.first, count: s.plan.frames.count }, planSha256: s.sha256 })),
+      solved.map((s) => ({ segmentId: s.selection.segmentId, clip: s.selection.clip, action: s.selection.action, frames: { first: s.plan.frames.first, count: s.plan.frames.count }, planSha256: s.sha256 })),
     ),
+    bound,
   };
 }

@@ -89,6 +89,9 @@ pub struct LandingConfig {
     pub compression_ms: f64,
     /// Rebound and return to the stance (the Settle phase), ms.
     pub settle_ms: f64,
+    /// Shortest settle a short perch may hurry the settle to, ms: a window whose last frame leaves
+    /// less after the absorption is refused.
+    pub min_settle_ms: f64,
     /// Natural frequency of the settle rebound, Hz.
     pub settle_freq_hz: f64,
     /// Damping ratio of the settle rebound (underdamped: one small rebound).
@@ -142,8 +145,8 @@ pub struct TailConfig {
     pub curl_load_deg: f64,
     /// Range of the curl, degrees per segment (a soft limit).
     pub max_curl_deg: f64,
-    /// Tension standing at rest, 0..1.
-    pub tension_rest: f64,
+    // There is no resting tension here: a body standing in a stance holds that stance's own tension
+    // (`stance.*.tailTension` in the input), so the curl and tension of a perch come from the lesson.
     /// Tension while loading the preload, 0..1.
     pub tension_load: f64,
     /// Tension as a lever at takeoff, 0..1.
@@ -249,6 +252,7 @@ impl MotionConfig {
         within("landing.contactMs", l.contact_ms, 1.0, 200.0)?;
         within("landing.compressionMs", l.compression_ms, 10.0, 600.0)?;
         within("landing.settleMs", l.settle_ms, 100.0, 3000.0)?;
+        within("landing.minSettleMs", l.min_settle_ms, 50.0, 3000.0)?;
         within("landing.settleFreqHz", l.settle_freq_hz, 0.2, 12.0)?;
         within("landing.settleDamping", l.settle_damping, 0.1, 0.95)?;
         within(
@@ -261,6 +265,9 @@ impl MotionConfig {
         within("landing.crouchGain", l.crouch_gain, 0.0, 1.0)?;
         within("landing.compressionGain", l.compression_gain, 0.0, 1.0)?;
         within("landing.nodDeg", l.nod_deg, -20.0, 20.0)?;
+        if l.min_settle_ms > l.settle_ms {
+            return refuse(InvalidConfig, "config.landing.minSettleMs exceeds landing.settleMs");
+        }
 
         let p = &self.pitch;
         within("pitch.maxDeg", p.max_deg, 0.0, 30.0)?;
@@ -279,7 +286,6 @@ impl MotionConfig {
         within("tail.curlLoadDeg", t.curl_load_deg, -10.0, 10.0)?;
         within("tail.maxCurlDeg", t.max_curl_deg, 0.5, 20.0)?;
         for (name, v) in [
-            ("tail.tensionRest", t.tension_rest),
             ("tail.tensionLoad", t.tension_load),
             ("tail.tensionLever", t.tension_lever),
             ("tail.tensionFlight", t.tension_flight),

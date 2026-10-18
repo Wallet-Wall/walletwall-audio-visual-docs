@@ -1,6 +1,6 @@
 # motion-intelligence
 
-WalletWallaby's deterministic traversal engine: a fixed start, a fixed authored target, and a time budget in; one motion state per video frame out. It decides **how** the body moves and can never change **where** it goes. See [docs/MOTION_INTELLIGENCE.md](../docs/MOTION_INTELLIGENCE.md) for the architecture, the boundary, and the determinism rules.
+WalletWallaby's deterministic traversal engine: a fixed start, a fixed authored target, a time budget, and the terrain in; the plan's contacts with the terrain and one motion state per video frame out. It decides **how** the body moves and can never change **where** it goes. See [docs/MOTION_INTELLIGENCE.md](../docs/MOTION_INTELLIGENCE.md) for the architecture, the boundary, and the determinism rules.
 
 ```rust
 pub fn solve_motion(input: &MotionInput) -> Result<MotionPlan, MotionError>;
@@ -9,13 +9,13 @@ pub fn solve_json(input: &[u8]) -> Result<Vec<u8>, MotionError>; // exactly what
 
 | Module | |
 |---|---|
-| `state.rs` | `MotionInput`, `MotionAction`, `MotionPhase`, `MotionState`, `MotionPlan` |
+| `state.rs` | `MotionInput`, `MotionAction`, `MotionPhase`, `MotionState`, `ContactEvent`, `MotionPlan` |
 | `config.rs` | the versioned physics configuration, validated against explicit ranges |
-| `hop.rs` | preload timing and the ballistic flight (a faithful port of the TypeScript `planHop`) |
-| `landing.rs` | contact, compression, settle |
+| `hop.rs` | preload timing, the ballistic flight, and the surface-aware arc search (a faithful port of the TypeScript `planHop`) |
+| `landing.rs` | contact, compression, settle (hurried onto a short perch's last frame, within `landing.minSettleMs`) |
 | `tail.rs` | tail counterbalance: desired swing, damped follower, curl, tension |
-| `terrain.rs` | the stage and the surfaces under the start and the target |
-| `solver.rs` | validation, phases, the fixed-step secondary simulation, frame sampling |
+| `terrain.rs` | the stage, the surfaces under the start and the target, the protected text, and the figure's layout box |
+| `solver.rs` | validation, phases, the fixed-step secondary simulation, frame sampling, the plan's contacts |
 | `constraints.rs` | the last gate: every guarantee re-checked before a plan leaves the engine |
 | `error.rs` | fail-closed refusal codes |
 | `math.rs` | `Vec2` and the deterministic arithmetic (pure-Rust `libm`) |
@@ -28,6 +28,6 @@ rustup toolchain install          # the toolchain pinned in rust-toolchain.toml,
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo clippy --target wasm32-unknown-unknown --lib -- -D warnings
-cargo test                        # unit tests plus tests/{fixture,guarantees,adversarial}.rs
+cargo test                        # unit tests plus tests/{fixture,guarantees,arc_search,adversarial}.rs
 bash build-wasm.sh <out.wasm>     # canonical artifact (Linux or macOS); npm run motion:build / motion:check
 ```

@@ -1,12 +1,16 @@
-//! The solver: validate, solve the hop, lay out the phases, simulate the secondary motion on a
-//! fixed time grid, sample one state per video frame, and check the plan before returning it.
+//! The solver: validate, solve the hop (with its surface-aware arc search), lay out the phases,
+//! simulate the secondary motion on a fixed time grid, sample one state per video frame, state the
+//! plan's contacts with the terrain, and check the plan before returning it.
 //!
 //! Kinematics and the body's postural channels are closed-form functions of time. The tail, the
 //! ears, and the tail's tension are damped responses, integrated once per plan on a fixed 1 ms grid
 //! from the start of the window and read at frame times by interpolation, so the dynamics never
-//! depend on the frame rate or on which frames a renderer asks for.
+//! depend on the frame rate or on which frames a renderer asks for. (The one exception is a perch
+//! too short for the configured settle: the settle is hurried to end on the last frame the plan
+//! performs, so the body is handed back at rest; see [`Landing::within`].)
 
 use alloc::format;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::f64::consts::PI;
 
@@ -20,8 +24,8 @@ use crate::math::{
     sqrt,
 };
 use crate::state::{
-    EngineId, FrameRange, MotionInput, MotionPhase, MotionPlan, MotionState, PhaseWindow, PlanTiming, Stance,
-    Trajectory,
+    ContactEvent, ContactKind, EngineId, FrameRange, MotionInput, MotionPhase, MotionPlan, MotionState, PhaseWindow,
+    PlanTiming, Stance, Trajectory,
 };
 use crate::tail::{Follower, TailSignals, desired_counterbalance, desired_curl, tension_target};
 use crate::terrain::{check_geometry, contact_with};
@@ -43,6 +47,7 @@ pub fn solve_motion(input: &MotionInput) -> Result<MotionPlan, MotionError> {
     validate_input(input)?;
     let cfg = &input.config;
     let timing = input.timing;
+    let terrain = &input.terrain;
     let hop = solve_hop(
         &HopRequest {
             from: input.start,
@@ -51,20 +56,15 @@ pub fn solve_motion(input: &MotionInput) -> Result<MotionPlan, MotionError> {
             to_scale: input.target_scale,
             start_ms: timing.start_ms,
             arrive_by_ms: timing.arrive_by_ms,
+            protected_text: &terrain.protected_text,
+            figure: terrain.figure,
         },
         cfg,
     )?;
     let (takeoff_impulse, landing_impulse) = hop::impulses(&hop, input.start, input.target, cfg);
-    let landing = Landing::new(hop.contact_ms, &cfg.landing);
-    if landing.settled_ms >= timing.end_ms {
-        return refuse(
-            MotionErrorCode::InvalidDuration,
-            format!(
-                "the window closes at {} ms, before the landing settles at {} ms",
-                timing.end_ms, landing.settled_ms
-            ),
-        );
-    }
+    let (first, count) = frame_grid(input)?;
+    // The last frame this plan performs: the body must be back in its stance by then.
+    let landing = Landing::within(hop.contact_ms, &cfg.landing, frame_ms(first + count - 1, input.fps))?;
     let push_ms = cfg
         .hop
         .push_ms
@@ -72,7 +72,6 @@ pub fn solve_motion(input: &MotionInput) -> Result<MotionPlan, MotionError> {
     let push_start_ms = hop.liftoff_ms - push_ms;
     let phases = phase_windows(input, &hop, push_start_ms, &landing);
     let body = Body::new(input, hop, landing, push_start_ms, phases, landing_impulse);
-    let (first, count) = frame_grid(input)?;
     let sim = Sim::run(&body);
     let samples: Vec<MotionState> = (first..first + count)
         .map(|f| body.sample(frame_ms(f, input.fps), &sim))
@@ -103,9 +102,27 @@ pub fn solve_motion(input: &MotionInput) -> Result<MotionPlan, MotionError> {
             gravity_boost: hop.gravity_px / hop.base_gravity_px,
             flight_ms: hop.contact_ms - hop.liftoff_ms,
             apex_above_px: hop.apex_above_px,
+            arc_fraction: hop.arc_fraction,
+            text_crossings: hop.text_crossings,
         },
-        takeoff_impulse,
-        landing_impulse,
+        events: vec![
+            ContactEvent {
+                kind: ContactKind::Takeoff,
+                at_ms: hop.liftoff_ms,
+                impulse: takeoff_impulse,
+                position: input.start,
+                scale: input.start_scale,
+                contact: contact_with(terrain.start.as_ref()),
+            },
+            ContactEvent {
+                kind: ContactKind::Landing,
+                at_ms: hop.contact_ms,
+                impulse: landing_impulse,
+                position: input.target,
+                scale: input.target_scale,
+                contact: contact_with(terrain.target.as_ref()),
+            },
+        ],
         phases: body.phases,
         frames: FrameRange {
             fps: input.fps,
@@ -145,8 +162,12 @@ fn validate_input(input: &MotionInput) -> Result<(), MotionError> {
         ("timing.endMs", t.end_ms),
         ("stance.initial.crouch", initial.crouch),
         ("stance.initial.tailDeg", initial.tail_deg),
+        ("stance.initial.tailCurl", initial.tail_curl),
+        ("stance.initial.tailTension", initial.tail_tension),
         ("stance.rest.crouch", rest.crouch),
         ("stance.rest.tailDeg", rest.tail_deg),
+        ("stance.rest.tailCurl", rest.tail_curl),
+        ("stance.rest.tailTension", rest.tail_tension),
     ];
     for (name, v) in numbers {
         if !v.is_finite() {
@@ -192,6 +213,7 @@ fn validate_input(input: &MotionInput) -> Result<(), MotionError> {
         );
     }
     let tail_range = input.config.tail.max_deg * RANGE_KNEE;
+    let curl_range = input.config.tail.max_curl_deg * RANGE_KNEE;
     for (name, s) in [("initial", initial), ("rest", rest)] {
         if !(0.0..=1.0).contains(&s.crouch) {
             return refuse(
@@ -206,6 +228,21 @@ fn validate_input(input: &MotionInput) -> Result<(), MotionError> {
                     "stance.{name}.tailDeg={} is outside the tail's exact range (+/-{tail_range})",
                     s.tail_deg
                 ),
+            );
+        }
+        if s.tail_curl.abs() > curl_range {
+            return refuse(
+                InvalidInput,
+                format!(
+                    "stance.{name}.tailCurl={} is outside the curl's exact range (+/-{curl_range})",
+                    s.tail_curl
+                ),
+            );
+        }
+        if !(0.0..=1.0).contains(&s.tail_tension) {
+            return refuse(
+                InvalidInput,
+                format!("stance.{name}.tailTension={} is outside [0, 1]", s.tail_tension),
             );
         }
     }
@@ -359,6 +396,8 @@ impl<'a> Body<'a> {
             Stance {
                 crouch: lerp(a.crouch, b.crouch, s),
                 tail_deg: lerp(a.tail_deg, b.tail_deg, s),
+                tail_curl: lerp(a.tail_curl, b.tail_curl, s),
+                tail_tension: lerp(a.tail_tension, b.tail_tension, s),
             }
         }
     }
@@ -450,6 +489,8 @@ impl<'a> Body<'a> {
         let airborne = phase == MotionPhase::Airborne;
         TailSignals {
             stance_deg: stance.tail_deg,
+            stance_curl: stance.tail_curl,
+            stance_tension: stance.tail_tension,
             // Only a surface can take the tail's weight: leg load presses it down on the ground only.
             leg_load: if airborne {
                 0.0
@@ -508,13 +549,13 @@ impl<'a> Body<'a> {
         let tension = sim.read(&sim.tension, t);
         // The perch is exact: the settle tapers every response to the stance, and the perch holds it.
         let (tail_angle, tail_curl, tail_tension, ear_lag) = match phase {
-            MotionPhase::Perch => (rest.tail_deg, 0.0, cfg.tail.tension_rest, 0.0),
+            MotionPhase::Perch => (rest.tail_deg, rest.tail_curl, rest.tail_tension, 0.0),
             MotionPhase::Settle => {
                 let k = settle_taper(progress);
                 (
                     rest.tail_deg + (tail - rest.tail_deg) * k,
-                    curl * k,
-                    cfg.tail.tension_rest + (tension - cfg.tail.tension_rest) * k,
+                    rest.tail_curl + (curl - rest.tail_curl) * k,
+                    rest.tail_tension + (tension - rest.tail_tension) * k,
                     ears * k,
                 )
             }
@@ -569,10 +610,11 @@ impl Sim {
         let dt_s = SIM_STEP_MS / 1000.0;
         // First-order follow of curl and tension toward their targets.
         let follow = SIM_STEP_MS / (cfg.tail.tension_follow_ms + SIM_STEP_MS);
-        let mut tail = Follower::at_rest(body.input.stance.initial.tail_deg);
+        let initial = body.input.stance.initial;
+        let mut tail = Follower::at_rest(initial.tail_deg);
         let mut ears = Follower::at_rest(0.0);
-        let mut curl = 0.0;
-        let mut tension = cfg.tail.tension_rest;
+        let mut curl = initial.tail_curl;
+        let mut tension = initial.tail_tension;
         let mut sim = Sim {
             start_ms,
             tail: Vec::with_capacity(steps + 1),
@@ -587,7 +629,7 @@ impl Sim {
             let (phase, progress) = body.window(t);
             let signals = body.tail_signals(t, phase, progress);
             let desired = desired_counterbalance(&signals, &cfg.tail);
-            tension += (tension_target(phase, desired, &tail, &cfg.tail) - tension) * follow;
+            tension += (tension_target(phase, &signals, desired, &tail, &cfg.tail) - tension) * follow;
             curl += (desired_curl(&signals, &cfg.tail) - curl) * follow;
             tail.step(desired, cfg.tail.freq_hz, cfg.tail.damping, dt_s);
             ears.step(body.ear_target(phase), cfg.ears.freq_hz, cfg.ears.damping, dt_s);

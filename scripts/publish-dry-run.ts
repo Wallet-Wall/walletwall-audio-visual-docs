@@ -21,6 +21,7 @@ import { buildIdentity } from '../src/manifest/build-identity.ts';
 import { buildProvenanceManifest } from '../src/manifest/provenance.ts';
 import { loadVerifiedArtifact } from '../src/motion/artifact.ts';
 import { readMotionIntelligenceConfig, typescriptEngineIdentity, type MotionEngineIdentity } from '../src/motion/engine-identity.ts';
+import { planRustMotion } from '../src/motion/rust-adapter.ts';
 import { distDir, loadCommittedSpec, loadRegistry, validationContextFor } from '../src/pipeline/context.ts';
 import { loadSnapshot, synthesize } from '../src/pipeline/render-input.ts';
 import { emptyLineage, type Lineage } from '../src/publish/lineage.ts';
@@ -52,8 +53,6 @@ writeFileSync(path.join(out, `${videoId}.en.srt`), toSrt(cues));
 const headings: Record<string, string> = Object.fromEntries(source.sections.map((s) => [s.id, s.heading]));
 const layouts = layoutsFor(timeline, (id) => headings[id] ?? '');
 const motion = planMotion(choreograph(timeline, layouts), layouts);
-const cueSheet = buildCueSheet(timeline, config.sonic, spec.audio.musicBedId, motion.events);
-writeFileSync(path.join(out, 'cue-sheet.json'), prettyJson(cueSheet));
 
 const renderInfoPath = path.join(out, 'render.json');
 const renderInfo = existsSync(renderInfoPath) ? readJson<{ engine: { name: string; version: string }; output: { path: string; sha256: string }; identity?: unknown; motionEngine?: MotionEngineIdentity }>(renderInfoPath) : null;
@@ -64,9 +63,11 @@ if (renderInfo && prettyJson(renderInfo.identity ?? null) !== prettyJson(identit
   process.exit(1);
 }
 // Nor can a render whose motion came from an engine artifact or engine config this checkout no longer has.
-// (A render.json from before the field existed was made by the TypeScript solver.) The cue sheet below is
-// timed to the TypeScript plan's contacts, which the engine's paths are bound to equal exactly.
+// (A render.json from before the field existed was made by the TypeScript solver.)
 const motionEngine: MotionEngineIdentity = renderInfo?.motionEngine ?? typescriptEngineIdentity();
+// The contact cues are timed to the contacts the render's scene reacted to: the TypeScript plan's, or,
+// on the paths the engine performed, the engine's own.
+let contacts = motion.events;
 if (renderInfo && motionEngine.motionEngine === 'rust-wasm') {
   // The bytes on disk, verified against their manifest (a swapped .wasm is refused here, not trusted).
   const { manifest: artifact } = loadVerifiedArtifact();
@@ -74,7 +75,16 @@ if (renderInfo && motionEngine.motionEngine === 'rust-wasm') {
     console.error(`[publish:dry-run] ${videoId}: dist render.json was made with a different Motion Intelligence artifact or config; re-render before publishing.`);
     process.exit(1);
   }
+  // Solve again (deterministic) and require exactly the plans the render performed, byte for byte.
+  const rust = planRustMotion({ spec, track, templates: config.templates, headings });
+  if (prettyJson(rust.identity) !== prettyJson(motionEngine)) {
+    console.error(`[publish:dry-run] ${videoId}: the Motion Intelligence plans no longer match the ones dist render.json recorded; re-render before publishing.`);
+    process.exit(1);
+  }
+  contacts = [...rust.bound.contacts];
 }
+const cueSheet = buildCueSheet(timeline, config.sonic, spec.audio.musicBedId, contacts);
+writeFileSync(path.join(out, 'cue-sheet.json'), prettyJson(cueSheet));
 const specHash = contentAddress(spec);
 const manifest = buildPublishManifest({
   spec,
