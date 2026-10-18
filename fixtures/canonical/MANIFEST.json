@@ -1,0 +1,25 @@
+{
+  "schema": "walletwall.canonical-fixtures/v1",
+  "note": "Byte-identical copies of public files from the canonical WalletWall repository, read only when WALLETWALL_SOURCE_ROOT is not set. Each copy is bound to its git blob id and re-verified on every read; none is an independent source of truth. Live staleness detection always runs against a real WalletWall checkout.",
+  "files": {
+    "docs/concepts/migration-readiness.mdx": {
+      "blob": "f8c294eecaef6142ab947ce16d8664a8bec743c0",
+      "sha256": "aeaf22d3c671af446596998ed741354a7ca4e44890fa60539f7fa1a56772dfe8",
+      "bytes": 8622,
+      "role": "Source page of the migration-readiness video, published at https://docs.walletwall.org/concepts/migration-readiness."
+    },
+    "docs/docs.json": {
+      "blob": "ed7a6f79391538fc3589a455be74b589c361c982",
+      "sha256": "3dbc63a2ecf92f1a4d32948a1d6f08a2204b36ad28510a84469f1ca3964289dc",
+      "bytes": 4719,
+      "role": "Docs-site navigation: decides which pages are published, their URLs, and their navigation groups."
+    }
+  },
+  "withheld": {
+    "docs/.mintignore": {
+      "blob": "6d97cdda44dd36f6b5baf5b551c20cc46da4266d",
+      "reason": "Lists internal, unpublished material, so it is not mirrored into a public repository. At this blob it excluded no existing navigation page file, which `npm run contracts:check` re-verifies against a checkout.",
+      "navigationPagesExcluded": 0
+    }
+  }
+}

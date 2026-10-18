@@ -1,0 +1,41 @@
+{
+  "schema": "walletwall.playlists/v1",
+  "note": "Conceptual playlists organized around viewer questions, not the docs directory. Order is data: change `order` values, never code. youtubePlaylistId stays null until a human creates the playlist on the channel.",
+  "playlists": [
+    {
+      "id": "walletwall-vault",
+      "title": "WalletWall Vault",
+      "description": "Migration readiness, the Stablecoin Vault research prototype, and what each readiness signal does and does not mean.",
+      "youtubePlaylistId": null,
+      "entries": [{ "videoId": "migration-readiness", "order": 10 }]
+    },
+    {
+      "id": "walletwall-quantum",
+      "title": "WalletWall Quantum",
+      "description": "Quantum exposure, uncertainty, and how WalletWall reasons about signature exposure over time.",
+      "youtubePlaylistId": null,
+      "entries": []
+    },
+    {
+      "id": "walletwall-data-foundations",
+      "title": "WalletWall Data Foundations",
+      "description": "Where WalletWall's data comes from, how it is validated, and how provenance is kept.",
+      "youtubePlaylistId": null,
+      "entries": []
+    },
+    {
+      "id": "walletwall-whale-watcher",
+      "title": "WalletWall Whale Watcher",
+      "description": "Large-wallet behavior and what the Whale Watcher surface shows.",
+      "youtubePlaylistId": null,
+      "entries": []
+    },
+    {
+      "id": "walletwall-architecture",
+      "title": "WalletWall Architecture",
+      "description": "Evidence, authority, and the system design behind WalletWall.",
+      "youtubePlaylistId": null,
+      "entries": []
+    }
+  ]
+}

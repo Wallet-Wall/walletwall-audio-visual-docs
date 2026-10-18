@@ -1,0 +1,12 @@
+{
+  "schema": "walletwall.video-registry/v1",
+  "note": "Every video the pipeline owns. `revision` bumps only when a materially changed video is regenerated as a new upload.",
+  "videos": [
+    {
+      "videoId": "migration-readiness",
+      "docPath": "docs/concepts/migration-readiness.mdx",
+      "storyboard": "fixtures/storyboards/migration-readiness.storyboard.json",
+      "revision": 1
+    }
+  ]
+}

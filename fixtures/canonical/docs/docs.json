@@ -1,0 +1,179 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "WalletWall",
+  "colors": {
+    "primary": "#BF4E32",
+    "light": "#f5e8df",
+    "dark": "#7A3120"
+  },
+  "logo": {
+    "light": "/logo/walletwall-light.png",
+    "dark": "/logo/walletwall-dark.png"
+  },
+  "favicon": "/favicon.png",
+  "icons": {
+    "library": "fontawesome"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Report an issue",
+        "icon": "flag",
+        "href": "https://github.com/Wallet-Wall/.github"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Open WalletWall",
+      "href": "https://walletwall.org"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Wallet-Wall"
+    }
+  },
+  "contextual": {
+    "options": ["chatgpt", "perplexity", "grok", "aistudio", "claude", "copy", "view"],
+    "display": "header"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "icon": "compass",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "introduction",
+              "concepts/what-is-walletwall",
+              "concepts/public-and-private",
+              "architecture/flows",
+              "explore",
+              "wallroom"
+            ]
+          },
+          {
+            "group": "Positioning",
+            "pages": [
+              "marketing/product-messaging"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Vault & Proof Readiness",
+        "icon": "vault",
+        "groups": [
+          {
+            "group": "Stablecoin Vault Readiness",
+            "pages": [
+              "features/vault",
+              "concepts/migration-readiness",
+              "concepts/readiness-packet",
+              "vault/boundaries",
+              "vault/pq-evidence-and-rehearsal"
+            ]
+          },
+          {
+            "group": "Vault Assurance",
+            "pages": [
+              "vault/vnext-kernel-status",
+              "vault/scanner-assurance-model"
+            ]
+          },
+          {
+            "group": "Proof Readiness",
+            "pages": [
+              "architecture/proof-readiness-stack",
+              "architecture/proof-claim-schema",
+              "architecture/sp1-candidate-decision",
+              "vault/zk-proof-artifact-roadmap"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Features",
+        "icon": "shapes",
+        "groups": [
+          {
+            "group": "Quantum Intelligence",
+            "pages": [
+              "features/quantum-intelligence",
+              "concepts/quantum-exposure-clock",
+              "concepts/exposure-report",
+              "concepts/scoring-methodology"
+            ]
+          },
+          {
+            "group": "Complementary Intelligence Surfaces",
+            "pages": [
+              "features/holder-wall",
+              "features/whale-watcher",
+              "features/stable-seer",
+              "features/coinstellation",
+              "features/wallet-profile"
+            ]
+          },
+          {
+            "group": "Proof-of-Readiness Rewards",
+            "pages": [
+              "features/proof-of-readiness-rewards",
+              "features/proof-of-readiness-campaign-roadmap"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Architecture & Evidence",
+        "icon": "sitemap",
+        "groups": [
+          {
+            "group": "Data, Dune & Architecture",
+            "pages": [
+              "architecture/model-layer",
+              "architecture/signal-engine",
+              "architecture/data-quality",
+              "architecture/the-labyrinth-and-the-maze",
+              "architecture/assurance-v2-runtime-evidence",
+              "architecture/independent-authority",
+              "architecture/wallet-graph-contract",
+              "architecture/wallet-evidence-model",
+              "architecture/wallet-risk-report-model",
+              "development/dune-queries"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "security/key-management-recovery-model"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "icon": "square-terminal",
+        "groups": [
+          {
+            "group": "Operations & Runbooks",
+            "pages": [
+              "operations/sp1-dev-environment-runbook",
+              "operations/evidence-endpoint-preview-rehearsal",
+              "operations/portfolio-assessment-cost-model"
+            ]
+          },
+          {
+            "group": "Documentation",
+            "pages": [
+              "changelog"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

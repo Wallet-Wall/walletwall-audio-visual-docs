@@ -1,0 +1,25 @@
+{
+  "schema": "walletwall.copy-policy/v1",
+  "note": "Applied to narration and on-screen text. Neutral wallet language follows AGENTS.md (Agent PR QA Checklist: Copy). Hype and subscribe-begging patterns follow the audiovisual brief.",
+  "forbiddenPhrases": [
+    { "pattern": "\\byour wallet\\b", "reason": "Use neutral public-wallet language: this wallet / the wallet." },
+    { "pattern": "\\bmy wallet\\b", "reason": "Use neutral public-wallet language." },
+    { "pattern": "\\byou moved\\b", "reason": "Use neutral public-wallet language." },
+    { "pattern": "\\byour strategy\\b", "reason": "Use neutral public-wallet language." },
+    { "pattern": "\\bsmash\\b", "reason": "No manufactured excitement." },
+    { "pattern": "\\b(notification )?bell\\b", "reason": "No notification-bell monologues." },
+    { "pattern": "\\bdon'?t forget to\\b", "reason": "No repeated subscribe begging." },
+    { "pattern": "\\bact now\\b|\\bbefore it'?s too late\\b|\\bhurry\\b", "reason": "No fake urgency." },
+    { "pattern": "\\b(insane|mind-?blowing|game-?changer|you won'?t believe|crazy)\\b", "reason": "No clickbait hype." },
+    { "pattern": "\\bguarantee[sd]?\\b|\\bbulletproof\\b|\\bunhackable\\b|\\b100% (safe|secure)\\b", "reason": "No unsupported technical guarantees." },
+    { "pattern": "\\bfinancial advice\\b(?! is not)|\\byou should (buy|sell)\\b", "reason": "WalletWall is not investment advice." }
+  ],
+  "callToActionPattern": "\\b(subscrib\\w*|like the video|like and (share|subscribe)|hit (the )?like|like button|comment below|leave a comment|share (this|the) video|follow (us|walletwall|the channel)|turn on notifications)\\b",
+  "interpretationMarkers": [
+    "In other words",
+    "Put another way",
+    "One way to read this",
+    "Read plainly",
+    "Our reading"
+  ]
+}

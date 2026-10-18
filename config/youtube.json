@@ -1,0 +1,35 @@
+{
+  "schema": "walletwall.youtube-channel/v1",
+  "note": "Channel defaults for the YouTube adapter. v1 never publishes publicly: uploads are UNLISTED for human review, then a human publishes.",
+  "defaults": {
+    "categoryId": "27",
+    "defaultLanguage": "en",
+    "defaultAudioLanguage": "en",
+    "privacyStatusOnUpload": "unlisted",
+    "selfDeclaredMadeForKids": false,
+    "containsSyntheticMedia": true,
+    "license": "youtube",
+    "baseTags": ["WalletWall", "on-chain analytics", "wallet risk intelligence"],
+    "descriptionFooter": [
+      "This video is a versioned interpretation of the canonical page above; the page is authoritative.",
+      "Narration is synthesized speech. WalletWall is read-only wallet intelligence and is not investment advice."
+    ]
+  },
+  "limits": {
+    "titleMaxChars": 100,
+    "descriptionMaxChars": 5000,
+    "chapterMinSeconds": 10,
+    "chapterMinCount": 3,
+    "endScreenMinMs": 5000,
+    "endScreenMaxMs": 20000,
+    "videoMinMsForEndScreen": 25000
+  },
+  "endScreen": {
+    "note": "The YouTube Data API cannot set end screen elements; a reviewer applies this layout in YouTube Studio. The renderer leaves these zones visually empty.",
+    "elements": [
+      { "kind": "VIDEO", "source": "BEST_FOR_VIEWER", "zone": "endscreen:video-a" },
+      { "kind": "PLAYLIST", "source": "SERIES_PLAYLIST", "zone": "endscreen:video-b" },
+      { "kind": "SUBSCRIBE", "zone": "endscreen:subscribe" }
+    ]
+  }
+}

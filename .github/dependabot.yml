@@ -1,0 +1,38 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Remotion's packages are exact-pinned to ONE version (a guard test fails
+      # otherwise), so they must always move together, in one reviewed PR with a
+      # re-render: a renderer bump can change frames.
+      remotion:
+        patterns:
+          - "remotion"
+          - "@remotion/*"
+      npm-security-and-maintenance:
+        # Non-breaking updates only; majors arrive as separate PRs.
+        update-types:
+          - "minor"
+          - "patch"
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "remotion"
+          - "@remotion/*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions-security-and-maintenance:
+        update-types:
+          - "minor"
+          - "patch"
+        patterns:
+          - "*"
