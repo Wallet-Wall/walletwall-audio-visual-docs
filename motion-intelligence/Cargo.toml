@@ -1,0 +1,35 @@
+[package]
+name = "motion-intelligence"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+description = "WalletWallaby Motion Intelligence: a small, deterministic traversal engine (hop, land, perch, tail counterbalance) compiled to WebAssembly."
+license = "MIT"
+repository = "https://github.com/Wallet-Wall/walletwall-audio-visual-docs"
+publish = false
+
+[lib]
+# rlib for native tests; cdylib for the wasm32 artifact the TypeScript pipeline loads.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Pure-Rust transcendental functions: identical results on every target (never the platform libm).
+libm = "0.2.16"
+# Typed, fail-closed parsing of the boundary documents (no_std + alloc; no std I/O).
+# float_roundtrip: parse every number exactly (the default parser may land 1 ULP away), so the
+# engine sees the bits the pipeline sent and echoes the authored target and window exactly.
+serde = { version = "1.0.228", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1.0.149", default-features = false, features = ["alloc", "float_roundtrip"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+debug = false
+strip = true
+incremental = false
+
+[lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"

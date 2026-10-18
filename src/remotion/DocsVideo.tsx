@@ -7,11 +7,12 @@ import { AbsoluteFill, cancelRender, continueRender, delayRender, useCurrentFram
 import { buildCaptions } from '../audio/captions.ts';
 import { TOKENS, withAlpha } from '../brand/tokens.ts';
 import { choreograph, layoutsFor, mouthAt, type Clip } from '../character/walletwallaby/choreography.ts';
-import { planMotion, platformOffsets, sampleWallaby, traverseProgress, type MotionPlan } from '../character/walletwallaby/motion.ts';
+import { planMotion, platformOffsets, traverseProgress, type MotionPlan } from '../character/walletwallaby/motion.ts';
 import { CONTENT_BOTTOM, easeInOut, TITLE_SAFE } from '../layout/geometry.ts';
 import { END_SCREEN_ZONES, PROVENANCE_CHIP } from '../layout/brand-layout.ts';
 import type { SceneLayout } from '../layout/scene-layout.ts';
 import type { SceneSpec } from '../spec/types.ts';
+import { bindMotionEngine, sampleWithEngine, type BoundMotionEngine } from '../motion/rust-path.ts';
 import { buildTimeline, type TimedSegment, type Timeline } from '../timeline/timeline.ts';
 import { BrandSegment } from './brand/BrandSegment.tsx';
 import { loadBrandFonts } from './fonts.ts';
@@ -26,6 +27,8 @@ interface Model {
   layouts: Map<string, SceneLayout>;
   clips: Clip[];
   motion: MotionPlan;
+  /** The Rust/WASM engine's plans for the paths it owns (none unless the render selected it). */
+  engine: BoundMotionEngine;
   captions: ReturnType<typeof buildCaptions>;
 }
 
@@ -33,7 +36,10 @@ export function buildModel(props: DocsVideoProps): Model {
   const timeline = buildTimeline(props.spec, props.track, props.templates);
   const layouts = layoutsFor(timeline, (id) => props.headings[id] ?? '');
   const clips = choreograph(timeline, layouts);
-  return { timeline, layouts, clips, motion: planMotion(clips, layouts), captions: buildCaptions(timeline) };
+  const motion = planMotion(clips, layouts);
+  // Fails closed: an engine plan that does not answer exactly these clips stops the render.
+  const engine = bindMotionEngine(props.motionEngine, motion, timeline.fps, props.spec.id);
+  return { timeline, layouts, clips, motion, engine, captions: buildCaptions(timeline) };
 }
 
 /** Map a Wallaby anchor id to the scene element it designates. */
@@ -119,7 +125,7 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
     return template ? <BrandSegment seg={s} ms={at} spec={props.spec} template={template} docTitle={props.docTitle} provenance={props.provenance} /> : null;
   };
 
-  const wallaby = sampleWallaby(model.motion, ms, mouthAt(timeline, ms));
+  const wallaby = sampleWithEngine(model.engine, model.motion, frame, ms, mouthAt(timeline, ms));
   const cue = props.overlays.captions ? model.captions.find((c) => ms >= c.startMs && ms < c.endMs) : undefined;
   const section = seg.scene ? props.headings[seg.scene.eyebrowSectionId] : undefined;
 

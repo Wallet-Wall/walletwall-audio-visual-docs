@@ -6,11 +6,12 @@ import { contentAddress, sha256Hex } from '../core/hash.ts';
 import type { ValidationReport } from '../core/issues.ts';
 import type { CueSheet } from '../audio/cue-sheet.ts';
 import type { BuildIdentity } from './build-identity.ts';
+import type { MotionEngineIdentity } from '../motion/engine-identity.ts';
 import type { VideoSpec } from '../spec/types.ts';
 import type { NarrationTrack, Timeline } from '../timeline/timeline.ts';
 
 export interface ProvenanceManifest {
-  schema: 'walletwall.video-provenance/v2';
+  schema: 'walletwall.video-provenance/v3';
   videoId: string;
   revision: number;
   specHash: string;
@@ -21,7 +22,8 @@ export interface ProvenanceManifest {
   timeline: { totalMs: number; segments: { id: string; role: string; startMs: number; endMs: number }[] };
   audio: { identAsset: string | null; musicBed: string | null; cues: number; silentCues: number; suppressedCues: number };
   validation: { ok: boolean; errors: number; warnings: number; codes: string[] };
-  render: { engine: string; version: string; output: string; sha256: string } | null;
+  /** The rendered artifact, and which motion engine made its motion (for rust-wasm: the exact WASM, config, and plan bytes). */
+  render: { engine: string; version: string; output: string; sha256: string; motionEngine: MotionEngineIdentity } | null;
   /** Toolchain, hashed configuration, and WalletWallaby's declared rig and motion versions. */
   identity: BuildIdentity;
 }
@@ -37,7 +39,7 @@ export function buildProvenanceManifest(args: {
 }): ProvenanceManifest {
   const { spec, track, timeline, cueSheet, validation } = args;
   return {
-    schema: 'walletwall.video-provenance/v2',
+    schema: 'walletwall.video-provenance/v3',
     videoId: spec.id,
     revision: spec.revision,
     specHash: contentAddress(spec),

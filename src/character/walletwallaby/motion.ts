@@ -319,8 +319,12 @@ export interface PlanHopArgs {
 /** Candidate arc heights, as fractions of the natural one: natural first, then lower, then higher. */
 const ARC_CANDIDATES = [1, 0.75, 0.5, 0.35, 0.22, 0.12, 0.05, 1.3, 1.65, 2.2, 3] as const;
 const FLIGHT_SAMPLES = 32;
-/** Every move touches down at least this long before its clip ends, so the clip closes standing on its anchor. */
-const SETTLE_RESERVE_MS = 40;
+/**
+ * A hop's flight is budgeted to end this long before its clip ends, so the clip closes standing on its
+ * anchor. The orient and the extra anticipation take up to 0.55 of the slack, so touchdown comes at least
+ * 0.45 x this before the clip ends (18 ms on the committed lesson's takeaway hop).
+ */
+export const SETTLE_RESERVE_MS = 40;
 
 interface ArcSolution {
   depth: number;
@@ -866,13 +870,18 @@ interface Responses {
   landingImpulse: number;
 }
 
-/** Sum of every event's spring response at `ms` (closed form, independent of frame history). */
-function responsesAt(plan: MotionPlan, ms: number): Responses {
+/**
+ * Sum of every event's spring response at `ms` (closed form, independent of frame history).
+ * Events in `muted` contribute nothing here: their secondary motion is produced elsewhere (the
+ * Rust/WASM engine, for the paths it owns). They still drive everything else they drive.
+ */
+function responsesAt(plan: MotionPlan, ms: number, muted?: ReadonlySet<MotionEvent>): Responses {
   const { response, gains } = plan.config;
   const out: Responses = { crouch: 0, compression: 0, headTilt: 0, tail: 0, ears: 0, landingImpulse: 0 };
   for (let i = firstLiveEvent(plan.events, ms); i < plan.events.length; i++) {
     const e = plan.events[i]!;
     if (e.atMs > ms) break;
+    if (muted?.has(e)) continue;
     const dt = ms - e.atMs;
     const comp = springResponse(dt, response.compression);
     const tail = springResponse(dt, response.tail);
@@ -967,7 +976,11 @@ function flightPose(s: number, reach: PoseParams = POSES.LAND): PoseParams {
   return blendPose(AIRBORNE, reach, easeInOut((s - 0.72) / 0.28));
 }
 
-export function sampleWallaby(plan: MotionPlan, ms: number, mouth: Viseme = 'REST'): WallabyState {
+/**
+ * `mutedResponses`: events whose spring responses (crouch, compression, head tilt, tail and ear
+ * follow-through) are left out because another engine produces that secondary motion. Default: none.
+ */
+export function sampleWallaby(plan: MotionPlan, ms: number, mouth: Viseme = 'REST', mutedResponses?: ReadonlySet<MotionEvent>): WallabyState {
   if (!Number.isFinite(ms)) return HIDDEN_STATE;
   const idx = clipIndexAt(plan.clips, ms);
   if (idx < 0) return HIDDEN_STATE;
@@ -976,7 +989,7 @@ export function sampleWallaby(plan: MotionPlan, ms: number, mouth: Viseme = 'RES
   if (clip.kind === 'HIDDEN' || motion.kind === 'HIDDEN') return HIDDEN_STATE;
   const { limits, hold, tail: tailCfg } = plan.config;
   const expr = EXPRESSIONS[clip.expression];
-  const r = responsesAt(plan, ms);
+  const r = responsesAt(plan, ms, mutedResponses);
 
   interface Behaviour {
     grounded: boolean;
