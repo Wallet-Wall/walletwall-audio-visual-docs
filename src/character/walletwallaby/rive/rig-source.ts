@@ -29,12 +29,14 @@
 // forelimb, the near ear, the line of the haunch) and the face.
 //
 // v5 (visual language): the belly IS the wall, as WalletWallrus's is: the brick
-// field fills the stomach, widest low, its courses racked back a quarter or half
-// brick at a time with no border of its own; the torso carries more mass through
-// the belly; each forelimb is one skinned limb whose line opens at the front of
-// the shoulder, so it grows out of the chest; the muzzle's profile runs convex to
-// a blunter nose; and the tail's root is fuller where it meets the rump. The
-// skeleton, IK, and clips are unchanged. Isomorphic.
+// field fills the front of the stomach, widest low, its courses racked back a
+// quarter or half brick at a time with no border of its own. The body is
+// soft-massed like WalletWallrus's: a convex back that sweeps into the tail
+// through a full rump, a rounded haunch, calves, a belly that rounds down over
+// the thigh, a rounded nape. Each forelimb is one skinned limb whose line opens at
+// the front of the shoulder, so it grows out of the chest; the muzzle's profile
+// runs convex to a blunter nose over a rounded chin. The skeleton, IK, and clips
+// are unchanged. Isomorphic.
 
 import { add, len, sampleContour, scale, smoothContour, sub, type ContourPoint, type Vec } from './rig-math.ts';
 
@@ -280,20 +282,6 @@ const INTERIOR: StrokeSpec = { slot: 'ink', width: 2, join: 'round', cap: 'round
 const MORTAR: StrokeSpec = { slot: 'ink', width: 2.6, join: 'round', cap: 'round' };
 const FINE: StrokeSpec = { slot: 'ink', width: 1.5, join: 'round', cap: 'round' };
 
-/** A tapered limb along a bone's local x axis, rounded at both ends. */
-function limb(length: number, w0: number, w1: number): ContourPoint[] {
-  return [
-    [-w0 * 0.7, 0],
-    [0, -w0],
-    [length * 0.5, -(w0 + w1) / 2],
-    [length, -w1],
-    [length + w1 * 0.75, 0],
-    [length, w1],
-    [length * 0.5, (w0 + w1) / 2],
-    [0, w0],
-  ];
-}
-
 // ── The signature tail ──────────────────────────────────────────────────────
 
 const tailSeg = TAIL_REST.slice(1).map((p, i) => Math.hypot(p[0] - TAIL_REST[i]![0], p[1] - TAIL_REST[i]![1]));
@@ -323,7 +311,7 @@ function tailAt(u: number): { p: Vec; n: Vec } {
  * filling the corner between the back and the tail so the tail reads as a counterweight the hips carry.
  * It is gone by a third of the way along; the taper beyond is unchanged.
  */
-const tailRootMass = (u: number): number => 7 * Math.exp(-(((u - 0.09) / 0.09) ** 2));
+const tailRootMass = (u: number): number => 10 * Math.exp(-(((u - 0.05) / 0.08) ** 2));
 
 const TAIL_STATIONS = [0, 0.08, 0.13, 0.18, 0.3, 0.42, 0.54, 0.66, 0.77, 0.87, 0.94] as const;
 const TAIL_ROUNDNESS = 0.9;
@@ -366,27 +354,33 @@ function tailUnderside(): ContourPoint[] {
 // ── The torso and its brick belly ───────────────────────────────────────────
 
 /**
- * The torso: an athletic back and a full stomach. The belly is the deepest part of the body (the wall
- * WalletWallaby carries, as WalletWallrus does), the chest a little narrower, the neck short and thick
+ * The torso: soft-massed, as WalletWallrus is. The back runs in one convex arc from a full rump to the
+ * nape; the belly is the deepest part of the body (the wall WalletWallaby carries, as WalletWallrus does)
+ * and rounds down in front of the haunch; the chest is a little narrower; the neck is short and thick
  * where it runs up into the head.
  */
 const TORSO: readonly ContourPoint[] = [
   [-46, -61],
-  [-51, -83],
-  [-43, -105],
-  [-29.5, -125],
-  [-14.5, -147],
-  [0, -165],
-  [13.5, -180.5],
-  [27, -188],
-  [40, -173],
-  [46.5, -156],
+  // A full rump: the back rounds down into the tail's root.
+  [-55, -86],
+  [-50.5, -99],
+  // The back: one convex arc from the hips to the nape.
+  [-41.1, -118.1],
+  [-30.1, -135.6],
+  [-17.1, -151.8],
+  [-2, -166.5],
+  // The nape rounds up into the back of the skull.
+  [9.5, -182],
+  [16.5, -189],
+  [27, -189],
+  [42.5, -171.5],
+  [47.5, -156],
   [48, -139],
   [44, -122.5],
-  [35.5, -106.5],
-  [24.5, -90.5],
-  [12, -76.5],
-  [-5, -62.5],
+  [36, -106.5],
+  [26.5, -89.5],
+  [16.5, -73.5],
+  [-2, -60],
   [-25, -56],
 ];
 const TORSO_SKIN: readonly RigBone[] = ['hip', 'chest', 'neck'];
@@ -424,11 +418,11 @@ const BRICK_X0 = 2.5;
 /**
  * Where each course ends at the back (x, px), bottom course first, as a wall's end is racked back:
  * each course up stops a quarter or a half brick further forward (closing with a bat where the bond
- * needs one), keeping a band of coat along the back, so the wall fills the stomach from the front of the
- * body nearly to the flank, and its back edge is the bricks' own toothed end, never a border. The lowest
- * course ends behind the haunch.
+ * needs one), keeping a band of coat along the flank, so the wall fills the front mass of the stomach (about
+ * three quarters of the torso's depth there), and its back edge is the bricks' own toothed end, never a
+ * border. The lowest course ends behind the haunch.
  */
-const BRICK_ENDS = [-31.25, -31.25, -24.5, -11] as const;
+const BRICK_ENDS = [-24.5, -24.5, -17.75, -4.25] as const;
 /** A head joint closer than this to either end of its course is left out (no slivers; with BRICK_X0, every back end closes with a half or three-quarter bat or a whole brick). */
 const BRICK_MIN_END = 8;
 /** Mortar lines are drawn through points at most this far apart (px), so the skinning bends them with the body. */
@@ -498,21 +492,21 @@ function creamChest(): ContourPoint[] {
   return [...front, [tip[0], tip[1]], ...backEdge];
 }
 
-/** The haunch: the hind leg's big thigh, drawn over the torso. */
+/** The haunch: the hind leg's big thigh, drawn over the torso, a full rounded drumstick down to the knee. */
 const THIGH_POINTS: readonly Vec[] = [
-  [-46, -67],
-  [-43, -85],
+  [-48, -68],
+  [-44, -86],
   [-31, -97],
   [-13, -99],
   [3, -92],
   [14, -74],
   [25, -52],
-  [27, -42],
-  [21, -34],
-  [10, -32],
-  [-4, -39],
-  [-23, -49],
-  [-39, -57],
+  [28, -41.5],
+  [21.5, -32.5],
+  [9, -30],
+  [-5, -35.5],
+  [-25, -45],
+  [-42, -54],
 ];
 const thighPoint = (p: Vec, d: Vec): Vec => {
   const c: Vec = [-8, -66];
@@ -599,6 +593,26 @@ function forelimb(d: Vec, w: LimbWidths): { outline: ContourPoint[]; edge: Conto
   return { outline, edge };
 }
 
+/** Shin half-widths at the knee and the heel (px): full at the knee, so the shin grows out of the haunch rather than meeting it at a corner. */
+const SHIN_W = [8.8, 4.9] as const;
+/**
+ * The shin along its bone's local x (knee at 0, heel at `length`): a tapered limb, rounded at both ends,
+ * with a rounded calf on its back (+y) side below the knee, which fills the corner behind the knee.
+ */
+function shin(length: number, w0: number, w1: number): ContourPoint[] {
+  return [
+    [-w0 * 0.7, 0],
+    [0, -w0],
+    [length * 0.5, -(w0 + w1) / 2],
+    [length, -w1],
+    [length + w1 * 0.75, 0],
+    [length, w1],
+    [length * 0.6, w1 + 1.2],
+    [length * 0.25, w0 + 2],
+    [0, w0 + 0.6],
+  ];
+}
+
 function footGeometry(): Geometry {
   return {
     kind: 'contour',
@@ -623,19 +637,19 @@ const FORELIMB_F_SHAPE = forelimb(FAR_ARM, FORELIMB_F);
 const FORELIMB_N_SHAPE = forelimb([0, 0], FORELIMB_N);
 const FORELIMB_F_PART: Part = { name: 'forelimb_f', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: true, points: FORELIMB_F_SHAPE.outline }, fill: { slot: 'furShade' }, skin: ['arm_f', 'forearm_f'] };
 const THIGH_F: Part = { name: 'thigh_f', attach: 'thigh_f', space: 'rig', geometry: thighGeometry(FAR_LEG), fill: { slot: 'furShade' } };
-const SHIN_F: Part = { name: 'shin_f', attach: 'shin_f', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(49.2, 7.6, 4.6) }, fill: { slot: 'furShade' } };
+const SHIN_F: Part = { name: 'shin_f', attach: 'shin_f', space: 'local', geometry: { kind: 'contour', closed: true, points: shin(49.2, SHIN_W[0], SHIN_W[1]) }, fill: { slot: 'furShade' } };
 const FOOT_F: Part = { name: 'foot_f', attach: 'foot_f', space: 'local', geometry: footGeometry(), fill: { slot: 'furShade' } };
 const TAIL: Part = { name: 'tail', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: true, points: tailOutline(), roundness: TAIL_ROUNDNESS }, fill: { slot: 'fur' }, skin: TAIL_BONES };
 const TORSO_PART: Part = { name: 'torso', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: true, points: TORSO }, fill: { slot: 'fur' }, skin: TORSO_SKIN };
 const THIGH_N: Part = { name: 'thigh_n', attach: 'thigh_n', space: 'rig', geometry: thighGeometry([0, 0]), fill: { slot: 'fur' } };
-const SHIN_N: Part = { name: 'shin_n', attach: 'shin_n', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(49.2, 7.6, 4.6) }, fill: { slot: 'fur' } };
+const SHIN_N: Part = { name: 'shin_n', attach: 'shin_n', space: 'local', geometry: { kind: 'contour', closed: true, points: shin(49.2, SHIN_W[0], SHIN_W[1]) }, fill: { slot: 'fur' } };
 const FOOT_N: Part = { name: 'foot_n', attach: 'foot_n', space: 'local', geometry: footGeometry(), fill: { slot: 'fur' } };
 const JAW: Part = {
   name: 'jaw',
   attach: 'jaw',
   space: 'rig',
-  // A short chin, tucked under the overhanging upper lip (a wallaby's, not a dog's long lower jaw).
-  geometry: { kind: 'contour', closed: true, points: [[52, -170], [66, -170.6], [77, -171], [76, -167.4], [69, -163.6], [56, -162.6], [45, -163.8], [41, -167]] },
+  // A short, rounded chin, tucked under the overhanging upper lip (a wallaby's, not a dog's long lower jaw).
+  geometry: { kind: 'contour', closed: true, points: [[52, -170], [66, -170.6], [76.5, -171], [77, -168.6], [73, -164.8], [64, -162.6], [53, -162.4], [44.5, -163.6], [40.5, -166.8]] },
   fill: { slot: 'accent' },
   stroke: FINE,
 };
