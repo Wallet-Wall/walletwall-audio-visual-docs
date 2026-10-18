@@ -1,4 +1,4 @@
-// WalletWallaby rig v4, authored as code: skeleton, IK constraints, silhouette,
+// WalletWallaby rig v5, authored as code: skeleton, IK constraints, silhouette,
 // paint slots, draw order, and the pose clips. ./rig-compile.ts turns this into
 // the .riv the Rive runtime loads; ./rig-controls.ts and ./rig-apply.ts pose it
 // per frame. Rive does the body performance (clip blending, IK, skinning,
@@ -26,7 +26,17 @@
 // width, drawn behind every fill) shows only around the union of the parts. The
 // torso, tail, head, and far limbs therefore read as one shape with one outer
 // line; thinner interior lines mark only what is in front of the body (the near
-// forelimb, the near ear, the line of the haunch) and the face. Isomorphic.
+// forelimb, the near ear, the line of the haunch) and the face.
+//
+// v5 (visual language): the belly IS the wall, as WalletWallrus's is: the brick
+// field fills the front of the stomach, widest low, its courses racked back a
+// quarter or half brick at a time with no border of its own. The body is
+// soft-massed like WalletWallrus's: a convex back that sweeps into the tail
+// through a full rump, a rounded haunch, calves, a belly that rounds down over
+// the thigh, a rounded nape. Each forelimb is one skinned limb whose line opens at
+// the front of the shoulder, so it grows out of the chest; the muzzle's profile
+// runs convex to a blunter nose over a rounded chin. The skeleton, IK, and clips
+// are unchanged. Isomorphic.
 
 import { add, len, sampleContour, scale, smoothContour, sub, type ContourPoint, type Vec } from './rig-math.ts';
 
@@ -272,20 +282,6 @@ const INTERIOR: StrokeSpec = { slot: 'ink', width: 2, join: 'round', cap: 'round
 const MORTAR: StrokeSpec = { slot: 'ink', width: 2.6, join: 'round', cap: 'round' };
 const FINE: StrokeSpec = { slot: 'ink', width: 1.5, join: 'round', cap: 'round' };
 
-/** A tapered limb along a bone's local x axis, rounded at both ends. */
-function limb(length: number, w0: number, w1: number): ContourPoint[] {
-  return [
-    [-w0 * 0.7, 0],
-    [0, -w0],
-    [length * 0.5, -(w0 + w1) / 2],
-    [length, -w1],
-    [length + w1 * 0.75, 0],
-    [length, w1],
-    [length * 0.5, (w0 + w1) / 2],
-    [0, w0],
-  ];
-}
-
 // ── The signature tail ──────────────────────────────────────────────────────
 
 const tailSeg = TAIL_REST.slice(1).map((p, i) => Math.hypot(p[0] - TAIL_REST[i]![0], p[1] - TAIL_REST[i]![1]));
@@ -310,12 +306,20 @@ function tailAt(u: number): { p: Vec; n: Vec } {
   return { p: TAIL_REST[TAIL_REST.length - 1]!, n: [0, 1] };
 }
 
-const TAIL_STATIONS = [0, 0.08, 0.18, 0.3, 0.42, 0.54, 0.66, 0.77, 0.87, 0.94] as const;
+/**
+ * Extra width on the tail's upper edge near the root (px): the muscle where the tail grows out of the rump,
+ * filling the corner between the back and the tail so the tail reads as a counterweight the hips carry.
+ * It is gone by a third of the way along; the taper beyond is unchanged.
+ */
+const tailRootMass = (u: number): number => 10 * Math.exp(-(((u - 0.05) / 0.08) ** 2));
+
+const TAIL_STATIONS = [0, 0.08, 0.13, 0.18, 0.3, 0.42, 0.54, 0.66, 0.77, 0.87, 0.94] as const;
 const TAIL_ROUNDNESS = 0.9;
-/** A point offset from the tail's centreline by `k` half-widths (+1: the upper edge, -1: the underside). */
+/** A point offset from the tail's centreline by `k` half-widths (+1: the upper edge, -1: the underside); the upper side carries the root mass. */
 const tailSide = (u: number, k: number): ContourPoint => {
   const { p, n } = tailAt(u);
-  return [p[0] + n[0] * tailHalf(u) * k, p[1] + n[1] * tailHalf(u) * k];
+  const d = (tailHalf(u) + (k > 0 ? tailRootMass(u) : 0)) * k;
+  return [p[0] + n[0] * d, p[1] + n[1] * d];
 };
 const tailTip = (): ContourPoint => {
   const tip = tailAt(1).p;
@@ -349,40 +353,37 @@ function tailUnderside(): ContourPoint[] {
 
 // ── The torso and its brick belly ───────────────────────────────────────────
 
+/**
+ * The torso: soft-massed, as WalletWallrus is. The back runs in one convex arc from a full rump to the
+ * nape; the belly is the deepest part of the body (the wall WalletWallaby carries, as WalletWallrus does)
+ * and rounds down in front of the haunch; the chest is a little narrower; the neck is short and thick
+ * where it runs up into the head.
+ */
 const TORSO: readonly ContourPoint[] = [
-  [-45, -61],
-  [-49, -82],
-  [-41, -104],
-  [-28, -124],
-  [-13, -146],
-  [1, -164],
-  [15, -180],
-  [27, -188],
-  [38, -172],
-  [44, -156],
-  [44, -139],
-  [38, -123],
-  [27, -108],
-  [17, -92],
-  [7, -77],
-  [-8, -63],
-  [-26, -56],
+  [-46, -61],
+  // A full rump: the back rounds down into the tail's root.
+  [-55, -86],
+  [-50.5, -99],
+  // The back: one convex arc from the hips to the nape.
+  [-41.1, -118.1],
+  [-30.1, -135.6],
+  [-17.1, -151.8],
+  [-2, -166.5],
+  // The nape rounds up into the back of the skull.
+  [9.5, -182],
+  [16.5, -189],
+  [27, -189],
+  [42.5, -171.5],
+  [47.5, -156],
+  [48, -139],
+  [44, -122.5],
+  [36, -106.5],
+  [26.5, -89.5],
+  [16.5, -73.5],
+  [-2, -60],
+  [-25, -56],
 ];
 const TORSO_SKIN: readonly RigBone[] = ['hip', 'chest', 'neck'];
-
-/**
- * The stomach's brick field is bounded at the back by a line parallel to the
- * spine (where the belly turns into the flank): `v` measures across the spine,
- * toward the belly, from the hip joint.
- */
-const SPINE_O: Vec = [-20, -78];
-const SPINE_A: Vec = scale([36, -78], 1 / len([36, -78]));
-const SPINE_B: Vec = [-SPINE_A[1], SPINE_A[0]];
-/** The field's back edge at height y (rest pose): the point at across-spine offset `v` on that horizontal. */
-const fieldBackAt = (y: number, v: number): Vec => {
-  const u = (y - SPINE_O[1] - v * SPINE_B[1]) / SPINE_A[1];
-  return add(SPINE_O, add(scale(SPINE_A, u), scale(SPINE_B, v)));
-};
 
 /** The torso's drawn outline (the smoothed contour, finely sampled). */
 const TORSO_LINE: readonly Vec[] = sampleContour(smoothContour(TORSO, true, 1), true, 24);
@@ -405,51 +406,67 @@ function torsoEdge(p: Vec, d: Vec): Vec {
   return add(p, scale(d, best));
 }
 
-/** Back edge of the brick field (across-spine offset, px): the field takes the front of the stomach, rounding out at its middle. */
-const BRICK_BACK_V = -10;
-const BRICK_BACK_BULGE = 4;
-/** Bed joints at rest, bottom to top (y, px): four bold courses from the haunch up to the chest. */
-const BRICK_BEDS = [-91, -104.5, -118, -131.5, -145] as const;
-/** Brick length (twice the course height) and the running bond's half-brick offset between courses. */
+/**
+ * Bed joints at rest, bottom to top (y, px): four courses up the stomach (the chest above is coat). They
+ * cross the haunch's arc rather than run along it, and the lowest course runs down behind the haunch
+ * with no bed under it.
+ */
+const BRICK_BEDS = [-77, -90.5, -104, -117.5, -131] as const;
+/** Brick length (twice the course height) and the running bond: course k's head joints at BRICK_X0 + (k odd ? half a brick : 0) + n bricks. */
 const BRICK_LEN = 27;
-const BRICK_X0 = 1;
-/** A head joint closer than this to either end of its course is left out (no slivers). */
-const BRICK_MIN_END = 6;
+const BRICK_X0 = 2.5;
+/**
+ * Where each course ends at the back (x, px), bottom course first, as a wall's end is racked back:
+ * each course up stops a quarter or a half brick further forward (closing with a bat where the bond
+ * needs one), keeping a band of coat along the flank, so the wall fills the front mass of the stomach (about
+ * three quarters of the torso's depth there), and its back edge is the bricks' own toothed end, never a
+ * border. The lowest course ends behind the haunch.
+ */
+const BRICK_ENDS = [-24.5, -24.5, -17.75, -4.25] as const;
+/** A head joint closer than this to either end of its course is left out (no slivers; with BRICK_X0, every back end closes with a half or three-quarter bat or a whole brick). */
+const BRICK_MIN_END = 8;
+/** Mortar lines are drawn through points at most this far apart (px), so the skinning bends them with the body. */
+const MORTAR_STEP = 7;
 
-const brickTop = BRICK_BEDS[BRICK_BEDS.length - 1]!;
-const brickBottom = BRICK_BEDS[0]!;
-/** The field's back edge at height y: parallel to the spine, bulging back a little at the middle (a rounded belly). */
-const brickBack = (y: number): Vec => fieldBackAt(y, BRICK_BACK_V - BRICK_BACK_BULGE * Math.sin((Math.PI * (y - brickTop)) / (brickBottom - brickTop)));
-/** Where a level line at height y meets the front of the torso. */
-const brickFront = (y: number): Vec => torsoEdge(brickBack(y), [1, 0]);
+/** Where a level line at height y, from x, meets the front of the torso. */
+const brickFront = (x: number, y: number): Vec => torsoEdge([x, y], [1, 0]);
+/** A mortar line from a to b, through evenly spaced points (open). */
+function mortarLine(a: Vec, b: Vec): ContourSpec {
+  const n = Math.max(1, Math.ceil(len(sub(b, a)) / MORTAR_STEP));
+  return { points: Array.from({ length: n + 1 }, (_, i): ContourPoint => add(a, scale(sub(b, a), i / n))), closed: false };
+}
 
 /**
  * The brick belly: the WalletWall brick motif built into the stomach, exactly as
- * on WalletWallrus. Courses of bricks in the coat's own colour, laid level
- * in running bond and marked out only by charcoal mortar. The front of the
- * stomach cuts every course (each bed joint runs into the silhouette line), a
- * mortar line closes the field at the top and along the flank, and the haunch
- * covers the lowest course's back. Every mortar line is skinned to the torso's
- * bone chain, so the bricks bend, compress, and stretch with the body that
- * carries them instead of riding on it.
+ * on WalletWallrus, whose stomach IS the wall. Courses of bricks in the coat's
+ * own colour, laid level in running bond and marked out only by charcoal
+ * mortar: bed joints, head joints, and at the back of each course the head
+ * joint where it ends. There is no outline around the field: the front of the
+ * stomach cuts every course (each bed joint runs into the silhouette line), the
+ * racked ends make the back, and the haunch covers the lowest course's back.
+ * Every mortar line is skinned to the torso's bone chain, so the bricks bend,
+ * compress, and stretch with the body that carries them instead of riding on it.
  */
 function brickMortar(): ContourSpec[] {
   const lines: ContourSpec[] = [];
-  const back = brickBack;
-  const front = brickFront;
-  // The flank edge of the field, from below the haunch line up to the top course (densely, to keep its curve).
-  lines.push({ points: Array.from({ length: 9 }, (_, i): ContourPoint => back(brickBottom + ((brickTop - brickBottom) * i) / 8)), closed: false });
-  // Bed joints (the lowest is hidden behind the haunch).
-  for (const y of BRICK_BEDS.slice(1)) lines.push({ points: [back(y), front(y)], closed: false });
-  // Head joints: a half-brick offset between courses (running bond), none that would cut a sliver.
-  for (let k = 0; k < BRICK_BEDS.length - 1; k++) {
+  const courses = BRICK_BEDS.length - 1;
+  // Bed joints above the lowest course: each runs from the back end of the course below it (the further back) to the front.
+  BRICK_BEDS.forEach((y, j) => {
+    if (j === 0) return;
+    const x = BRICK_ENDS[j - 1]!;
+    lines.push(mortarLine([x, y], brickFront(x, y)));
+  });
+  for (let k = 0; k < courses; k++) {
     const y0 = BRICK_BEDS[k]!;
     const y1 = BRICK_BEDS[k + 1]!;
-    const lo = Math.max(back(y0)[0], back(y1)[0]) + BRICK_MIN_END;
-    const hi = Math.min(front(y0)[0], front(y1)[0]) - BRICK_MIN_END;
-    const shift = (k % 2) * (BRICK_LEN / 2);
-    for (let x = BRICK_X0 + shift - BRICK_LEN * 4; x <= hi; x += BRICK_LEN) {
-      if (x >= lo) lines.push({ points: [[x, y0], [x, y1]], closed: false });
+    const end = BRICK_ENDS[k]!;
+    // The course's own end at the back (a stepped, toothed end, never a border line).
+    lines.push(mortarLine([end, y0], [end, y1]));
+    // Head joints in running bond, none that would cut a sliver at either end.
+    const lo = end + BRICK_MIN_END;
+    const hi = Math.min(brickFront(end, y0)[0], brickFront(end, y1)[0]) - BRICK_MIN_END;
+    for (let x = BRICK_X0 + (k % 2) * (BRICK_LEN / 2) - BRICK_LEN * 4; x <= hi; x += BRICK_LEN) {
+      if (x >= lo) lines.push(mortarLine([x, y0], [x, y1]));
     }
   }
   return lines;
@@ -457,39 +474,39 @@ function brickMortar(): ContourSpec[] {
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
+/** Where the cream throat ends on the front of the chest (y, px): above the brick field, with coat between. */
+const THROAT_END = -147;
 /**
- * The cream chest: the inner body's cream, from under the chin down the front of the throat and chest to
- * the top of the brick field (the wallaby's own cream front, as on the WalletWallaby reference). Its front
- * edge is the torso's drawn outline itself, so the cream runs into the silhouette line; it is skinned
- * with the torso.
+ * The cream throat: the inner body's cream, from under the chin down the front of the throat, narrowing to
+ * a rounded point on the chest above the brick field (coat runs between them, so the bricks sit in the
+ * body, not under a bib). Its front edge is the torso's drawn outline itself, so the cream runs into the
+ * silhouette line; it is skinned with the torso.
  */
 function creamChest(): ContourPoint[] {
   const top = -178;
-  const front = TORSO_LINE.filter((p) => p[0] > 25 && p[1] >= top && p[1] < brickTop).map((p): ContourPoint => [p[0], p[1]]);
-  const corner = brickFront(brickTop);
-  // The back edge: a smooth curve from the field's top back up under the jaw.
-  const backEdge = Array.from({ length: 7 }, (_, i): ContourPoint => {
-    const t = i / 6;
-    return [lerp(14, 29, t) - 3 * Math.sin(Math.PI * t), lerp(brickTop, top, t)];
-  });
-  return [...front, [corner[0], corner[1]], ...backEdge];
+  const front = TORSO_LINE.filter((p) => p[0] > 25 && p[1] >= top && p[1] < THROAT_END).map((p): ContourPoint => [p[0], p[1]]);
+  const tip = brickFront(25, THROAT_END);
+  // The back edge: from the point on the chest, a rounded end sweeping back across the throat, then up under the jaw (finely sampled: the shape is drawn unsmoothed).
+  const guide: ContourPoint[] = [[tip[0], tip[1]], [tip[0] - 7, THROAT_END - 2], [lerp(tip[0], 27, 0.6), THROAT_END - 6.5], [27.5, THROAT_END - 13], [28.5, -166], [29.5, top]];
+  const backEdge = sampleContour(smoothContour(guide, false, 1), false, 6).slice(1).map((p): ContourPoint => [p[0], p[1]]);
+  return [...front, [tip[0], tip[1]], ...backEdge];
 }
 
-/** The haunch: the hind leg's big thigh, drawn over the torso. */
+/** The haunch: the hind leg's big thigh, drawn over the torso, a full rounded drumstick down to the knee. */
 const THIGH_POINTS: readonly Vec[] = [
-  [-46, -67],
-  [-43, -85],
+  [-48, -68],
+  [-44, -86],
   [-31, -97],
   [-13, -99],
   [3, -92],
   [14, -74],
   [25, -52],
-  [27, -42],
-  [21, -34],
-  [10, -32],
-  [-4, -39],
-  [-23, -49],
-  [-39, -57],
+  [28, -41.5],
+  [21.5, -32.5],
+  [9, -30],
+  [-5, -35.5],
+  [-25, -45],
+  [-42, -54],
 ];
 const thighPoint = (p: Vec, d: Vec): Vec => {
   const c: Vec = [-8, -66];
@@ -512,6 +529,90 @@ function haunchLine(): ContourPoint[] {
   return samples.slice(steps + 3, steps * 5 + 6).map((p): ContourPoint => [p[0], p[1]]);
 }
 
+// ── The forelimbs ───────────────────────────────────────────────────────────
+
+/** Half-widths along a forelimb (px): the broad shoulder it grows from, the upper arm, the elbow, the forearm, the paw. */
+interface LimbWidths {
+  shoulder: number;
+  upper: number;
+  elbow: number;
+  fore: number;
+  paw: number;
+}
+const FORELIMB_N: LimbWidths = { shoulder: 9.5, upper: 6.7, elbow: 5.2, fore: 4.5, paw: 4.3 };
+const FORELIMB_F: LimbWidths = { shoulder: 8.8, upper: 6.2, elbow: 4.9, fore: 4.2, paw: 4 };
+/**
+ * The near forelimb's line, like the haunch's over the thigh, wraps the back of the shoulder and runs down
+ * the back of the limb, round the paw, and up its front to this far from the shoulder joint (px); the
+ * front of the shoulder has no line, so the limb grows out of the chest.
+ */
+const LIMB_LINE_FRONT_FROM = 12;
+
+const unit = (v: Vec): Vec => scale(v, 1 / len(v));
+/** The left-hand normal (toward the limb's lower side when it points forward). */
+const normal = (v: Vec): Vec => [-v[1], v[0]];
+
+/**
+ * A forelimb as one continuous shape from the shoulder to the paw, in rig space at rest, skinned to its
+ * two bones (so it bends at the elbow as one limb, with no seam or cap there). `d` offsets the far limb.
+ * Returns the closed outline and the open edge that skips the front of the shoulder (where the limb grows
+ * out of the chest, there is no line).
+ */
+function forelimb(d: Vec, w: LimbWidths): { outline: ContourPoint[]; edge: ContourPoint[] } {
+  const s = off(SHOULDER, d);
+  const e = off(ELBOW, d);
+  const p = off(PAW, d);
+  const a = unit(sub(e, s));
+  const f = unit(sub(p, e));
+  const la = len(sub(e, s));
+  const lf = len(sub(p, e));
+  const nElbow = unit(add(normal(a), normal(f)));
+  // Centreline stations: distance along the limb, point, normal, half-width.
+  const stations: { at: number; c: Vec; n: Vec; hw: number }[] = [
+    { at: -5, c: add(s, scale(a, -5)), n: normal(a), hw: w.shoulder },
+    { at: 0, c: s, n: normal(a), hw: w.shoulder * 0.94 },
+    { at: la * 0.4, c: add(s, scale(a, la * 0.4)), n: normal(a), hw: w.upper },
+    { at: la * 0.75, c: add(s, scale(a, la * 0.75)), n: normal(a), hw: (w.upper + w.elbow) / 2 },
+    { at: la, c: e, n: nElbow, hw: w.elbow },
+    { at: la + lf * 0.35, c: add(e, scale(f, lf * 0.35)), n: normal(f), hw: w.fore },
+    { at: la + lf * 0.7, c: add(e, scale(f, lf * 0.7)), n: normal(f), hw: (w.fore + w.paw) / 2 },
+    { at: la + lf, c: p, n: normal(f), hw: w.paw },
+  ];
+  const side = (k: number) => stations.map((st) => ({ at: st.at, pt: add(st.c, scale(st.n, st.hw * k)) as Vec }));
+  const upper = side(-1);
+  const lower = side(1);
+  const tip: Vec = add(p, scale(f, w.paw * 0.75));
+  const root: Vec = add(s, scale(a, -5 - w.shoulder * 0.7));
+  const outline: ContourPoint[] = [root, ...upper.map((v) => v.pt), tip, ...[...lower].reverse().map((v) => v.pt)];
+  // The open edge: down the front (upper side) from LIMB_LINE_FRONT_FROM, round the paw, up the back (lower side), and halfway over the back of the shoulder.
+  const k = upper.findIndex((v) => v.at >= LIMB_LINE_FRONT_FROM);
+  const t = (LIMB_LINE_FRONT_FROM - upper[k - 1]!.at) / (upper[k]!.at - upper[k - 1]!.at);
+  const front = [add(upper[k - 1]!.pt, scale(sub(upper[k]!.pt, upper[k - 1]!.pt), t)), ...upper.slice(k).map((v) => v.pt)];
+  const overShoulder: Vec = add(stations[0]!.c, scale(unit(sub(normal(a), a)), w.shoulder));
+  const edge: ContourPoint[] = [...front, tip, ...[...lower].reverse().map((v) => v.pt), overShoulder];
+  return { outline, edge };
+}
+
+/** Shin half-widths at the knee and the heel (px): full at the knee, so the shin grows out of the haunch rather than meeting it at a corner. */
+const SHIN_W = [8.8, 4.9] as const;
+/**
+ * The shin along its bone's local x (knee at 0, heel at `length`): a tapered limb, rounded at both ends,
+ * with a rounded calf on its back (+y) side below the knee, which fills the corner behind the knee.
+ */
+function shin(length: number, w0: number, w1: number): ContourPoint[] {
+  return [
+    [-w0 * 0.7, 0],
+    [0, -w0],
+    [length * 0.5, -(w0 + w1) / 2],
+    [length, -w1],
+    [length + w1 * 0.75, 0],
+    [length, w1],
+    [length * 0.6, w1 + 1.2],
+    [length * 0.25, w0 + 2],
+    [0, w0 + 0.6],
+  ];
+}
+
 function footGeometry(): Geometry {
   return {
     kind: 'contour',
@@ -532,24 +633,30 @@ const EAR_F: Part = {
   geometry: { kind: 'contour', closed: true, points: [[-3, 8], [12, 10], [28, 9], [44, 5], [56, 0, 'corner'], [44, -5], [28, -8.5], [12, -9], [-3, -7]] },
   fill: { slot: 'furShade' },
 };
-const ARM_F: Part = { name: 'arm_f', attach: 'arm_f', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(29, 6, 4.4) }, fill: { slot: 'furShade' } };
-const FOREARM_F: Part = { name: 'forearm_f', attach: 'forearm_f', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(21, 4.4, 3.8) }, fill: { slot: 'furShade' } };
+const FORELIMB_F_SHAPE = forelimb(FAR_ARM, FORELIMB_F);
+const FORELIMB_N_SHAPE = forelimb([0, 0], FORELIMB_N);
+const FORELIMB_F_PART: Part = { name: 'forelimb_f', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: true, points: FORELIMB_F_SHAPE.outline }, fill: { slot: 'furShade' }, skin: ['arm_f', 'forearm_f'] };
 const THIGH_F: Part = { name: 'thigh_f', attach: 'thigh_f', space: 'rig', geometry: thighGeometry(FAR_LEG), fill: { slot: 'furShade' } };
-const SHIN_F: Part = { name: 'shin_f', attach: 'shin_f', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(49.2, 7.6, 4.6) }, fill: { slot: 'furShade' } };
+const SHIN_F: Part = { name: 'shin_f', attach: 'shin_f', space: 'local', geometry: { kind: 'contour', closed: true, points: shin(49.2, SHIN_W[0], SHIN_W[1]) }, fill: { slot: 'furShade' } };
 const FOOT_F: Part = { name: 'foot_f', attach: 'foot_f', space: 'local', geometry: footGeometry(), fill: { slot: 'furShade' } };
 const TAIL: Part = { name: 'tail', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: true, points: tailOutline(), roundness: TAIL_ROUNDNESS }, fill: { slot: 'fur' }, skin: TAIL_BONES };
 const TORSO_PART: Part = { name: 'torso', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: true, points: TORSO }, fill: { slot: 'fur' }, skin: TORSO_SKIN };
 const THIGH_N: Part = { name: 'thigh_n', attach: 'thigh_n', space: 'rig', geometry: thighGeometry([0, 0]), fill: { slot: 'fur' } };
-const SHIN_N: Part = { name: 'shin_n', attach: 'shin_n', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(49.2, 7.6, 4.6) }, fill: { slot: 'fur' } };
+const SHIN_N: Part = { name: 'shin_n', attach: 'shin_n', space: 'local', geometry: { kind: 'contour', closed: true, points: shin(49.2, SHIN_W[0], SHIN_W[1]) }, fill: { slot: 'fur' } };
 const FOOT_N: Part = { name: 'foot_n', attach: 'foot_n', space: 'local', geometry: footGeometry(), fill: { slot: 'fur' } };
 const JAW: Part = {
   name: 'jaw',
   attach: 'jaw',
   space: 'rig',
-  geometry: { kind: 'contour', closed: true, points: [[52, -170], [68, -171], [80, -171.5], [78.5, -167], [70, -163], [56, -162], [45, -163.5], [41, -167]] },
+  // A short, rounded chin, tucked under the overhanging upper lip (a wallaby's, not a dog's long lower jaw).
+  geometry: { kind: 'contour', closed: true, points: [[52, -170], [66, -170.6], [76.5, -171], [77, -168.6], [73, -164.8], [64, -162.6], [53, -162.4], [44.5, -163.6], [40.5, -166.8]] },
   fill: { slot: 'accent' },
   stroke: FINE,
 };
+/**
+ * The head: a rounded crown running in one convex line (no stop, no dished bridge) down a deep muzzle to
+ * a blunt nose, with a full cheek; the macropod profile rather than a canine or deer wedge.
+ */
 const HEAD: Part = {
   name: 'head',
   attach: 'head',
@@ -561,17 +668,18 @@ const HEAD: Part = {
       [17, -183],
       [21, -197],
       [31, -206],
-      [45, -209],
-      [58, -204],
-      [69, -194],
-      [79, -186],
-      [87, -180],
-      [89, -175],
-      [85, -171],
-      [74, -170],
-      [61, -168],
-      [47, -166],
-      [33, -166],
+      [45, -209.5],
+      [58, -205.5],
+      [69, -198],
+      [79, -190],
+      [86.5, -184],
+      [90.5, -178.5],
+      [90, -173.5],
+      [85.5, -170.5],
+      [74, -169.5],
+      [61, -167.5],
+      [48, -165],
+      [34, -165.5],
       [23, -172],
     ],
   },
@@ -585,11 +693,10 @@ const EAR_N: Part = {
   fill: { slot: 'fur' },
   stroke: INTERIOR,
 };
-const ARM_N: Part = { name: 'arm_n', attach: 'arm_n', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(29, 6.4, 4.6) }, fill: { slot: 'fur' }, stroke: INTERIOR };
-const FOREARM_N: Part = { name: 'forearm_n', attach: 'forearm_n', space: 'local', geometry: { kind: 'contour', closed: true, points: limb(21, 4.6, 4) }, fill: { slot: 'fur' }, stroke: INTERIOR };
+const FORELIMB_N_PART: Part = { name: 'forelimb_n', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: true, points: FORELIMB_N_SHAPE.outline }, fill: { slot: 'fur' }, skin: ['arm_n', 'forearm_n'] };
 
 /** Every part of the one silhouette, in draw order (back to front). */
-const PARTS: readonly Part[] = [EAR_F, ARM_F, FOREARM_F, THIGH_F, SHIN_F, FOOT_F, TAIL, TORSO_PART, THIGH_N, SHIN_N, FOOT_N, JAW, HEAD, EAR_N, ARM_N, FOREARM_N];
+const PARTS: readonly Part[] = [EAR_F, FORELIMB_F_PART, THIGH_F, SHIN_F, FOOT_F, TAIL, TORSO_PART, THIGH_N, SHIN_N, FOOT_N, JAW, HEAD, EAR_N, FORELIMB_N_PART];
 /** The parts whose contour forms the silhouette underlay. */
 export const SILHOUETTE_PARTS: readonly string[] = PARTS.map((p) => p.name);
 
@@ -604,9 +711,9 @@ export const SHAPES: readonly ShapeSpec[] = [
   ...PARTS.map(underlayOf),
 
   // Far side, in the derived shade.
-  ...[EAR_F, ARM_F, FOREARM_F, THIGH_F, SHIN_F, FOOT_F].map(shapeOf),
+  ...[EAR_F, FORELIMB_F_PART, THIGH_F, SHIN_F, FOOT_F].map(shapeOf),
 
-  // The tail and the torso: one coat, joined without a seam. The tail's underside and the throat and chest are cream.
+  // The tail and the torso: one coat, joined without a seam. The tail's underside and the throat are cream.
   shapeOf(TAIL),
   { name: 'tail_underside', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: true, points: tailUnderside(), roundness: TAIL_ROUNDNESS }, fill: { slot: 'accent' }, skin: TAIL_BONES },
   shapeOf(TORSO_PART),
@@ -621,17 +728,17 @@ export const SHAPES: readonly ShapeSpec[] = [
   { name: 'claws_n', attach: 'foot_n', space: 'local', geometry: { kind: 'contour', closed: false, points: [[60, -1.5], [64, 0.2], [67.5, 1.6]] }, stroke: { slot: 'ink', width: 1.4, cap: 'round', join: 'round' } },
 
   // Head: mouth interior behind the jaw, the jaw behind the upper head; a cream muzzle and a round charcoal nose.
-  { name: 'mouth', attach: 'head', space: 'rig', geometry: { kind: 'contour', closed: true, points: [[56, -169], [82, -171], [79, -164], [60, -163]] }, fill: { slot: 'ink' } },
+  { name: 'mouth', attach: 'head', space: 'rig', geometry: { kind: 'contour', closed: true, points: [[56, -169], [80, -171], [77, -165], [60, -163.5]] }, fill: { slot: 'ink' } },
   shapeOf(JAW),
   shapeOf(HEAD),
   {
     name: 'muzzle',
     attach: 'head',
     space: 'rig',
-    geometry: { kind: 'contour', closed: true, points: [[47, -169.6], [55, -175.4], [67, -178.6], [79, -179], [86.6, -176.6], [86.2, -172.2], [76, -170.6], [62, -169.6]] },
+    geometry: { kind: 'contour', closed: true, points: [[47, -169.4], [55, -175.6], [67, -179.4], [79, -180.4], [87, -178], [87.6, -172.6], [76, -170.4], [62, -169.4]] },
     fill: { slot: 'accent' },
   },
-  { name: 'nose', attach: 'head', space: 'rig', geometry: { kind: 'contour', closed: true, points: [[82.6, -181.6], [88.4, -180.6], [90.8, -176.8], [89.4, -173], [85.2, -172.8], [82.2, -176.2]] }, fill: { slot: 'ink' } },
+  { name: 'nose', attach: 'head', space: 'rig', geometry: { kind: 'contour', closed: true, points: [[83.6, -183.4], [89.4, -182.4], [92.2, -178.2], [90.8, -174], [86.4, -173.4], [83.2, -177.4]] }, fill: { slot: 'ink' } },
   { name: 'eye', attach: 'gaze', space: 'rig', geometry: { kind: 'ellipse', center: [57.5, -191.4], width: 10.4, height: 11.2 }, fill: { slot: 'ink' } },
   { name: 'glint', attach: 'gaze', space: 'rig', geometry: { kind: 'ellipse', center: [59.7, -193.5], width: 3.2, height: 3.2 }, fill: { slot: 'accent' } },
   {
@@ -654,9 +761,9 @@ export const SHAPES: readonly ShapeSpec[] = [
     fill: { slot: 'innerEar' },
   },
 
-  // Near forelimb in front of the body, with charcoal claws.
-  shapeOf(ARM_N),
-  shapeOf(FOREARM_N),
+  // Near forelimb in front of the body, with charcoal claws. Its line opens at the shoulder: the limb grows out of the chest.
+  shapeOf(FORELIMB_N_PART),
+  { name: 'forelimb_n_line', attach: 'root', space: 'rig', geometry: { kind: 'contour', closed: false, points: FORELIMB_N_SHAPE.edge }, stroke: INTERIOR, skin: ['arm_n', 'forearm_n'] },
   { name: 'paw_claws', attach: 'forearm_n', space: 'local', geometry: { kind: 'contour', closed: false, points: [[23.4, -2.6], [26.4, -0.6], [27.4, 2]] }, stroke: { slot: 'ink', width: 1.2, cap: 'round', join: 'round' } },
 ];
 
