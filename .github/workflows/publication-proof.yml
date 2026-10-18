@@ -1,0 +1,106 @@
+name: Publication Proof
+
+# A full proof render for human review: the whole video with the fixture voice, the publish dry run
+# against that exact render, and the public-output gate with the render required (render identity,
+# MP4 bytes, provenance, and the publish manifest must all agree with this checkout). The proof package
+# is uploaded for a human to review. Too heavy for every pull request, so it runs on demand and after
+# changes on main that can change a frame or the publication package; it is not a required check.
+#
+# Publication safety invariant:
+#   CI CAN prove publication readiness. CI MUST NOT publish.
+#   - This workflow NEVER uploads to YouTube. It holds no YouTube, Google OAuth, voice-provider, or
+#     repository-write credential: the token is read-only (contents: read), the checkout does not
+#     persist it, and no secret or variable is referenced.
+#   - Human review of the proof package is mandatory before any publication. Actual publication is a
+#     separate, explicitly authorized, human-triggered action, and initial uploads stay UNLISTED.
+#   - The render is a review render: silent fixture narration with captions burned in so it can be
+#     watched; YouTube receives captions as a sidecar file.
+#
+# Every action is pinned to a full commit SHA; the comment names the release it was resolved from.
+
+on:
+  workflow_dispatch:
+    inputs:
+      motion-engine:
+        description: Motion engine for the proof render (rust-wasm stays opt-in)
+        type: choice
+        options:
+          - typescript
+          - rust-wasm
+        default: typescript
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'specs/**'
+      - 'config/**'
+      - 'contracts/**'
+      - 'assets/**'
+      - 'fixtures/**'
+      - 'manifests/**'
+      - 'motion-intelligence/wasm/**'
+      - 'scripts/render.ts'
+      - 'scripts/publish-dry-run.ts'
+      - 'scripts/public-output-check.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/publication-proof.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  proof:
+    name: Publication proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Chrome Headless Shell (the version @remotion/renderer pins)
+        run: npx remotion browser ensure
+
+      - name: Validate specs
+        run: npm run validate
+
+      - name: Full render with the fixture voice
+        env:
+          MOTION_ENGINE: ${{ inputs.motion-engine || 'typescript' }}
+        run: |
+          case "$MOTION_ENGINE" in
+            typescript | rust-wasm) ;;
+            *) echo "::error::unknown motion engine"; exit 2 ;;
+          esac
+          npm run render -- --motion-engine="$MOTION_ENGINE"
+
+      - name: Publish dry run against this exact render
+        run: npm run publish:dry-run
+
+      - name: Public-output gate, render required (writes the proof package)
+        run: npm run public:check -- --require-render --bundle="$RUNNER_TEMP/publication-proof" --summary="$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the proof package for human review
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: publication-proof-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/publication-proof
+          if-no-files-found: error
+          retention-days: 14

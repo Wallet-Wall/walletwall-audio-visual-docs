@@ -16,7 +16,7 @@ import { FixtureVoiceProvider } from '../src/audio/voice-provider.ts';
 import { loadPipelineConfig, readJson, VIDEO_ROOT } from '../src/config/load.ts';
 import { buildIdentity } from '../src/manifest/build-identity.ts';
 import { prettyJson } from '../src/core/canonical-json.ts';
-import { sha256Hex } from '../src/core/hash.ts';
+import { contentAddress, sha256Hex } from '../src/core/hash.ts';
 import { typescriptEngineIdentity, type MotionEngineIdentity } from '../src/motion/engine-identity.ts';
 import { planRustMotion } from '../src/motion/rust-adapter.ts';
 import { distDir, loadCommittedSpec, loadRegistry, validationContextFor } from '../src/pipeline/context.ts';
@@ -37,6 +37,9 @@ if (engineArg !== 'typescript' && engineArg !== 'rust-wasm') {
 
 const config = loadPipelineConfig();
 const spec = loadCommittedSpec(videoId);
+// Recorded in render.json and stills.json: an on-screen text edit changes neither the timeline nor the
+// build identity, so only the spec hash ties the frames to the spec they show.
+const specHash = contentAddress(spec);
 
 // Fail closed: nothing renders unless the spec passes the publishability gate.
 const gate = validateSpec(spec, validationContextFor(spec, config));
@@ -106,7 +109,7 @@ if (flag('--stills')) {
     }
   }
   // Lossless frames are the determinism evidence (MP4 bytes are not run-to-run stable).
-  writeFileSync(path.join(stillsDir, 'stills.json'), prettyJson({ schema: 'walletwall.stills-info/v1', videoId, revision: spec.revision, motionEngine, identity: buildIdentity(), stills }));
+  writeFileSync(path.join(stillsDir, 'stills.json'), prettyJson({ schema: 'walletwall.stills-info/v2', videoId, revision: spec.revision, specHash, motionEngine, identity: buildIdentity(), stills }));
   console.log(`[render] ${picks.length * 2} stills -> ${stillsDir}`);
 } else {
   const output = path.join(out, `${videoId}.r${spec.revision}.mp4`);
@@ -127,9 +130,10 @@ if (flag('--stills')) {
     },
   });
   const info = {
-    schema: 'walletwall.render-info/v3',
+    schema: 'walletwall.render-info/v4',
     videoId,
     revision: spec.revision,
+    specHash,
     engine: { name: 'remotion', version: remotionVersion, compositionId: COMPOSITION_ID },
     fps: timeline.fps,
     frames: totalFrames(timeline),

@@ -108,6 +108,8 @@ npm run pipeline migration-readiness           # every gate, then stills, MP4, a
 | `npm run render:stills` | Settled frame of every segment and transition, plus characterless variants. |
 | `npm run render` | Full MP4 into `dist/<id>/<id>.r<revision>.mp4` plus `render.json`. |
 | `npm run publish:dry-run` | Captions (VTT/SRT), semantic cue sheet, provenance, media QA, and the YouTube publish manifest; dry-run receipt only. |
+| `npm run public:check` | The public-output gate over `dist/<id>/` after `publish:dry-run`: dry run only, unlisted, captions, manifest, provenance, and build identity, with no placeholder text or local paths. `--stills=<dir>` adds review stills, `--require-render` the MP4. See [docs/CI.md](docs/CI.md). |
+| `npm run stills:compare -- <a> <b>` | Repeat-render determinism: two `render:stills` outputs must be byte-identical. |
 | `npm run studio` | Remotion Studio preview of the committed spec. |
 
 The first render downloads Remotion's pinned headless Chrome. Everything generated goes to `dist/`, which is never committed.
