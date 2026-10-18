@@ -12,8 +12,8 @@ use crate::config::MotionConfig;
 use crate::math::Vec2;
 use crate::terrain::{Stage, Terrain};
 
-/// A semantic action, as the lesson names it. v1 performs `Hop`, `Land`, and `Perch` (which all
-/// arrive by the same physical traversal); the others are refused with
+/// A semantic action, as the lesson names it. The engine performs `Hop`, `Land`, and `Perch` (which
+/// all arrive by the same physical traversal); the others are refused with
 /// [`crate::MotionErrorCode::UnsupportedAction`] until a later lane implements them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -129,6 +129,11 @@ pub struct Stance {
     pub crouch: f64,
     /// Tail swing relative to the body, degrees (positive raises the tip).
     pub tail_deg: f64,
+    /// Tail curl along its length, degrees per segment (positive curls the tip up): a stance that
+    /// leans in to inspect lifts and curls the tail as a counterweight.
+    pub tail_curl: f64,
+    /// How hard the tail works holding the stance, 0..1.
+    pub tail_tension: f64,
 }
 
 /// The authored postures the traversal leaves from and settles into (continuity with whatever
@@ -166,7 +171,7 @@ pub struct MotionInput {
     pub fps: u32,
     /// The visible frame.
     pub stage: Stage,
-    /// Surfaces under the start and the target.
+    /// Surfaces under the start and the target, the text to keep clear, and the figure's box.
     pub terrain: Terrain,
     /// Postures at both ends.
     pub stance: StanceChange,
@@ -263,6 +268,42 @@ pub struct Trajectory {
     pub flight_ms: f64,
     /// Apex height above the higher endpoint, px.
     pub apex_above_px: f64,
+    /// The arc the surface-aware search kept: its apex as a fraction of the natural apex (one of
+    /// [`crate::hop::ARC_CANDIDATES`]; 1 = the natural arc).
+    pub arc_fraction: f64,
+    /// Flight samples (of [`crate::hop::FLIGHT_SAMPLES`]) whose figure box crosses protected text.
+    pub text_crossings: u32,
+}
+
+/// Which contact a [`ContactEvent`] is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ContactKind {
+    /// The push-off: the feet leave the start.
+    Takeoff,
+    /// Touchdown: the feet arrive on the target.
+    Landing,
+}
+
+/// A contact between the feet and the terrain, as the scene should react to it (a platform's dip, a
+/// contact sound). The plan states its own contacts so that nothing downstream has to re-derive
+/// them from another solver.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContactEvent {
+    /// Push-off or touchdown.
+    pub kind: ContactKind,
+    /// When, absolute ms: exactly the liftoff or the contact instant.
+    pub at_ms: f64,
+    /// Normalised strength, 0..1: vertical speed at that end of the flight over the touchdown speed
+    /// of a fall from `landing.impulseReferenceBodyHeights`.
+    pub impulse: f64,
+    /// Where the feet are: exactly the start (takeoff) or the target (landing).
+    pub position: Vec2,
+    /// Character scale there.
+    pub scale: f64,
+    /// What the feet push off from or land on.
+    pub contact: Contact,
 }
 
 /// Which video frames the plan samples: `first .. first + count`.
@@ -304,10 +345,8 @@ pub struct MotionPlan {
     pub timing: PlanTiming,
     /// The flight.
     pub trajectory: Trajectory,
-    /// Normalised push-off impulse, 0..1.
-    pub takeoff_impulse: f64,
-    /// Normalised touchdown impulse, 0..1.
-    pub landing_impulse: f64,
+    /// The plan's contacts with the terrain, in time order: the takeoff, then the landing.
+    pub events: Vec<ContactEvent>,
     /// Every non-empty phase window, in order, covering the window exactly.
     pub phases: Vec<PhaseWindow>,
     /// The sampled frame grid.

@@ -1,7 +1,8 @@
 // npm run motion:bench -> measure the Rust/WASM Motion Intelligence engine on the committed lesson's
-// takeaway path: artifact size, module compile and instantiate time, solve time, and the cost of
-// binding and sampling the plan in the composition. Informational; nothing here is a gate, and the
-// numbers are machine-dependent (they are not part of any committed fixture).
+// engine paths: artifact size, module compile and instantiate time, solve time (the takeaway path,
+// then every path), and the cost of binding and sampling the plans in the composition.
+// Informational; nothing here is a gate, and the numbers are machine-dependent (they are not part
+// of any committed fixture).
 
 import { gzipSync } from 'node:zlib';
 import { FixtureVoiceProvider } from '../src/audio/voice-provider.ts';
@@ -44,12 +45,14 @@ console.log(`engine load  ${fmt(time(10, () => RustMotionEngine.load()))} (read 
 
 const engine = RustMotionEngine.load();
 const { inputs } = rustInputsFor(args);
-const input = inputs[0]!.input;
+const input = inputs.find((i) => i.selection.segmentId === 'takeaway')!.input;
 const solved = engine.solve(input);
 const raw = new TextEncoder().encode(JSON.stringify(input));
-console.log(`plan         ${solved.plan.frames.count} frames, ${solved.bytes.length} bytes, sha256 ${solved.sha256}`);
-console.log(`solve (raw)  ${fmt(time(200, () => engine.solveBytes(raw)))} (WASM only: parse, solve, simulate, sample, check, serialize)`);
+console.log(`plan         ${solved.plan.frames.count} frames, ${solved.bytes.length} bytes, sha256 ${solved.sha256} (takeaway)`);
+console.log(`solve (raw)  ${fmt(time(200, () => engine.solveBytes(raw)))} (WASM only: parse, arc search, solve, simulate, sample, check, serialize)`);
 console.log(`solve        ${fmt(time(200, () => engine.solve(input)))} (+ JSON encode/decode and TypeScript plan validation)`);
+const frameTotal = inputs.reduce((n, i) => n + engine.solve(i.input).plan.frames.count, 0);
+console.log(`solve all    ${fmt(time(20, () => inputs.forEach((i) => engine.solve(i.input))))} (${inputs.length} paths, ${frameTotal} frames)`);
 console.log(`plan render  ${fmt(time(20, () => planRustMotion(args, engine)))} (everything the render script adds: choreography, eligibility, solve, bind)`);
 
 const timeline = buildTimeline(spec, track, config.templates);
@@ -58,8 +61,7 @@ const ts = planMotion(choreograph(timeline, layouts), layouts);
 const props = planRustMotion(args, engine).props;
 console.log(`bind         ${fmt(time(50, () => bindMotionEngine(props, ts, timeline.fps, spec.id)))} (once per composition model)`);
 const bound = bindMotionEngine(props, ts, timeline.fps, spec.id);
-const path0 = bound.paths[0]!;
-const frames = Array.from({ length: path0.end - path0.first }, (_, k) => path0.first + k);
+const frames = bound.paths.flatMap((p) => Array.from({ length: p.end - p.first }, (_, k) => p.first + k));
 const perFrame = (fn: (f: number) => void) => time(20, () => frames.forEach(fn));
 const engineFrames = perFrame((f) => sampleWithEngine(bound, ts, f, (f * 1000) / timeline.fps));
 const tsFrames = perFrame((f) => sampleWallaby(ts, (f * 1000) / timeline.fps));

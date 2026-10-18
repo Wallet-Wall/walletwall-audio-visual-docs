@@ -1,19 +1,34 @@
-//! HOP: a ballistic arc from a fixed start to the fixed authored target.
+//! HOP: a ballistic arc from a fixed start to the fixed authored target, chosen to keep the scene's
+//! text readable.
 //!
-//! Timing and trajectory are a faithful port of the TypeScript v2 solver (`planHop` in
-//! `src/character/walletwallaby/motion.ts`), evaluated with the same IEEE-754 operations in the
-//! same order. That makes the transitional TypeScript solver an exact oracle for this module: the
-//! same liftoff and contact instants and bit-identical flight positions. v1 flies the natural arc
-//! only; the surface-aware arc search stays in TypeScript until a later lane moves it here.
+//! Timing, trajectory, and the surface-aware arc search are a faithful port of the TypeScript
+//! solver (`planHop` in `src/character/walletwallaby/motion.ts`), evaluated with the same IEEE-754
+//! operations in the same order. That makes the transitional TypeScript solver an exact oracle for
+//! this module: the same arc, the same liftoff and contact instants, and bit-identical flight
+//! positions.
 //!
 //! The arc is `y(s) = y0 + (y1 - y0)s - c·s(1 - s)` with constant horizontal velocity, `s` going
 //! from 0 at liftoff to 1 at contact. At `s = 1` it is exactly the target.
+//!
+//! Surface awareness: when the scene protects text, the solver tries a fixed list of apex heights
+//! ([`ARC_CANDIDATES`], fractions of the natural one: natural first, then lower, then higher),
+//! counts the flight samples whose figure box crosses protected text ([`FLIGHT_SAMPLES`] per
+//! flight), and keeps the arc that crosses least; ties go to the earlier, more natural candidate,
+//! and the first arc that crosses nothing ends the search. A higher arc keeps its height and fits
+//! the window with stronger gravity; any other arc is lowered further before gravity is raised. The
+//! search can only lower or raise the arc: whichever it keeps lands exactly on the target.
 
 use alloc::format;
 
 use crate::config::MotionConfig;
 use crate::error::{MotionError, MotionErrorCode, refuse};
 use crate::math::{Vec2, clamp, lerp, sqrt};
+use crate::terrain::{FigureBox, Rect};
+
+/// Candidate apex heights, as fractions of the natural one: natural first, then lower, then higher.
+pub const ARC_CANDIDATES: [f64; 11] = [1.0, 0.75, 0.5, 0.35, 0.22, 0.12, 0.05, 1.3, 1.65, 2.2, 3.0];
+/// A flight is tested against the protected text at `k / FLIGHT_SAMPLES` for `k` in `1..FLIGHT_SAMPLES`.
+pub const FLIGHT_SAMPLES: u32 = 32;
 
 /// Share of the window the preload may take (TypeScript v2: 0.3).
 const ANTICIPATION_WINDOW_FRAC: f64 = 0.3;
@@ -26,9 +41,9 @@ const EXTRA_ANTICIPATION_MAX_MS: f64 = 80.0;
 /// Share of the spare time added to the preload (TypeScript v2: 0.2).
 const EXTRA_ANTICIPATION_SPARE_FRAC: f64 = 0.2;
 
-/// One hop's fixed endpoints and its window `[start_ms, arrive_by_ms)`.
+/// One hop's fixed endpoints, its window `[start_ms, arrive_by_ms)`, and what it should not cross.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct HopRequest {
+pub struct HopRequest<'a> {
     /// Start, px.
     pub from: Vec2,
     /// Authored target, px.
@@ -41,6 +56,10 @@ pub struct HopRequest {
     pub start_ms: f64,
     /// Arrival deadline, ms.
     pub arrive_by_ms: f64,
+    /// Text the figure should not cross in flight; empty flies the natural arc.
+    pub protected_text: &'a [Rect],
+    /// The figure's layout box at scale 1.
+    pub figure: FigureBox,
 }
 
 /// The solved hop.
@@ -62,6 +81,99 @@ pub struct HopSolution {
     pub apex_above_px: f64,
     /// Body height at the mean scale, px.
     pub body_px: f64,
+    /// The candidate the search kept: its apex as a fraction of the natural one.
+    pub arc_fraction: f64,
+    /// Flight samples (of [`FLIGHT_SAMPLES`]) whose figure box crosses protected text.
+    pub text_crossings: u32,
+}
+
+/// One candidate arc fitted to the window: its depth, the gravity it needs, and its flight time.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ArcFit {
+    depth: f64,
+    gravity: f64,
+    flight_s: f64,
+}
+
+/// What every candidate of one hop shares.
+struct Candidates<'a> {
+    r: &'a HopRequest<'a>,
+    cfg: &'a MotionConfig,
+    /// Configured gravity at the mean scale, px/s².
+    g0: f64,
+    /// Horizontal distance, px.
+    dx: f64,
+    /// Flight-time budget, s.
+    budget_s: f64,
+    /// Horizontal speed limit, px/s.
+    max_speed: f64,
+}
+
+impl Candidates<'_> {
+    /// The arc whose apex sits `apex` px above the higher endpoint, fitted to the window, or `None`
+    /// when no gravity within its bound and no flight within the speed limit fits it (the
+    /// TypeScript `solve`, operation for operation). `keep_height`: a deliberately higher arc keeps
+    /// its height and fits the window with stronger gravity instead of being lowered.
+    fn fit(&self, apex: f64, keep_height: bool) -> Option<ArcFit> {
+        let (r, cfg) = (self.r, self.cfg);
+        let budget_s = self.budget_s;
+        let mut gravity = self.g0;
+        let mut depth = arc_depth(r.from.y, r.to.y, apex);
+        let mut flight_s = sqrt((2.0 * depth) / gravity);
+        if flight_s > budget_s && keep_height {
+            gravity = (2.0 * depth) / (budget_s * budget_s);
+            if gravity > self.g0 * cfg.max_gravity_boost {
+                return None;
+            }
+            flight_s = budget_s;
+        } else if flight_s > budget_s {
+            // Lower the arc to fit; then, only if even the lowest arc is too slow, raise gravity.
+            depth = arc_depth(r.from.y, r.to.y, 0.0).max(gravity * budget_s * budget_s / 2.0);
+            flight_s = sqrt((2.0 * depth) / gravity);
+            if flight_s > budget_s {
+                gravity = (2.0 * depth) / (budget_s * budget_s);
+                if gravity > self.g0 * cfg.max_gravity_boost {
+                    return None;
+                }
+                flight_s = budget_s;
+            }
+        }
+        if self.dx.abs() / flight_s > self.max_speed {
+            // A higher arc buys flight time, never past the window.
+            let need_s = self.dx.abs() / self.max_speed;
+            if need_s > budget_s {
+                return None;
+            }
+            depth = depth.max(gravity * need_s * need_s / 2.0);
+            flight_s = sqrt((2.0 * depth) / gravity);
+        }
+        let min_flight_ms = cfg.hop.min_flight_ms;
+        if flight_s * 1000.0 < min_flight_ms && min_flight_ms / 1000.0 <= budget_s {
+            flight_s = min_flight_ms / 1000.0;
+            depth = gravity * flight_s * flight_s / 2.0;
+        }
+        (depth.is_finite() && flight_s.is_finite() && flight_s > 0.0).then_some(ArcFit {
+            depth,
+            gravity,
+            flight_s,
+        })
+    }
+
+    /// Flight samples whose figure box crosses protected text (the TypeScript `crossings`).
+    fn crossings(&self, arc: &ArcFit) -> u32 {
+        let r = self.r;
+        let mut n = 0;
+        for k in 1..FLIGHT_SAMPLES {
+            let u = f64::from(k) / f64::from(FLIGHT_SAMPLES);
+            let figure = r
+                .figure
+                .at(feet_at(r.from, r.to, arc.depth, u), lerp(r.from_scale, r.to_scale, u));
+            if r.protected_text.iter().any(|text| figure.intersects(text)) {
+                n += 1;
+            }
+        }
+        n
+    }
 }
 
 impl HopSolution {
@@ -79,10 +191,11 @@ pub fn arc_depth(y0: f64, y1: f64, h: f64) -> f64 {
 }
 
 /// Solve a hop that leaves `from` and lands exactly on `to` inside the window. The natural apex
-/// grows with distance; if the flight cannot fit, the arc is lowered first, then gravity raised up
-/// to its bound; otherwise the hop is refused. Every hop touches down at least
-/// `hop.settleReserveMs` before the deadline.
-pub fn solve_hop(r: &HopRequest, cfg: &MotionConfig) -> Result<HopSolution, MotionError> {
+/// grows with distance; with protected text, the surface-aware search picks among
+/// [`ARC_CANDIDATES`] (see the module docs). A candidate that cannot fit is lowered first, then
+/// fitted with gravity raised up to its bound; when no candidate fits, the hop is refused. Every hop
+/// touches down at least `hop.settleReserveMs` before the deadline.
+pub fn solve_hop(r: &HopRequest<'_>, cfg: &MotionConfig) -> Result<HopSolution, MotionError> {
     let hop = &cfg.hop;
     let dur = r.arrive_by_ms - r.start_ms;
     let scale = (r.from_scale + r.to_scale) / 2.0;
@@ -99,53 +212,55 @@ pub fn solve_hop(r: &HopRequest, cfg: &MotionConfig) -> Result<HopSolution, Moti
             format!("a hop window of {dur} ms leaves no time to fly"),
         );
     }
-    let max_speed = cfg.max_speed_body_heights_per_s * body;
     let natural = clamp(
         hop.peak_base * body + hop.peak_per_px * dx.abs(),
         hop.peak_min * body,
         hop.peak_max * body,
     );
-    let apex = (hop.peak_max * body).min(natural);
-
-    let unsolvable = || {
-        MotionError::new(
+    let candidates = Candidates {
+        r,
+        cfg,
+        g0,
+        dx,
+        budget_s,
+        max_speed: cfg.max_speed_body_heights_per_s * body,
+    };
+    // Without protected text there is nothing to avoid: the natural arc only.
+    let fractions = if r.protected_text.is_empty() {
+        &ARC_CANDIDATES[..1]
+    } else {
+        &ARC_CANDIDATES[..]
+    };
+    let mut best: Option<(ArcFit, u32, f64)> = None;
+    for &fraction in fractions {
+        let Some(arc) = candidates.fit((hop.peak_max * body).min(natural * fraction), fraction > 1.0) else {
+            continue;
+        };
+        let n = candidates.crossings(&arc);
+        if best.is_none_or(|(_, fewest, _)| n < fewest) {
+            best = Some((arc, n, fraction));
+            if n == 0 {
+                break;
+            }
+        }
+    }
+    let Some((
+        ArcFit {
+            depth,
+            gravity,
+            flight_s,
+        },
+        text_crossings,
+        arc_fraction,
+    )) = best
+    else {
+        return refuse(
             MotionErrorCode::UnsolvableTrajectory,
             format!(
                 "a hop of {dx} px across and {d} px down cannot land within {dur} ms under the speed and gravity limits"
             ),
-        )
+        );
     };
-    let mut gravity = g0;
-    let mut depth = arc_depth(r.from.y, r.to.y, apex);
-    let mut flight_s = sqrt((2.0 * depth) / gravity);
-    if flight_s > budget_s {
-        // Lower the arc to fit; then, only if even the lowest arc is too slow, raise gravity.
-        depth = arc_depth(r.from.y, r.to.y, 0.0).max(gravity * budget_s * budget_s / 2.0);
-        flight_s = sqrt((2.0 * depth) / gravity);
-        if flight_s > budget_s {
-            gravity = (2.0 * depth) / (budget_s * budget_s);
-            if gravity > g0 * cfg.max_gravity_boost {
-                return Err(unsolvable());
-            }
-            flight_s = budget_s;
-        }
-    }
-    if dx.abs() / flight_s > max_speed {
-        // A higher arc buys flight time, never past the window.
-        let need_s = dx.abs() / max_speed;
-        if need_s > budget_s {
-            return Err(unsolvable());
-        }
-        depth = depth.max(gravity * need_s * need_s / 2.0);
-        flight_s = sqrt((2.0 * depth) / gravity);
-    }
-    if flight_s * 1000.0 < hop.min_flight_ms && hop.min_flight_ms / 1000.0 <= budget_s {
-        flight_s = hop.min_flight_ms / 1000.0;
-        depth = gravity * flight_s * flight_s / 2.0;
-    }
-    if !(depth.is_finite() && flight_s.is_finite() && flight_s > 0.0) {
-        return Err(unsolvable());
-    }
 
     let flight_ms = flight_s * 1000.0;
     let spare = (dur - anticipation - flight_ms).max(0.0);
@@ -174,6 +289,8 @@ pub fn solve_hop(r: &HopRequest, cfg: &MotionConfig) -> Result<HopSolution, Moti
         base_gravity_px: g0,
         apex_above_px,
         body_px: body,
+        arc_fraction,
+        text_crossings,
     })
 }
 

@@ -80,7 +80,7 @@ No general-purpose physics or game engine (Matter.js, Rapier, Phaser), no Three.
 | Frame-pure posing on the Rive runtime | `rive/rig-apply.ts` |
 | Drawing in Remotion | `src/remotion/wallaby/WallabyRive.tsx`, `rive-loader.ts` |
 | Declared versions and pinned hashes | `src/character/walletwallaby/versions.ts` |
-| Rust/WASM Motion Intelligence (engine v1: the paths it owns, opt-in) | `motion-intelligence/`, `src/motion/`; see [MOTION_INTELLIGENCE.md](MOTION_INTELLIGENCE.md) |
+| Rust/WASM Motion Intelligence (engine v2, opt-in: every hop that ends in a perch, its arc search, and the contacts the scene reacts to) | `motion-intelligence/`, `src/motion/`; see [MOTION_INTELLIGENCE.md](MOTION_INTELLIGENCE.md) |
 
 `planMotion(clips, layouts)` runs once per video; `sampleWallaby(plan, ms)` is a pure function of the plan and the absolute time. Neither can return a destination that the clip did not give it.
 

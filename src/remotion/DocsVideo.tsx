@@ -27,7 +27,7 @@ interface Model {
   layouts: Map<string, SceneLayout>;
   clips: Clip[];
   motion: MotionPlan;
-  /** The Rust/WASM engine's plans for the paths it owns (none unless the render selected it). */
+  /** The Rust/WASM engine's plans for the paths it owns (none unless the render selected it), and the contacts the scene reacts to. */
   engine: BoundMotionEngine;
   captions: ReturnType<typeof buildCaptions>;
 }
@@ -52,7 +52,8 @@ function elementForAnchor(anchor: string | undefined, scene: SceneSpec): string[
   return [];
 }
 
-function sceneState(seg: TimedSegment, layout: SceneLayout, motion: MotionPlan, ms: number): SceneState {
+/** `contacts`: what the platforms react to (the TypeScript plan's contacts, or the engine's on the paths it performs). */
+function sceneState(seg: TimedSegment, layout: SceneLayout, motion: MotionPlan, contacts: BoundMotionEngine['contacts'], ms: number): SceneState {
   const scene = seg.scene!;
   const attention = new Set<string>();
   const resolved = new Set<string>();
@@ -72,7 +73,7 @@ function sceneState(seg: TimedSegment, layout: SceneLayout, motion: MotionPlan, 
     // The trail fills in as WalletWallaby's feet cover it.
     traced[c.target] = ms < c.startMs ? 0 : traverseProgress(motion, c, ms);
   }
-  return { ms, seg, layout, attention, resolved, traced, platformDip: platformOffsets(motion, seg.id, ms) };
+  return { ms, seg, layout, attention, resolved, traced, platformDip: platformOffsets(motion, seg.id, ms, contacts) };
 }
 
 function transitionStyles(type: TimedSegment['transitionIn']['type'], e: number): { exit: React.CSSProperties; enter: React.CSSProperties } {
@@ -119,7 +120,7 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
   const renderSegment = (s: TimedSegment, at: number): React.ReactNode => {
     if (s.scene) {
       const layout = model.layouts.get(s.id)!;
-      return <SceneView scene={s.scene} state={sceneState(s, layout, model.motion, at)} spec={props.spec} />;
+      return <SceneView scene={s.scene} state={sceneState(s, layout, model.motion, model.engine.contacts, at)} spec={props.spec} />;
     }
     const template = s.templateId ? props.templates.templates[s.templateId] : undefined;
     return template ? <BrandSegment seg={s} ms={at} spec={props.spec} template={template} docTitle={props.docTitle} provenance={props.provenance} /> : null;

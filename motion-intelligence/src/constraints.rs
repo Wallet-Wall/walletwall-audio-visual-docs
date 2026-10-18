@@ -6,12 +6,15 @@
 //! - phases are non-empty, contiguous, in traversal order, and cover the window exactly;
 //! - samples follow the phases in order and match the frame grid;
 //! - every number is finite and every channel is inside its limit;
+//! - the contacts are exactly the takeoff from the start at liftoff and the landing on the target
+//!   at touchdown;
 //! - the last sample is the perch, at rest in the authored stance.
 
 use alloc::format;
 
 use crate::error::{MotionError, MotionErrorCode, refuse};
-use crate::state::{Contact, MotionInput, MotionPhase, MotionPlan, MotionState};
+use crate::hop::{ARC_CANDIDATES, FLIGHT_SAMPLES};
+use crate::state::{Contact, ContactEvent, ContactKind, MotionInput, MotionPhase, MotionPlan, MotionState};
 use crate::terrain::contact_with;
 
 fn finite_state(s: &MotionState) -> bool {
@@ -64,14 +67,13 @@ pub fn check_plan(plan: &MotionPlan, input: &MotionInput) -> Result<(), MotionEr
         j.gravity_boost,
         j.flight_ms,
         j.apex_above_px,
-        plan.takeoff_impulse,
-        plan.landing_impulse,
+        j.arc_fraction,
     ];
     if !scalars.iter().all(|v| v.is_finite()) {
-        return refuse(
-            NonFiniteValue,
-            "a plan timing, trajectory, or impulse value is not finite",
-        );
+        return refuse(NonFiniteValue, "a plan timing or trajectory value is not finite");
+    }
+    if !ARC_CANDIDATES.contains(&j.arc_fraction) || j.text_crossings >= FLIGHT_SAMPLES {
+        return refuse(OutOfBounds, "the plan's arc is not one the search can choose");
     }
     if !(t.start_ms <= t.orient_end_ms
         && t.orient_end_ms < t.push_ms
@@ -83,9 +85,7 @@ pub fn check_plan(plan: &MotionPlan, input: &MotionInput) -> Result<(), MotionEr
     {
         return refuse(InvalidDuration, "the plan's key instants are out of order");
     }
-    if !(0.0..=1.0).contains(&plan.takeoff_impulse) || !(0.0..=1.0).contains(&plan.landing_impulse) {
-        return refuse(OutOfBounds, "an impulse is outside [0, 1]");
-    }
+    check_events(plan, input)?;
 
     // Phases: non-empty, contiguous, strictly in traversal order, covering [start, end).
     let (Some(first), Some(last)) = (plan.phases.first(), plan.phases.last()) else {
@@ -189,9 +189,9 @@ pub fn check_plan(plan: &MotionPlan, input: &MotionInput) -> Result<(), MotionEr
     let at_rest = last_sample.phase == MotionPhase::Perch
         && last_sample.crouch == rest.crouch
         && last_sample.tail_angle == rest.tail_deg
-        && last_sample.tail_tension == cfg.tail.tension_rest
+        && last_sample.tail_curl == rest.tail_curl
+        && last_sample.tail_tension == rest.tail_tension
         && [
-            last_sample.tail_curl,
             last_sample.tuck,
             last_sample.compression,
             last_sample.stretch,
@@ -209,6 +209,56 @@ pub fn check_plan(plan: &MotionPlan, input: &MotionInput) -> Result<(), MotionEr
             InvalidDuration,
             "the window closes before the body is at rest in its stance",
         );
+    }
+    Ok(())
+}
+
+/// The contacts are exactly two, in order: the takeoff from the start at liftoff and the landing on
+/// the target at touchdown, each with a finite impulse in `[0, 1]`, the exact position and scale,
+/// and the contact the terrain declares there.
+fn check_events(plan: &MotionPlan, input: &MotionInput) -> Result<(), MotionError> {
+    use MotionErrorCode::{InvalidDuration, InvalidTarget, NonFiniteValue, OutOfBounds};
+    let [takeoff, landing] = plan.events.as_slice() else {
+        return refuse(
+            InvalidDuration,
+            "the plan does not state exactly one takeoff and one landing",
+        );
+    };
+    let expected = [
+        (
+            takeoff,
+            ContactKind::Takeoff,
+            plan.timing.liftoff_ms,
+            input.start,
+            input.start_scale,
+            contact_with(input.terrain.start.as_ref()),
+        ),
+        (
+            landing,
+            ContactKind::Landing,
+            plan.timing.contact_ms,
+            input.target,
+            input.target_scale,
+            contact_with(input.terrain.target.as_ref()),
+        ),
+    ];
+    for (e, kind, at_ms, position, scale, contact) in expected {
+        let ContactEvent { impulse, .. } = *e;
+        if !impulse.is_finite() {
+            return refuse(NonFiniteValue, format!("the {kind:?} impulse is not finite"));
+        }
+        if !(0.0..=1.0).contains(&impulse) {
+            return refuse(OutOfBounds, format!("the {kind:?} impulse is outside [0, 1]"));
+        }
+        if e.kind != kind || e.at_ms.to_bits() != at_ms.to_bits() {
+            return refuse(
+                InvalidDuration,
+                format!("the {kind:?} is not stated at its own instant"),
+            );
+        }
+        if !e.position.bits_eq(position) || e.scale.to_bits() != scale.to_bits() || e.contact != contact {
+            return refuse(InvalidTarget, format!("the {kind:?} is not where the feet are"));
+        }
     }
     Ok(())
 }

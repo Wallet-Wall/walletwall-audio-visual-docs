@@ -1,5 +1,5 @@
 {
-  "schema": "walletwall.motion-input/v1",
+  "schema": "walletwall.motion-input/v2",
   "action": "HOP",
   "start": {
     "x": 1050,
@@ -28,22 +28,63 @@
       "topY": 600,
       "leftX": 1440,
       "rightX": 1760
+    },
+    "protectedText": [
+      {
+        "x": 160,
+        "y": 104,
+        "w": 1100,
+        "h": 32
+      },
+      {
+        "x": 160,
+        "y": 250,
+        "w": 1180,
+        "h": 229
+      },
+      {
+        "x": 160,
+        "y": 523,
+        "w": 1180,
+        "h": 87
+      },
+      {
+        "x": 160,
+        "y": 630,
+        "w": 1180,
+        "h": 87
+      },
+      {
+        "x": 160,
+        "y": 104,
+        "w": 1100,
+        "h": 32
+      }
+    ],
+    "figure": {
+      "left": 150,
+      "right": 100,
+      "top": 292
     }
   },
   "stance": {
     "initial": {
       "crouch": 0,
-      "tailDeg": 0
+      "tailDeg": 0,
+      "tailCurl": 0,
+      "tailTension": 0.1
     },
     "rest": {
       "crouch": 0,
-      "tailDeg": 0
+      "tailDeg": 0,
+      "tailCurl": 0,
+      "tailTension": 0.1
     }
   },
   "config": {
-    "schema": "walletwall.motion-intelligence-config/v1",
+    "schema": "walletwall.motion-intelligence-config/v2",
     "id": "walletwallaby-motion-intelligence",
-    "version": 1,
+    "version": 2,
     "note": "Physics for the Rust/WASM Motion Intelligence engine (motion-intelligence/). Lengths are in body heights (bodyHeightPx x the character's scale), times in milliseconds, angles in degrees. The hop timing values must equal config/motion.json while the TypeScript solver remains the oracle (test/rust-motion-engine.test.ts enforces it). Changing any value requires a new version (pinned in src/motion/engine-identity.ts).",
     "bodyHeightPx": 236,
     "gravityBodyHeightsPerS2": 21,
@@ -69,6 +110,7 @@
       "contactMs": 34,
       "compressionMs": 110,
       "settleMs": 700,
+      "minSettleMs": 350,
       "settleFreqHz": 2.6,
       "settleDamping": 0.55,
       "impulseReferenceBodyHeights": 0.6,
@@ -93,7 +135,6 @@
       "curlFlightDeg": 1.5,
       "curlLoadDeg": 1.5,
       "maxCurlDeg": 6,
-      "tensionRest": 0.1,
       "tensionLoad": 0.5,
       "tensionLever": 0.85,
       "tensionFlight": 0.55,

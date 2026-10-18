@@ -4,9 +4,9 @@
 // validateMotionPlan, which fails closed. No trajectory mathematics lives here: a plan is data,
 // one state per video frame. Isomorphic (used by the Node adapter and inside the composition).
 
-export const INPUT_SCHEMA = 'walletwall.motion-input/v1';
-export const PLAN_SCHEMA = 'walletwall.motion-plan/v1';
-export const CONFIG_SCHEMA = 'walletwall.motion-intelligence-config/v1';
+export const INPUT_SCHEMA = 'walletwall.motion-input/v2';
+export const PLAN_SCHEMA = 'walletwall.motion-plan/v2';
+export const CONFIG_SCHEMA = 'walletwall.motion-intelligence-config/v2';
 export const ENGINE_NAME = 'motion-intelligence';
 
 export const MOTION_PHASES = ['IDLE', 'PRELOAD', 'TAKEOFF', 'AIRBORNE', 'CONTACT', 'COMPRESSION', 'SETTLE', 'PERCH'] as const;
@@ -14,10 +14,18 @@ export type MotionPhase = (typeof MOTION_PHASES)[number];
 export type MotionAction = 'IDLE' | 'HOP' | 'LAND' | 'PERCH' | 'INSPECT' | 'TRACE' | 'MANTLE' | 'VAULT' | 'PUSH_THROUGH';
 export type MotionContact = 'NONE' | 'GROUND' | 'PLATFORM';
 export type SurfaceKind = 'CARD' | 'NODE' | 'PILLAR' | 'LEDGE';
+/** Flight samples the engine tests against the protected text (motion-intelligence/src/hop.rs). */
+export const FLIGHT_SAMPLES = 32;
 
 export interface Vec2 {
   x: number;
   y: number;
+}
+export interface MotionRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 export interface MotionSurface {
   kind: SurfaceKind;
@@ -25,9 +33,19 @@ export interface MotionSurface {
   leftX: number;
   rightX: number;
 }
+/** The standing figure's layout box at scale 1, px from the feet (WALLABY_EXTENT). */
+export interface MotionFigure {
+  left: number;
+  right: number;
+  top: number;
+}
 export interface MotionStance {
   crouch: number;
   tailDeg: number;
+  /** Degrees per segment (positive curls the tip up). */
+  tailCurl: number;
+  /** 0..1. */
+  tailTension: number;
 }
 
 /** config/motion-intelligence.json (validated by the engine; see motion-intelligence/src/config.rs). */
@@ -56,9 +74,9 @@ export interface MotionIntelligenceConfig {
     extensionReferenceBodyHeights: number;
     airborneCrouch: number;
   };
-  landing: { contactMs: number; compressionMs: number; settleMs: number; settleFreqHz: number; settleDamping: number; impulseReferenceBodyHeights: number; crouchBase: number; crouchGain: number; compressionGain: number; nodDeg: number };
+  landing: { contactMs: number; compressionMs: number; settleMs: number; minSettleMs: number; settleFreqHz: number; settleDamping: number; impulseReferenceBodyHeights: number; crouchBase: number; crouchGain: number; compressionGain: number; nodDeg: number };
   pitch: { maxDeg: number; velocityGain: number; headStabilization: number };
-  tail: { freqHz: number; damping: number; loadDeg: number; pitchCounter: number; liftDeg: number; impactDeg: number; maxDeg: number; curlFlightDeg: number; curlLoadDeg: number; maxCurlDeg: number; tensionRest: number; tensionLoad: number; tensionLever: number; tensionFlight: number; tensionBrace: number; tensionEffort: number; tensionFollowMs: number };
+  tail: { freqHz: number; damping: number; loadDeg: number; pitchCounter: number; liftDeg: number; impactDeg: number; maxDeg: number; curlFlightDeg: number; curlLoadDeg: number; maxCurlDeg: number; tensionLoad: number; tensionLever: number; tensionFlight: number; tensionBrace: number; tensionEffort: number; tensionFollowMs: number };
   ears: { freqHz: number; damping: number; accelGainDeg: number; maxDeg: number };
   limits: { maxHeadDeg: number; maxWindowMs: number; maxApexBodyHeights: number };
 }
@@ -74,9 +92,21 @@ export interface MotionInput {
   timing: { startMs: number; arriveByMs: number; endMs: number };
   fps: number;
   stage: { width: number; height: number };
-  terrain: { start: MotionSurface | null; target: MotionSurface | null };
+  /** The surfaces under both ends, the text the flight should not cross (empty: the natural arc), and the figure's box. */
+  terrain: { start: MotionSurface | null; target: MotionSurface | null; protectedText: MotionRect[]; figure: MotionFigure };
   stance: { initial: MotionStance; rest: MotionStance };
   config: MotionIntelligenceConfig;
+}
+
+/** A contact the engine makes with the terrain: the push-off from the start, the touchdown on the target. */
+export interface MotionContactEvent {
+  kind: 'TAKEOFF' | 'LANDING';
+  atMs: number;
+  /** 0..1. */
+  impulse: number;
+  position: Vec2;
+  scale: number;
+  contact: MotionContact;
 }
 
 /** One video frame of motion, renderer-neutral; angles use the Rive rig's conventions. */
@@ -111,9 +141,10 @@ export interface MotionPlan {
   start: Vec2;
   target: Vec2;
   timing: { startMs: number; arriveByMs: number; endMs: number; orientEndMs: number; pushMs: number; liftoffMs: number; contactMs: number; settledMs: number };
-  trajectory: { depthPx: number; gravityPxPerS2: number; gravityBoost: number; flightMs: number; apexAbovePx: number };
-  takeoffImpulse: number;
-  landingImpulse: number;
+  /** `arcFraction`: the arc the surface-aware search kept, as a fraction of the natural apex; `textCrossings`: flight samples (of 32) crossing protected text. */
+  trajectory: { depthPx: number; gravityPxPerS2: number; gravityBoost: number; flightMs: number; apexAbovePx: number; arcFraction: number; textCrossings: number };
+  /** The takeoff, then the landing. */
+  events: MotionContactEvent[];
   phases: { phase: MotionPhase; startMs: number; endMs: number }[];
   frames: { fps: number; first: number; count: number };
   samples: MotionState[];
@@ -154,12 +185,14 @@ export interface PlanExpectation {
   action: MotionAction;
   start: Vec2;
   target: Vec2;
+  startScale: number;
+  targetScale: number;
   timing: { startMs: number; arriveByMs: number; endMs: number };
   fps: number;
   rest: MotionStance;
   contactAtStart: MotionContact;
   contactAtTarget: MotionContact;
-  limits: { pitchDeg: number; tailDeg: number; curlDeg: number; earDeg: number; headDeg: number; tensionRest: number };
+  limits: { pitchDeg: number; tailDeg: number; curlDeg: number; earDeg: number; headDeg: number };
 }
 
 export function expectationFor(input: MotionInput): PlanExpectation {
@@ -168,6 +201,8 @@ export function expectationFor(input: MotionInput): PlanExpectation {
     action: input.action,
     start: input.start,
     target: input.target,
+    startScale: input.startScale,
+    targetScale: input.targetScale,
     timing: input.timing,
     fps: input.fps,
     rest: input.stance.rest,
@@ -177,12 +212,13 @@ export function expectationFor(input: MotionInput): PlanExpectation {
   };
 }
 
-const PLAN_KEYS = ['schema', 'engine', 'action', 'start', 'target', 'timing', 'trajectory', 'takeoffImpulse', 'landingImpulse', 'phases', 'frames', 'samples'];
+const PLAN_KEYS = ['schema', 'engine', 'action', 'start', 'target', 'timing', 'trajectory', 'events', 'phases', 'frames', 'samples'];
 const TIMING_KEYS = ['startMs', 'arriveByMs', 'endMs', 'orientEndMs', 'pushMs', 'liftoffMs', 'contactMs', 'settledMs'];
-const TRAJECTORY_KEYS = ['depthPx', 'gravityPxPerS2', 'gravityBoost', 'flightMs', 'apexAbovePx'];
+const TRAJECTORY_KEYS = ['depthPx', 'gravityPxPerS2', 'gravityBoost', 'flightMs', 'apexAbovePx', 'arcFraction', 'textCrossings'];
+const EVENT_KEYS = ['kind', 'atMs', 'impulse', 'position', 'scale', 'contact'];
 /** The output ranges a configuration promises (the engine's soft limits never exceed them). */
 export function limitsOf(c: MotionIntelligenceConfig): PlanExpectation['limits'] {
-  return { pitchDeg: c.pitch.maxDeg, tailDeg: c.tail.maxDeg, curlDeg: c.tail.maxCurlDeg, earDeg: c.ears.maxDeg, headDeg: c.limits.maxHeadDeg, tensionRest: c.tail.tensionRest };
+  return { pitchDeg: c.pitch.maxDeg, tailDeg: c.tail.maxDeg, curlDeg: c.tail.maxCurlDeg, earDeg: c.ears.maxDeg, headDeg: c.limits.maxHeadDeg };
 }
 
 const STATE_KEYS = ['phase', 'phaseProgress', 'position', 'velocity', 'scale', 'contact', 'bodyPitch', 'crouch', 'tuck', 'compression', 'stretch', 'tailAngle', 'tailCurl', 'tailTension', 'headAngle', 'earLag', 'landingImpulse'];
@@ -234,10 +270,25 @@ export function validateMotionPlan(raw: unknown, expect: PlanExpectation): Motio
   const trajectory = object(plan.trajectory, TRAJECTORY_KEYS, 'plan.trajectory');
   for (const k of TRAJECTORY_KEYS) finite(trajectory[k], `plan.trajectory.${k}`);
   if (!same(trajectory.flightMs as number, t.contactMs - t.liftoffMs) || !((trajectory.depthPx as number) > 0) || !((trajectory.gravityPxPerS2 as number) > 0)) invalid('plan.trajectory is inconsistent');
-  for (const k of ['takeoffImpulse', 'landingImpulse']) {
-    const v = finite(plan[k], `plan.${k}`);
-    if (v < 0 || v > 1) invalid(`plan.${k} is outside [0, 1]`);
-  }
+  const crossings = trajectory.textCrossings as number;
+  if (!((trajectory.arcFraction as number) > 0) || !Number.isInteger(crossings) || crossings < 0 || crossings >= FLIGHT_SAMPLES) invalid('plan.trajectory does not name an arc the search can choose');
+
+  // The plan's contacts: exactly the takeoff from the start at liftoff, then the landing on the target at touchdown.
+  if (!Array.isArray(plan.events) || plan.events.length !== 2) invalid('plan.events is not one takeoff and one landing');
+  const ends = [
+    { kind: 'TAKEOFF', atMs: t.liftoffMs, position: expect.start, scale: expect.startScale, contact: expect.contactAtStart },
+    { kind: 'LANDING', atMs: t.contactMs, position: expect.target, scale: expect.targetScale, contact: expect.contactAtTarget },
+  ] as const;
+  const events = plan.events.map((raw: unknown, i: number): MotionContactEvent => {
+    const at = `plan.events[${i}]`;
+    const e = object(raw, EVENT_KEYS, at);
+    const end = ends[i]!;
+    const event: MotionContactEvent = { kind: end.kind, atMs: finite(e.atMs, `${at}.atMs`), impulse: finite(e.impulse, `${at}.impulse`), position: point(e.position, `${at}.position`), scale: finite(e.scale, `${at}.scale`), contact: end.contact };
+    if (e.kind !== end.kind || !same(event.atMs, end.atMs)) invalid(`${at} is not the ${end.kind} at its own instant`);
+    if (event.impulse < 0 || event.impulse > 1) invalid(`${at}.impulse is outside [0, 1]`);
+    if (!samePoint(event.position, end.position) || !same(event.scale, end.scale) || e.contact !== end.contact) invalid(`${at} is not where the feet are`);
+    return event;
+  });
 
   if (!Array.isArray(plan.phases) || plan.phases.length === 0) invalid('plan.phases is empty');
   const phases = plan.phases.map((w: unknown, i: number) => {
@@ -313,8 +364,9 @@ export function validateMotionPlan(raw: unknown, expect: PlanExpectation): Motio
     last.phase === 'PERCH' &&
     same(last.crouch, expect.rest.crouch) &&
     same(last.tailAngle, expect.rest.tailDeg) &&
-    same(last.tailTension, expect.limits.tensionRest) &&
-    [last.tailCurl, last.tuck, last.compression, last.stretch, last.bodyPitch, last.headAngle, last.earLag, last.landingImpulse, last.velocity.x, last.velocity.y].every((v) => v === 0);
+    same(last.tailCurl, expect.rest.tailCurl) &&
+    same(last.tailTension, expect.rest.tailTension) &&
+    [last.tuck, last.compression, last.stretch, last.bodyPitch, last.headAngle, last.earLag, last.landingImpulse, last.velocity.x, last.velocity.y].every((v) => v === 0);
   if (!atRest) invalid('the plan closes before the body is at rest in its stance');
 
   return deepFreeze({
@@ -324,9 +376,8 @@ export function validateMotionPlan(raw: unknown, expect: PlanExpectation): Motio
     start: { ...expect.start },
     target: { ...expect.target },
     timing: t,
-    trajectory: trajectory as MotionPlan['trajectory'],
-    takeoffImpulse: plan.takeoffImpulse as number,
-    landingImpulse: plan.landingImpulse as number,
+    trajectory: Object.fromEntries(TRAJECTORY_KEYS.map((k) => [k, trajectory[k]])) as MotionPlan['trajectory'],
+    events,
     phases,
     frames: { fps, first, count },
     samples,

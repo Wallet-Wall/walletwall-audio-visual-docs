@@ -28,6 +28,10 @@ pub struct TailSignals {
     /// The authored resting swing at this moment (blends from the initial to the rest stance across
     /// the flight), degrees.
     pub stance_deg: f64,
+    /// The authored resting curl at this moment (blended like the swing), degrees per segment.
+    pub stance_curl: f64,
+    /// The authored resting tension at this moment (blended like the swing), 0..1.
+    pub stance_tension: f64,
     /// Leg bend beyond the stance while the feet are on a surface, 0..1 (0 in the air).
     pub leg_load: f64,
     /// Whole-body pitch, degrees (positive = nose down).
@@ -54,10 +58,11 @@ pub fn desired_counterbalance(s: &TailSignals, cfg: &TailConfig) -> f64 {
         - cfg.impact_deg * s.impact
 }
 
-/// The curl the tail is heading toward, degrees per segment: a loose curl in the air, flattened
-/// against the ground under load.
+/// The curl the tail is heading toward, degrees per segment: the stance's own curl, looser in the
+/// air, flattened against the ground under load. With the body at rest in its stance, this is
+/// exactly the stance's curl.
 pub fn desired_curl(s: &TailSignals, cfg: &TailConfig) -> f64 {
-    cfg.curl_flight_deg * s.airborne - cfg.curl_load_deg * s.leg_load
+    s.stance_curl + cfg.curl_flight_deg * s.airborne - cfg.curl_load_deg * s.leg_load
 }
 
 /// A damped spring pulling `x` toward a target, integrated with semi-implicit Euler on a fixed
@@ -86,10 +91,11 @@ impl Follower {
     }
 }
 
-/// How hard the tail works in each phase before effort is added, 0..1.
-pub fn base_tension(phase: MotionPhase, cfg: &TailConfig) -> f64 {
+/// How hard the tail works in each phase before effort is added, 0..1: the stance's own tension
+/// while the body stands in a stance (orienting, settling, perching), the phase's work otherwise.
+pub fn base_tension(phase: MotionPhase, s: &TailSignals, cfg: &TailConfig) -> f64 {
     match phase {
-        MotionPhase::Idle | MotionPhase::Settle | MotionPhase::Perch => cfg.tension_rest,
+        MotionPhase::Idle | MotionPhase::Settle | MotionPhase::Perch => s.stance_tension,
         MotionPhase::Preload => cfg.tension_load,
         MotionPhase::Takeoff => cfg.tension_lever,
         MotionPhase::Airborne => cfg.tension_flight,
@@ -99,10 +105,10 @@ pub fn base_tension(phase: MotionPhase, cfg: &TailConfig) -> f64 {
 
 /// Tension the tail is heading toward: the phase's base plus effort (how far the tail lags its
 /// desired swing and how fast it is swinging), within 0..1. At rest it is exactly the base.
-pub fn tension_target(phase: MotionPhase, desired: f64, tail: &Follower, cfg: &TailConfig) -> f64 {
+pub fn tension_target(phase: MotionPhase, s: &TailSignals, desired: f64, tail: &Follower, cfg: &TailConfig) -> f64 {
     let lag = (desired - tail.x).abs() / cfg.max_deg;
     let swing = tail.v.abs() / (2.0 * PI * cfg.freq_hz * cfg.max_deg);
-    clamp01(base_tension(phase, cfg) + cfg.tension_effort * (lag + swing))
+    clamp01(base_tension(phase, s, cfg) + cfg.tension_effort * (lag + swing))
 }
 
 #[cfg(test)]
@@ -121,7 +127,6 @@ mod tests {
             curl_flight_deg: 1.5,
             curl_load_deg: 1.5,
             max_curl_deg: 6.0,
-            tension_rest: 0.1,
             tension_load: 0.5,
             tension_lever: 0.85,
             tension_flight: 0.55,
@@ -133,6 +138,8 @@ mod tests {
 
     const STILL: TailSignals = TailSignals {
         stance_deg: 0.0,
+        stance_curl: 0.0,
+        stance_tension: 0.1,
         leg_load: 0.0,
         pitch_deg: 0.0,
         rise_body_per_s: 0.0,
@@ -153,7 +160,22 @@ mod tests {
             f.step(2.0, 2.4, 0.45, 0.001);
         }
         assert_eq!(f, Follower::at_rest(2.0));
-        assert_eq!(tension_target(MotionPhase::Idle, 2.0, &f, &cfg()), 0.1);
+        assert_eq!(tension_target(MotionPhase::Idle, &still, 2.0, &f, &cfg()), 0.1);
+        // A stance that leans in to inspect holds its own curl and tension, exactly.
+        let inspecting = TailSignals {
+            stance_curl: 1.5,
+            stance_tension: 0.35,
+            ..still
+        };
+        assert_eq!(desired_curl(&inspecting, &cfg()), 1.5);
+        for phase in [MotionPhase::Idle, MotionPhase::Settle, MotionPhase::Perch] {
+            assert_eq!(tension_target(phase, &inspecting, 2.0, &f, &cfg()), 0.35);
+        }
+        assert_eq!(
+            tension_target(MotionPhase::Airborne, &inspecting, 2.0, &f, &cfg()),
+            0.55,
+            "control: a working phase sets its own tension"
+        );
     }
 
     #[test]
