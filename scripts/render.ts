@@ -15,7 +15,7 @@ import { prettyJson } from '../src/core/canonical-json.ts';
 import { sha256Hex } from '../src/core/hash.ts';
 import { distDir, loadCommittedSpec, loadRegistry, validationContextFor } from '../src/pipeline/context.ts';
 import { validateSpec } from '../src/validation/validate-spec.ts';
-import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, synthesize } from '../src/pipeline/render-input.ts';
+import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, stageRendererAssets, synthesize } from '../src/pipeline/render-input.ts';
 import { buildTimeline, msToFrame, totalFrames } from '../src/timeline/timeline.ts';
 
 const COMPOSITION_ID = 'WalletWallDocsVideo';
@@ -41,6 +41,7 @@ const out = distDir(videoId);
 mkdirSync(out, { recursive: true });
 
 stageDeclaredAssets(spec);
+stageRendererAssets();
 console.log(`[render] bundling ${COMPOSITION_ID} (${(timeline.totalMs / 1000).toFixed(1)} s, ${totalFrames(timeline)} frames)…`);
 const serveUrl = await bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'index.ts'), publicDir: PUBLIC_DIR });
 

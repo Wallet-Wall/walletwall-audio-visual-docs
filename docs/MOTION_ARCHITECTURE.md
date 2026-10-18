@@ -14,12 +14,19 @@ semantic clips (from → to, start → end)          ← fixed by the spec; neve
         │ motion solver: pure, closed-form, bounded
         ▼
 motion plan (phases, trajectory, contact events)
-        │ sample at absolute time t
+        │ sample at absolute time t (Remotion frame → ms)
         ▼
-pose channels (position, compression, stretch, rotation, tail, ears, contact)
+motion state (position, velocity, action, phase,     ← Motion Intelligence decides BEHAVIOUR
+              key-pose blend, contacts, tail intent)
+        │ rig controls: a pure mapping
+        ▼
+clip weights + IK targets + small continuous offsets
+        │ a fresh Rive artboard instance per frame
+        ▼
+Rive: clip blending, IK, skinning, drawing           ← Rive performs the BODY
         │
         ▼
-Remotion renders frame N
+Remotion captures frame N                             ← Remotion owns TIME
 ```
 
 The choreography layer resolves every destination from the spec's anchors and owns the order and timing windows. The motion solver receives a fixed start, a fixed destination, and a time budget, and returns how to get there. It has no input through which it could pick a different node, skip content, reorder traversal, or change what a claim means, and its final semantic state is exactly the authored anchor.
@@ -59,18 +66,57 @@ Cards, graph nodes, and ledges may acknowledge contact with a tiny, bounded sett
 
 No general-purpose physics or game engine (Matter.js, Rapier, Phaser), no Three.js conversion of the character, no collision world, pathfinding, procedural levels, particles, camera shake, character variants, or new mascots. If a concrete need ever proves one of these unavoidable, it is proposed and reviewed on its own.
 
-## Implementation (rig v2, motion v2)
+## Implementation (rig v3, motion v3)
 
 | Layer | Code |
 |---|---|
 | Where and when: anchors, order, time windows | `src/character/walletwallaby/choreography.ts` |
-| How: motion plan and per-frame sampling | `src/character/walletwallaby/motion.ts` |
-| Physics constants (versioned) | `config/motion.json` |
-| Look: palette slots, poses, expressions | `src/character/walletwallaby/rig.ts` |
-| Declared versions and pinned definition hashes | `src/character/walletwallaby/versions.ts` |
-| Drawing the channels | `src/remotion/wallaby/WallabyFigure.tsx` |
+| Motion intelligence: plan, phases, contacts, tail intent, mantles, landings | `src/character/walletwallaby/motion.ts` |
+| Physics and behaviour constants (versioned) | `config/motion.json` |
+| Vocabulary poses as clip blends, expressions, palette slots | `src/character/walletwallaby/rig.ts` |
+| The rig as code: skeleton, IK, silhouette, draw order, clips | `src/character/walletwallaby/rive/rig-source.ts` |
+| Rig source to `.riv` (deterministic bytes) | `rive/rig-compile.ts`, `rive/riv-format.ts`, `npm run rive:build` |
+| Motion state to rig controls | `rive/rig-controls.ts` |
+| Frame-pure posing on the Rive runtime | `rive/rig-apply.ts` |
+| Drawing in Remotion | `src/remotion/wallaby/WallabyRive.tsx`, `rive-loader.ts` |
+| Declared versions and pinned hashes | `src/character/walletwallaby/versions.ts` |
 
 `planMotion(clips, layouts)` runs once per video; `sampleWallaby(plan, ms)` is a pure function of the plan and the absolute time. Neither can return a destination that the clip did not give it.
+
+### Rive
+
+WalletWallaby is a Rive rig. The `.riv` (`assets/character/walletwallaby.riv`, about 24 KB) is compiled from `rig-source.ts` by a small writer for the Rive runtime format (major version 7), committed, and pinned by the sha256 of its bytes. `npm run rive:check` (also in CI) proves that the committed file, a fresh compile, and the pin agree. Authoring the rig as code keeps every bone, weight, and key reviewable in a diff. The asset contract (artboard, bone, control, clip, and IK names) is what any future editor-authored replacement must satisfy.
+
+- **Skeleton:** 22 bones. Hip, chest, neck, head, jaw, two ears, a five-bone tail, two three-bone hind legs, and two two-bone forelimbs.
+- **Skinning:** the torso, belly, strap, and tail are single outlines skinned to their bone chains (linear-blend weights, 50/50 at each joint). The body bends and compresses as one surface, and the tail curves rather than hinging. Rigid parts (head, ears, limbs, feet) ride their bones.
+- **Clips:** a reset (`base`), a looping `idle_alert` (a 3.4 s breath), eleven key poses (`crouch_preload`, `takeoff`, `airborne`, `land_soft`, `land_hard`, `perch`, `inspect`, `trace`, `mantle`, `push`, `resolve`), and two control clips (`tail_free`, `point_near`). Every pose clip keys the full pose property set, so blending is order-stable.
+- **IK (Rive constraints):** two-bone legs plant each foot, with the heel set by the clip-keyed foot angle and the toes on the rig's ground point. Single-bone foot constraints aim each foot. Two-bone forelimbs grip a ledge lip in the mantle and point at what the lesson reveals. A two-bone tail tip rests on the surface. Strengths are keyed by the clips, so the clips decide when the feet plant (never in flight), and a blend of two clips blends their IK. A five-bone tail chain was tried first and rejected: the runtime's iterative solve missed its target by up to 16 px and folded the tail into a hook.
+- **Palette:** coat, tail, outer ears, and lids are the canonical WalletWall terracotta. Belly, the pale cheek stripe real wallabies carry, chin, and inner ears are cream. Outline, eyes, nose, and claws are charcoal. The shade is terracotta mixed 42% toward the dark terracotta, computed from the two tokens, and highlights are cream at 30% alpha. Colours are resolved from the brand contract at compile time; no source file types a colour.
+
+**Frame-authoritative integration.** `@remotion/rive`'s `<RemotionRiveCanvas>` is not used. It fetches the runtime WASM from unpkg at render time (the render path may not touch the network), and it advances its animation by frame deltas (a frame would depend on the previous one). WalletWallaby drives the same runtime that component pins, `@rive-app/canvas-advanced@2.31.5`, directly:
+
+1. The loader fetches the staged `.riv` and `rive.wasm` from the bundle's own public dir and re-hashes both against their pins. It hands the WASM to the runtime as bytes (so the runtime fetches nothing) and loads the rig with Rive's asset CDN disabled. `stageRendererAssets()` refuses to stage bytes that do not match the pins.
+2. For every frame, every character is posed on a **fresh artboard instance**: `base` at mix 1, then the pose clips with normalised sequential mixes (Rive lerps from the current value, so this is the exact weighted average), then the control clips. The continuous controls and IK targets are written, and the artboard is advanced by zero seconds, twice: the pinned runtime does not order an IK constraint after its target node, so the first pass settles the targets and the second solves against them. The instance is drawn, the queued canvas commands are flushed, and the instance is freed.
+3. Nothing calls `play()`, uses a state machine, or reads elapsed time.
+
+A fresh instance per frame is the guarantee, not an optimisation. Rive's IK writes the constrained bones' transforms, and a property re-set to an unchanged value does not invalidate them, so a reused instance let one frame's solve leak into the next: 527 of 591 shuffled frames differed before the fix, and 0 after. The re-dirty pass also makes a reused instance clean, and the tests check both. The cost is about 1.7 ms per character per frame.
+
+### Motion intelligence (v3)
+
+The motion layer now returns behaviour, not drawing parameters:
+
+- **Action and phase.** `IDLE`, `HOP`, `AIRBORNE`, `LAND`, `PERCH`, `INSPECT`, `TRACE`, `MANTLE`, and `PUSH_THROUGH`, through phases from `ORIENT` and `PRELOAD` to `REACH`, `CONTACT`, `SETTLE`, `HANG`, `PULL`, `BRACE`, `LOAD`, `DRIVE`, and `FALL`.
+- **Key-pose blend.** Each vocabulary pose is a blend of the rig's clips (`TEACH` is part alert idle, part teaching stance), and every transition is a blend between clip mixes.
+- **Velocity.** Closed form: the derivative of the feet's path, tested against finite differences.
+- **Jumps.** Orient; preload, where the tail loads down against the ground and stiffens; takeoff extension, where the tail locks straight as a lever; flight, where the tail counter-rotates against the body's pitch and streams against the vertical velocity; reach, where the legs swing forward feet-first and the tail sweeps down to meet the ground; then contact, compression, and settle.
+- **Landings** are soft or hard by impact (a smoothstep from 0.55 to 0.95). A hard landing blends in `land_hard` (deeper compression, a wider stance, forelimbs out), recovers 2.5 times more slowly, and braces the tail. The brace carries into the following hold and relaxes there.
+- **Mantles.** A move becomes a climb when its destination is a platform top at least 0.55 body heights above a start beside that platform, the whole sequence fits the window under the speed and gravity limits, and it crosses no more protected text than the hop would. The climb: jump to a hang point below the lip; catch it (Rive's arm IK grips the lip, the body hangs outside the face with the legs against it, and the tail swings as a counterweight); pull the hindquarters up and over; settle exactly on the anchor. The committed lesson has no ledge that can be climbed without crossing text, so it keeps its hops; the motion lab shows the climb.
+- **The tail.** It rests on the surface behind as a third support whenever there is surface under it, and Rive's tail IK makes the contact exact. Past a platform's edge, `tail_free` releases it and it hangs. Where a pose holds it well clear (inspect, trace, flight), the release is smooth. On narrow perches it corrects the balance with a slow ±2° sway. It never sinks through a surface: if a pose would drive the tip below the surface line, the tail first swings up about its root, so the IK only has to close a few pixels instead of folding the tip.
+- **Pointing.** The near forelimb reaches for the subject with Rive's arm IK, weighted by the pose's reach. Presenting gestures stay as small rotation offsets.
+
+### Bounds
+
+`RIG_ENVELOPE` (rig space at scale 1: x −176..152, y −284..72) bounds the drawn ink of every pose the motion system can produce, measured on the runtime's own transforms. While holding, the drawn ink never overlaps protected text and stays inside title-safe (checked on the committed lesson's hold frames). The layout box `WALLABY_EXTENT` still describes the standing figure (the rest pose's ink is x −144..90), but a real lean exceeds it, as the v2 figure's did, so the guarantees above are checked on real geometry instead.
 
 ### Model
 
@@ -90,31 +136,25 @@ No general-purpose physics or game engine (Matter.js, Rapier, Phaser), no Three.
 - **Platform response:** a landing on a card, graph node, or ledge depresses that platform by at most 3 px (cards by half as much) and returns it exactly to rest within 420 ms. The platform's text moves with it, and the feet ride it by the same quantised amount, so the character never floats or clips. UI captures never move.
 - **Sound:** `LANDING` now plays at the real contact rather than at the beat start, with quiet `TAKEOFF` (−30 dB) and `PUSH_CONTACT` cues. Steps and weight shifts are silent. All sonic assets are still unassigned, which means silence.
 
-### Palette (rig v2)
+### Guarantees
 
-| Part | Token |
-|---|---|
-| Coat, tail, outer ears, eyelids | `terracotta` (canonical WalletWall terracotta, `#BF4E32`) |
-| Far ear and foot, shading strokes | derived: `terracotta` mixed 42% toward `terracottaDark`, computed rather than typed |
-| Belly, muzzle, highlight | `cream` |
-| Inner ears | `mortar` (WalletWall's cream-family token) |
-| Outline, eyes, nose, claws | `charcoal` |
-| Trail tag on the strap | `tan` (the coat's former colour, kept as an accent) |
+Tests live in `test/motion.test.ts`, `test/motion-intelligence.test.ts`, `test/rive-rig.test.ts`, `test/rive-format.test.ts`, and `test/versions.test.ts`.
 
-The traced route stays a 3 px terracotta line over a grey dashed rail. Next to a filled, outlined character it reads as the path rather than the agent, so its treatment was left unchanged.
+- The same spec, config, rig, and runtime give the same plan, the same rig controls, and the same bone transforms. Shuffled evaluation of about 590 frames is bit-identical to timeline order, and a positive control proves the comparison catches a 0.01° change.
+- Every hop lands exactly on its target. Every clip that moves ends on its authored anchor, every perch holds it, and the mantle ends on the authored ledge. A very different physics config gives the same landings in the same order.
+- On every grounded frame the near toe is exactly on the ground point (within 0.01 px) and the knees point forward. The tail rests on supported surfaces and is released past edges, and no tail joint bends more than 70°.
+- Every control is finite and inside its hard limit on every frame. Clip weights are in [0, 1] and sum to 1, and clip times are in range.
+- Adversarial controls are refused, each with a positive control: non-finite or out-of-range values, unknown or duplicated clips, control clips used as poses, unreachable grips, and inverted support spans. So are malformed `.riv` values (NaN, overflow, duplicate or unknown properties) and a tampered asset.
+- The committed `.riv` regenerates byte-for-byte and matches its pin, and the coat written into the asset is the canonical terracotta. The build identity and the provenance manifest record the asset hash, rig version, runtime version, and WASM hash.
+- Invalid motion configs are refused, as before, with positive controls.
 
-### Guarantees (tests in `test/motion.test.ts`)
+### Review renders
 
-- The same spec, config, and code give the same plan and the same frames. The motion module reads no clock, randomness, or environment.
-- Every hop lands exactly on its target. Every clip that moves ends on its authored anchor, and every perch holds it.
-- A different but valid physics config yields the same landings in the same order. The solver reads clips and never rewrites them.
-- Invalid configs are refused, with positive controls for each case: NaN, Infinity, negative or zero values, out-of-range or unbounded values, string numbers, missing or unknown fields, and inconsistent pairs.
-- Invalid moves are refused: non-finite inputs, empty windows, non-positive scales, and moves that cannot fit their window under the speed and gravity limits.
-- All channels stay inside their limits on every frame, and platforms return exactly to rest.
-- Perched frames never overlap protected text.
+`npm run render:review` renders the pose sheet, a close-up, and the motion lab from `src/remotion/review/`, a separate entry point the video pipeline never bundles. Lab frames are chosen from the lab's own motion plan.
 
 ### Known weaknesses
 
-- **Text crossings in flight are reduced, not eliminated.** This video has 105 crossing frames against 109 for v1, which the tests use as a ceiling. The remainder come from route traces that pass beside node labels, the exit leap through the eyebrow, and hops between graph nodes. Removing them needs choreography changes (route and exit placement), which are outside a physics pass.
-- **Mid-route contacts on a trace are on the drawn trail, not on a platform.** The trail is treated as terrain.
-- **Code changes in `motion.ts` are not covered by the definition hash.** Only the config and the timing table are hashed, so a behavioural code change must bump `MOTION.version` by review discipline.
+- **Text crossings in flight are reduced, not eliminated:** 105 frames against the v1 ceiling of 109, for the reasons given for v2. Flight poses extend past the layout box, so that count, which uses the box, is an estimate.
+- **The rig is code-authored.** Its silhouette and clips were tuned by hand with probes, not by an animator in the Rive editor. The contract is stable, so an editor-authored `.riv` can replace it, but such a file must pass the same tests.
+- **Code changes in `motion.ts` are not covered by the definition hash.** Only the config and the timing table are hashed, so a behavioural code change must bump `MOTION.version` by review discipline. The rig is fully covered: its source is in the definition, and the asset is pinned by its bytes.
+- **The pinned runtime's IK quirks are handled, not removed.** The second zero-time pass and the reach clamp on the tail contact are needed on 2.31.5 and are checked by the tests. A runtime upgrade must re-run them.

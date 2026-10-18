@@ -21,11 +21,14 @@
     "studio": "node scripts/prepare-assets.ts && remotion studio src/remotion/index.ts --public-dir=dist/public",
     "render": "node scripts/render.ts",
     "render:stills": "node scripts/render.ts --stills",
+    "render:review": "node scripts/render-review.ts",
     "publish:dry-run": "node scripts/publish-dry-run.ts",
     "freshness": "node scripts/freshness.ts",
     "contracts:check": "node scripts/contracts-check.ts",
+    "rive:build": "node scripts/build-rive.ts",
+    "rive:check": "node scripts/build-rive.ts --check",
     "pipeline": "node scripts/pipeline.ts",
-    "check": "npm run typecheck && npm test && npm run plan:check && npm run validate"
+    "check": "npm run typecheck && npm test && npm run plan:check && npm run validate && npm run rive:check"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "5.2.8",
@@ -34,6 +37,7 @@
     "@remotion/bundler": "4.0.532",
     "@remotion/cli": "4.0.532",
     "@remotion/renderer": "4.0.532",
+    "@rive-app/canvas-advanced": "2.31.5",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "remotion": "4.0.532"

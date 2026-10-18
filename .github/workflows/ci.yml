@@ -1,7 +1,7 @@
 name: CI
 
-# Verifies the audiovisual docs pipeline: types, tests, byte-for-byte spec
-# regeneration, publishability validation, contract integrity, and a
+# Verifies the audiovisual docs pipeline: types, tests, byte-for-byte spec and
+# Rive rig regeneration, publishability validation, contract integrity, and a
 # dependency audit. Read-only and credential-free by design: it never renders
 # with a live voice, never contacts YouTube, and is safe on fork PRs.
 # Canonical reads come from the blob-verified fixture mirror; live staleness
@@ -50,6 +50,9 @@ jobs:
 
       - name: Committed specs regenerate byte-for-byte
         run: npm run plan:check
+
+      - name: Committed Rive rig regenerates byte-for-byte
+        run: npm run rive:check
 
       - name: Validate specs
         run: npm run validate

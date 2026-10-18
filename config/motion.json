@@ -1,8 +1,8 @@
 {
-  "schema": "walletwall.motion-config/v1",
+  "schema": "walletwall.motion-config/v2",
   "id": "walletwallaby-motion",
-  "version": 2,
-  "note": "WalletWallaby's physical performance. Lengths are in body heights (WALLABY_HEIGHT x the character's scale at that moment) so a near and a far WalletWallaby move alike; times are in milliseconds. Changing any value requires a new version (see src/character/walletwallaby/versions.ts).",
+  "version": 3,
+  "note": "WalletWallaby's physical performance. Lengths are in body heights (WALLABY_HEIGHT x the character's scale at that moment) so a near and a far WalletWallaby move alike; times are in milliseconds; angles in degrees. Changing any value requires a new version (see src/character/walletwallaby/versions.ts).",
   "gravityBodyHeightsPerS2": 21,
   "maxGravityBoost": 1.8,
   "hop": {
@@ -37,9 +37,42 @@
   "hold": {
     "poseBlendMs": 300,
     "shiftImpulse": 0.2,
-    "gazeTurnMs": 260,
-    "breathePeriodMs": 3400,
-    "breatheCrouch": 0.016
+    "gazeTurnMs": 260
+  },
+  "mantle": {
+    "minRiseBodyHeights": 0.55,
+    "approachMarginBodyHeights": 0.3,
+    "hangDepthBodyHeights": 0.72,
+    "faceGapBodyHeights": 0.16,
+    "apexAboveHangBodyHeights": 0.06,
+    "preloadMs": 120,
+    "hangMs": 90,
+    "pullMs": 220,
+    "settleMs": 120,
+    "grabImpulse": 0.35,
+    "topImpulse": 0.3
+  },
+  "landing": {
+    "hardFrom": 0.55,
+    "hardFull": 0.95,
+    "hardRecoverScale": 2.5
+  },
+  "tail": {
+    "restTension": 0.1,
+    "preloadSwingDeg": -8,
+    "preloadTension": 0.5,
+    "takeoffTension": 0.85,
+    "flightCounterGain": 0.9,
+    "flightStreamDeg": 10,
+    "flightTension": 0.55,
+    "reachSwingDeg": -8,
+    "braceSwingDeg": -12,
+    "braceTension": 0.8,
+    "hangSwingDeg": 9,
+    "pullSwingDeg": 10,
+    "narrowSwayDeg": 2,
+    "narrowSwayPeriodMs": 2600,
+    "narrowWidthBodyHeights": 1.6
   },
   "response": {
     "compression": {
@@ -80,6 +113,8 @@
     "maxEarLagDeg": 9,
     "maxHeadStabDeg": 6,
     "platformMaxPx": 3,
-    "maxSpeedBodyHeightsPerS": 16
+    "maxSpeedBodyHeightsPerS": 16,
+    "maxTailSwingDeg": 30,
+    "maxTailCurlDeg": 6
   }
 }

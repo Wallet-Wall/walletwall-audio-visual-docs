@@ -2,6 +2,8 @@
 *.png binary
 *.jpg binary
 *.woff2 binary
+# The compiled Rive rig is pinned by the sha256 of its exact bytes.
+*.riv binary
 
 # Canonical fixtures are byte-identical copies bound to their WalletWall git blob ids:
 # never convert line endings, or the blob binding breaks.

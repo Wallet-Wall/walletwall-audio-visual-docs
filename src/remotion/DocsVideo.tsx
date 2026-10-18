@@ -19,7 +19,7 @@ import type { DocsVideoProps } from './props.ts';
 import { SceneView } from './scenes/SceneView.tsx';
 import type { SceneState } from './scenes/common.tsx';
 import { rectStyle, textStyle } from './style.ts';
-import { WallabyFigure } from './wallaby/WallabyFigure.tsx';
+import { WallabyRive } from './wallaby/WallabyRive.tsx';
 
 interface Model {
   timeline: Timeline;
@@ -134,7 +134,7 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
         </div>
       ) : null}
 
-      {props.overlays.characterless ? null : <WallabyFigure state={wallaby} />}
+      {props.overlays.characterless ? null : <WallabyRive states={[wallaby]} opacity={wallaby.opacity} />}
 
       {cue ? (
         <div style={{ position: 'absolute', left: 260, width: 1400, top: 948, display: 'flex', justifyContent: 'center' }}>

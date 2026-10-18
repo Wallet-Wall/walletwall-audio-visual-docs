@@ -25,12 +25,13 @@ import {
   type MotionPlan,
 } from '../src/character/walletwallaby/motion.ts';
 import { RIG_PALETTE } from '../src/character/walletwallaby/rig.ts';
+import { SHAPES } from '../src/character/walletwallaby/rive/rig-source.ts';
 import { MOTION } from '../src/character/walletwallaby/versions.ts';
 import { VIDEO_ROOT } from '../src/config/load.ts';
 import { intersects } from '../src/layout/geometry.ts';
 import { EYEBROW_RECT, wallabyBounds } from '../src/layout/scene-layout.ts';
 import { buildTimeline } from '../src/timeline/timeline.ts';
-import { clone, committedSnapshot, committedSpec, config } from './helpers.ts';
+import { clone, committedSnapshot, committedSpec, config, poseNumbers } from './helpers.ts';
 
 const spec = committedSpec();
 const headings = Object.fromEntries(committedSnapshot().sections.map((s) => [s.id, s.heading]));
@@ -183,8 +184,15 @@ describe('the committed video', () => {
     for (const ms of frames()) {
       const s = sampleWallaby(plan, ms);
       if (!s.visible) continue;
-      const nums = [s.x, s.y, s.scale, s.opacity, ...Object.values(s.pose), ...Object.values(s.motion).filter((v): v is number => typeof v === 'number')];
+      const m0 = s.motion;
+      const nums = [s.x, s.y, s.scale, s.opacity, ...poseNumbers(s.pose), ...Object.values(m0).filter((v): v is number => typeof v === 'number'), m0.velocity.x, m0.velocity.y, m0.tail.swing, m0.tail.curl, m0.tail.tension];
       for (const v of nums) assert.ok(Number.isFinite(v), `t=${ms}`);
+      const weights = Object.values(s.pose.mix) as number[];
+      assert.ok(weights.length > 0 && weights.every((w) => w > 0 && w <= 1 + 1e-12), `clip weights t=${ms}`);
+      assert.ok(Math.abs(weights.reduce((a, b) => a + b, 0) - 1) < 1e-9, `clip weights sum to 1 t=${ms}`);
+      assert.ok(Math.abs(m0.tail.swing) <= limits.maxTailSwingDeg + 1e-9 && Math.abs(m0.tail.curl) <= limits.maxTailCurlDeg + 1e-9, `tail intent t=${ms}`);
+      assert.ok(m0.tail.tension >= 0 && m0.tail.tension <= 1, `tail tension t=${ms}`);
+      if (m0.support) assert.ok(m0.support.x0 <= s.x && s.x <= m0.support.x1, `support under the feet t=${ms}`);
       const m = s.motion;
       assert.ok(Math.abs(m.rotation) <= limits.maxRotationDeg + 1e-9, `rotation t=${ms}`);
       assert.ok(m.stretch >= -limits.maxCompression - 1e-9 && m.stretch <= limits.maxStretch + 1e-9, `stretch t=${ms}`);
@@ -323,10 +331,15 @@ describe('terracotta character', () => {
     assert.throws(() => mixTokens(TOKENS.terracotta, 'orange', 0.5), 'refuses a non-token colour');
   });
 
-  test('the figure paints only from the rig palette', () => {
-    const src = readFileSync(path.join(VIDEO_ROOT, 'src', 'remotion', 'wallaby', 'WallabyFigure.tsx'), 'utf8');
-    assert.ok(!/#[0-9a-f]{3,6}\b|rgba?\(/i.test(src), 'no colour literal in the figure');
-    for (const m of src.matchAll(/(?:fill|stroke)=\{([A-Z_]+)\}/g)) assert.ok(['FUR', 'FUR_SHADE', 'BELLY', 'INNER_EAR', 'INK', 'HIGHLIGHT', 'TAG'].includes(m[1]!), m[1]);
+  test('the rig paints only from the rig palette, and terracotta is the coat', () => {
+    const slots = Object.keys(RIG_PALETTE);
+    for (const shape of SHAPES) {
+      for (const paint of [shape.fill, shape.stroke]) if (paint) assert.ok(slots.includes(paint.slot), `${shape.name}: ${paint.slot}`);
+    }
+    const coat = SHAPES.filter((s) => s.fill?.slot === 'fur').map((s) => s.name);
+    for (const part of ['torso', 'tail', 'head', 'thigh_n', 'ear_n']) assert.ok(coat.includes(part), `${part} wears the terracotta coat`);
+    const sources = ['rig-source.ts', 'rig-compile.ts', 'riv-format.ts'].map((f) => readFileSync(path.join(VIDEO_ROOT, 'src', 'character', 'walletwallaby', 'rive', f), 'utf8'));
+    for (const src of sources) assert.ok(!/#[0-9a-f]{6}\b|rgba?\(/i.test(src), 'no colour literal in the rig');
   });
 });
 
