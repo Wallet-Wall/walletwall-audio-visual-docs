@@ -55,11 +55,18 @@ const layouts = layoutsFor(timeline, (id) => headings[id] ?? '');
 const motion = planMotion(choreograph(timeline, layouts), layouts);
 
 const renderInfoPath = path.join(out, 'render.json');
-const renderInfo = existsSync(renderInfoPath) ? readJson<{ engine: { name: string; version: string }; output: { path: string; sha256: string }; identity?: unknown; motionEngine?: MotionEngineIdentity }>(renderInfoPath) : null;
+const renderInfo = existsSync(renderInfoPath) ? readJson<{ specHash?: string; engine: { name: string; version: string }; output: { path: string; sha256: string }; identity?: unknown; motionEngine?: MotionEngineIdentity }>(renderInfoPath) : null;
 // A render made by a different toolchain, configuration, or character version cannot be described by this one.
 const identity = buildIdentity();
 if (renderInfo && prettyJson(renderInfo.identity ?? null) !== prettyJson(identity)) {
   console.error(`[publish:dry-run] ${videoId}: dist render.json was produced with a different build identity; re-render before publishing.`);
+  process.exit(1);
+}
+// Nor can a render of a different spec (an on-screen text edit keeps the timeline and the identity), or
+// a render.json from before renders recorded their spec.
+const specHash = contentAddress(spec);
+if (renderInfo && renderInfo.specHash !== specHash) {
+  console.error(`[publish:dry-run] ${videoId}: dist render.json was rendered from a different spec, or does not record one; re-render before publishing.`);
   process.exit(1);
 }
 // Nor can a render whose motion came from an engine artifact or engine config this checkout no longer has.
@@ -85,7 +92,6 @@ if (renderInfo && motionEngine.motionEngine === 'rust-wasm') {
 }
 const cueSheet = buildCueSheet(timeline, config.sonic, spec.audio.musicBedId, contacts);
 writeFileSync(path.join(out, 'cue-sheet.json'), prettyJson(cueSheet));
-const specHash = contentAddress(spec);
 const manifest = buildPublishManifest({
   spec,
   specHash,

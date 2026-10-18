@@ -163,4 +163,70 @@ describe('repository rules', () => {
     assert.ok(!/pull_request_target|schedule:/.test(wf), 'no privileged or scheduled trigger');
     for (const uses of wf.match(/uses:\s*\S+/g) ?? []) assert.match(uses, /uses:\s*actions\/(checkout|setup-node)@/);
   });
+
+  const workflows = (): { file: string; text: string }[] => {
+    const dir = path.join(VIDEO_ROOT, '.github', 'workflows');
+    return readdirSync(dir)
+      .filter((f) => /\.ya?ml$/.test(f))
+      .map((file) => ({ file, text: readFileSync(path.join(dir, file), 'utf8').replace(/\r\n/g, '\n') }));
+  };
+
+  test('every action is pinned to a full commit SHA, with the release it was resolved from', () => {
+    // A tag or branch can be moved to new code without any change here; a commit SHA cannot.
+    let refs = 0;
+    for (const { file, text } of workflows()) {
+      for (const m of text.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)(.*)$/gm)) {
+        refs++;
+        assert.match(m[1]!, /^[A-Za-z0-9-]+\/[A-Za-z0-9._/-]+@[0-9a-f]{40}$/, `${file}: ${m[1]} is not pinned to a full commit SHA`);
+        assert.match(m[2]!, /^ # v\d+\.\d+\.\d+$/, `${file}: ${m[1]} does not name the release it was resolved from`);
+      }
+    }
+    assert.ok(refs >= 10, `the scan found ${refs} action references`);
+  });
+
+  test('no workflow and no pipeline code can reach a live YouTube upload', () => {
+    // No credential can reach a job: no secret and no repository variable is referenced anywhere.
+    for (const { file, text } of workflows()) assert.ok(!/\b(?:secrets|vars)\./.test(text), `${file} references a secret or a repository variable`);
+    // Nothing names a YouTube or Google OAuth endpoint.
+    const endpoints = /youtube\.googleapis\.com|googleapis\.com\/(?:upload\/)?youtube|accounts\.google\.com\/o\/oauth2|oauth2\.googleapis\.com/i;
+    const pipeline = sources.filter((f) => !f.includes(`${path.sep}test${path.sep}`));
+    for (const file of pipeline) assert.ok(!endpoints.test(readFileSync(file, 'utf8')), `${path.relative(VIDEO_ROOT, file)} names a YouTube or OAuth endpoint`);
+    for (const { file, text } of workflows()) assert.ok(!endpoints.test(text), `${file} names a YouTube or OAuth endpoint`);
+    // The credential-free dry-run provider is the only upload provider, and nothing can state a live receipt.
+    const providers = pipeline.flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/class\s+(\w+)\s+implements\s+UploadProvider\b/g)].map((m) => m[1]));
+    assert.deepEqual(providers, ['DryRunUploadProvider']);
+    const live = pipeline.filter((f) => /['"]LIVE['"]/.test(readFileSync(f, 'utf8')));
+    assert.deepEqual(live.map((f) => path.relative(VIDEO_ROOT, f).split(path.sep).join('/')), ['src/publish/upload-provider.ts'], 'only the receipt type may name LIVE');
+  });
+
+  /** Each step of a workflow: its `- name:` line and every deeper-indented line after it. */
+  const steps = (text: string): string[] => {
+    const lines = text.split('\n');
+    const out: string[] = [];
+    lines.forEach((line, i) => {
+      const start = /^(\s*)- name: /.exec(line);
+      if (!start) return;
+      const indent = start[1]!.length;
+      let end = i + 1;
+      while (end < lines.length && (lines[end]!.trim() === '' || /^\s*/.exec(lines[end]!)![0].length > indent)) end++;
+      out.push(lines.slice(i, end).join('\n'));
+    });
+    return out;
+  };
+
+  test('review uploads carry only bundles the public-output gate verified', () => {
+    // The gate writes --bundle only on PASS, so an upload of that directory is an upload of verified files.
+    let uploads = 0;
+    for (const { file, text } of workflows()) {
+      const bundles = new Set([...text.matchAll(/--bundle="\$RUNNER_TEMP\/([\w.-]+)"/g)].map((m) => m[1]));
+      for (const step of steps(text)) {
+        if (!/uses:\s*actions\/upload-artifact@/.test(step)) continue;
+        uploads++;
+        const uploaded = /\n\s+path: \$\{\{ runner\.temp \}\}\/([\w.-]+)\n/.exec(`${step}\n`)?.[1];
+        assert.ok(uploaded && bundles.has(uploaded), `${file}: an upload step uploads something other than a bundle the gate wrote`);
+        assert.ok(!/\n\s+if:/.test(step), `${file}: an upload step must only run after every earlier step passed`);
+      }
+    }
+    assert.ok(uploads >= 2, `the scan found ${uploads} upload steps`);
+  });
 });

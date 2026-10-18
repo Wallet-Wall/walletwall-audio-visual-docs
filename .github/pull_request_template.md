@@ -96,9 +96,10 @@ docs page → VideoSpec → timeline → motion plan → Rive controls and IK �
 | Rustfmt | `cargo fmt --check` | |
 | Build / artifact regeneration | `npm run plan:check`; `npm run rive:check`; `npm run motion:check` (Linux or WSL) | |
 | Validation | `npm run validate`; `npm run contracts:check` | |
+| Public output | `npm run publish:dry-run`; `npm run public:check` (add `--stills=<dir>` after `npm run render:stills`) | |
 | Security audit | `npm audit --audit-level=moderate`; `cargo audit` when crate dependencies change | |
 | Diff hygiene | `git diff --check` | |
-| CI | Checks: Verify pipeline, Motion Intelligence (Rust/WASM), CodeQL | |
+| CI | Checks: Verify pipeline, Motion Intelligence (Rust/WASM), CodeQL, Public surface, Render determinism, Dependency review ([docs/CI.md](../docs/CI.md)) | |
 
 - **Test counts:** <!-- total, pass, fail, and skipped, and the change from main -->
 - **Positive controls:** <!-- for each new guard, the input that proves it fires -->

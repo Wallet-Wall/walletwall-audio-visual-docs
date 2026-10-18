@@ -1,0 +1,163 @@
+name: Public Output
+
+# The public-output assurance layer. CI (ci.yml) proves the source is correct; this workflow proves the
+# PUBLIC surface: the publication package that publish:dry-run writes (captions, cue sheet, media QA,
+# provenance, YouTube publish manifest, dry-run receipt), the lossless review stills including the
+# characterless design test, and that a repeat render reproduces every frame. It also reviews new
+# dependencies before they reach the rendering and publishing supply chain.
+#
+# Publication safety invariant:
+#   CI CAN prove publication readiness. CI MUST NOT publish.
+#   - No job here can obtain a YouTube, Google OAuth, voice-provider, or repository-write credential:
+#     the token is read-only (contents: read), the checkout does not persist it, and no secret or
+#     variable is referenced. The gate fails if a publication credential appears in its environment.
+#   - The only upload provider in the codebase is the credential-free DryRunUploadProvider. The gate
+#     refuses any package that describes a live upload or an initial privacy other than UNLISTED.
+#   - Actual YouTube publication is a separate, explicitly authorized, human-triggered action after
+#     human review (publish-manifest.json review.gate HUMAN_REVIEW_BEFORE_PUBLIC). Initial uploads stay
+#     UNLISTED under the current WalletWall publication policy.
+#   - Fork-safe: plain pull_request events only, fixture voice only, no live provider.
+#
+# Every action is pinned to a full commit SHA; the comment names the release it was resolved from.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  public-surface:
+    name: Public surface
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate specs
+        run: npm run validate
+
+      - name: Publish dry run (captions, cue sheet, media QA, provenance, manifest, receipt)
+        run: npm run publish:dry-run
+
+      - name: Public-output gate
+        run: npm run public:check -- --summary="$GITHUB_STEP_SUMMARY"
+
+  render-determinism:
+    name: Render determinism
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Where render:stills writes the review stills of the registered video (config/videos.json).
+      STILLS: dist/migration-readiness/stills
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Chrome Headless Shell (the version @remotion/renderer pins)
+        run: npx remotion browser ensure
+
+      # Lossless PNG stills are the determinism evidence; MP4 bytes are not run-to-run stable, so an MP4
+      # hash is never used here. Each render runs in a fresh Node process, and only the generated stills
+      # directory is moved between renders.
+      - name: Default engine, render A (standard review stills, with and without WalletWallaby)
+        run: |
+          npm run render:stills
+          mkdir -p "$RUNNER_TEMP/stills"
+          mv "$STILLS" "$RUNNER_TEMP/stills/typescript-a"
+
+      - name: Default engine, render B
+        run: |
+          npm run render:stills
+          mv "$STILLS" "$RUNNER_TEMP/stills/typescript-b"
+
+      - name: Default engine, A and B are byte-identical
+        run: npm run stills:compare -- "$RUNNER_TEMP/stills/typescript-a" "$RUNNER_TEMP/stills/typescript-b"
+
+      # Rust/WASM stays opt-in. Its body motion intentionally differs from the default engine's, so it is
+      # never compared with it: the proof is that the same Rust input gives the same Rust output. The set
+      # is bounded to one airborne frame per path the engine performs, chosen from its own plans.
+      - name: Rust/WASM engine, render A (one airborne frame per engine path)
+        run: |
+          frames="$(node scripts/engine-path-frames.ts)"
+          echo "engine path frames: $frames"
+          npm run render:stills -- --motion-engine=rust-wasm --frames="$frames"
+          mv "$STILLS" "$RUNNER_TEMP/stills/rust-wasm-a"
+
+      - name: Rust/WASM engine, render B
+        run: |
+          frames="$(node scripts/engine-path-frames.ts)"
+          npm run render:stills -- --motion-engine=rust-wasm --frames="$frames"
+          mv "$STILLS" "$RUNNER_TEMP/stills/rust-wasm-b"
+
+      - name: Rust/WASM engine, A and B are byte-identical
+        run: npm run stills:compare -- "$RUNNER_TEMP/stills/rust-wasm-a" "$RUNNER_TEMP/stills/rust-wasm-b"
+
+      - name: Validate specs
+        run: npm run validate
+
+      - name: Publish dry run
+        run: npm run publish:dry-run
+
+      # The gate checks both engines' stills (identity, motion engine, hashes, characterless twins, no
+      # metadata or local paths) and, only on PASS, copies exactly the files it verified into the bundle.
+      - name: Public-output gate over the review stills (writes the review bundle)
+        run: npm run public:check -- --stills="$RUNNER_TEMP/stills/typescript-b" --stills="$RUNNER_TEMP/stills/rust-wasm-b" --bundle="$RUNNER_TEMP/public-output-review" --summary="$GITHUB_STEP_SUMMARY"
+
+      - name: Upload review evidence (stills and publication package, as verified)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: public-output-review-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/public-output-review
+          if-no-files-found: error
+          retention-days: 14
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # Blocks a pull request that introduces a dependency (npm, Cargo, or GitHub Actions) with a known
+      # vulnerability of moderate severity or worse, in any scope: the same bar as
+      # `npm audit --audit-level=moderate` in ci.yml, which also covers dev dependencies. No license
+      # policy is set: see docs/CI.md.
+      - name: Dependency review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          fail-on-scopes: runtime, development, unknown
