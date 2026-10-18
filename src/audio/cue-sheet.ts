@@ -5,6 +5,7 @@
 // renderer resolves cue -> versioned asset; an unassigned asset is silence.
 // Isomorphic.
 
+import type { MotionEvent } from '../character/walletwallaby/motion.ts';
 import type { SonicIdentityConfig } from '../config/types.ts';
 import type { WallabyAction } from '../spec/vocabulary.ts';
 import type { Timeline } from '../timeline/timeline.ts';
@@ -12,7 +13,7 @@ import type { Timeline } from '../timeline/timeline.ts';
 export interface SonicCueEntry {
   event: string;
   atMs: number;
-  reason: 'ACTION' | 'TRANSITION' | 'EXPLICIT' | 'IDENT';
+  reason: 'ACTION' | 'TRANSITION' | 'EXPLICIT' | 'IDENT' | 'CONTACT';
   segmentId: string;
   /** Versioned asset id, or null = silence (not yet produced). */
   asset: string | null;
@@ -38,15 +39,31 @@ export const ACTION_SONICS: Partial<Record<WallabyAction, string>> = {
   DIMENSION_JUMP: 'DIMENSION_SHIFT',
 };
 
-export function buildCueSheet(timeline: Timeline, sonic: SonicIdentityConfig, musicBedId: string | null): CueSheet {
+/**
+ * Physical contact is sound too, owned by the renderer (never by the planner):
+ * takeoff and landing are timed to the motion plan's actual contacts. Steps
+ * within a trace and small weight shifts stay silent: no constant patter.
+ */
+export const CONTACT_SONICS: Partial<Record<MotionEvent['kind'], string>> = {
+  TAKEOFF: 'TAKEOFF',
+  LANDING: 'LANDING',
+  PUSH: 'PUSH_CONTACT',
+};
+
+export function buildCueSheet(timeline: Timeline, sonic: SonicIdentityConfig, musicBedId: string | null, contacts?: readonly MotionEvent[]): CueSheet {
   const raw: Omit<SonicCueEntry, 'asset' | 'gainDb'>[] = [];
   for (const seg of timeline.segments) {
     if (seg.role === 'IDENT') raw.push({ event: 'IDENT', atMs: seg.contentStartMs, reason: 'IDENT', segmentId: seg.id });
     for (const b of seg.beats) {
       const event = ACTION_SONICS[b.beat.action];
-      if (event) raw.push({ event, atMs: b.startMs, reason: 'ACTION', segmentId: seg.id });
+      // With a motion plan, landings are placed at the real contact instead of the beat start.
+      if (event && !(contacts && event === 'LANDING')) raw.push({ event, atMs: b.startMs, reason: 'ACTION', segmentId: seg.id });
     }
     for (const c of seg.sonic) raw.push({ event: c.event, atMs: c.atMs, reason: 'EXPLICIT', segmentId: seg.id });
+  }
+  for (const e of contacts ?? []) {
+    const event = CONTACT_SONICS[e.kind];
+    if (event) raw.push({ event, atMs: Math.round(e.atMs), reason: 'CONTACT', segmentId: e.segmentId });
   }
   // Codepoint order, never locale order: the cue sheet must be identical on every machine.
   raw.sort((a, b) => a.atMs - b.atMs || (a.event < b.event ? -1 : a.event > b.event ? 1 : 0));

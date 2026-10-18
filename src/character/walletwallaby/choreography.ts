@@ -1,17 +1,19 @@
-// WalletWallaby choreography: semantic beats -> deterministic motion clips.
+// WalletWallaby choreography: semantic beats -> clips that fix WHERE and WHEN.
 //
-// The planner picks MEANING (INSPECT this, TRACE that route). This module owns
-// locomotion: if WalletWallaby is not standing where an action needs it, it
-// hops there first; traces follow the drawn route; exit actions are scheduled
-// to finish exactly as their segment ends so they drive the transition. There
-// is no physics and no pathfinding: every clip is a closed-form function of
-// time, so any frame can be rendered independently. Isomorphic.
+// The planner picks MEANING (INSPECT this, TRACE that route). This module turns
+// it into an ordered list of clips whose endpoints are anchors resolved from the
+// VideoSpec: if WalletWallaby is not standing where an action needs it, it moves
+// there first; traces follow the drawn route; exit actions are scheduled to
+// finish exactly as their segment ends so they drive the transition. HOW each
+// clip is performed (anticipation, ballistic flight, contact, settle) is
+// ./motion.ts's job, and nothing there can change a clip's endpoints or order.
+// No pathfinding, no simulation. Isomorphic.
 
-import { easeInOut, easeOut, GROUND_Y, lerp, type Point } from '../../layout/geometry.ts';
+import { GROUND_Y, type Point } from '../../layout/geometry.ts';
 import { layoutScene, type SceneLayout } from '../../layout/scene-layout.ts';
 import type { WallabyAction, WallabyExpression, WallabyPose } from '../../spec/vocabulary.ts';
 import type { TimedSegment, Timeline } from '../../timeline/timeline.ts';
-import { AIRBORNE, blendExpression, blendPose, EXPRESSIONS, POSES, WALLABY_HEIGHT, type ExpressionParams, type PoseParams, type Viseme } from './rig.ts';
+import type { Viseme } from './rig.ts';
 
 export type ClipKind = 'HIDDEN' | 'HOLD' | 'TRAVEL' | 'TRAVERSE' | 'EXIT_JUMP' | 'PUSH' | 'DROP_IN';
 
@@ -259,37 +261,7 @@ export function choreograph(timeline: Timeline, layouts: Map<string, SceneLayout
   return clips;
 }
 
-// ── Sampling ────────────────────────────────────────────────────────────────
-
-export interface WallabyState {
-  visible: boolean;
-  /** Feet position in frame coordinates. */
-  x: number;
-  y: number;
-  scale: number;
-  opacity: number;
-  facing: 1 | -1;
-  pose: PoseParams;
-  expression: WallabyExpression;
-  expr: ExpressionParams;
-  /** Eye direction, each axis -1..1. */
-  gaze: Point;
-  mouth: Viseme;
-}
-
-const HIDDEN_STATE: WallabyState = {
-  visible: false,
-  x: 0,
-  y: 0,
-  scale: 1,
-  opacity: 0,
-  facing: 1,
-  pose: POSES.NEUTRAL,
-  expression: 'NEUTRAL',
-  expr: EXPRESSIONS.NEUTRAL,
-  gaze: { x: 0, y: 0 },
-  mouth: 'REST',
-};
+// ── Lookup ──────────────────────────────────────────────────────────────────
 
 export function clipAt(clips: Clip[], ms: number): Clip | undefined {
   let lo = 0;
@@ -302,100 +274,6 @@ export function clipAt(clips: Clip[], ms: number): Clip | undefined {
     else return c;
   }
   return undefined;
-}
-
-function pointAlong(path: Point[], f: number): Point {
-  const segs = path.slice(1).map((p, i) => dist(path[i]!, p));
-  const total = segs.reduce((a, b) => a + b, 0) || 1;
-  let target = f * total;
-  for (let i = 0; i < segs.length; i++) {
-    const len = segs[i]!;
-    if (target <= len) {
-      const t = len === 0 ? 0 : target / len;
-      return { x: lerp(path[i]!.x, path[i + 1]!.x, t), y: lerp(path[i]!.y, path[i + 1]!.y, t) };
-    }
-    target -= len;
-  }
-  return path[path.length - 1]!;
-}
-
-function gazeToward(x: number, y: number, scale: number, look: Point | null): Point {
-  if (!look) return { x: 0, y: 0 };
-  const eyeY = y - WALLABY_HEIGHT * scale * 0.82;
-  return { x: Math.max(-1, Math.min(1, (look.x - x) / 520)), y: Math.max(-1, Math.min(1, (look.y - eyeY) / 380)) };
-}
-
-export function wallabyStateAt(clips: Clip[], ms: number, mouth: Viseme = 'REST'): WallabyState {
-  const clip = clipAt(clips, ms);
-  if (!clip || clip.kind === 'HIDDEN') return HIDDEN_STATE;
-  const p = (ms - clip.startMs) / (clip.endMs - clip.startMs);
-  const expr = EXPRESSIONS[clip.expression];
-  const state = (x: number, y: number, scale: number, pose: PoseParams, opacity: number, look: Point | null, facing?: 1 | -1): WallabyState => {
-    const gaze = gazeToward(x, y, scale, look);
-    return {
-      visible: opacity > 0.001,
-      x,
-      y,
-      scale,
-      opacity,
-      facing: facing ?? (look && look.x < x - 12 ? -1 : 1),
-      pose,
-      expression: clip.expression,
-      expr,
-      gaze: facing !== undefined ? { x: Math.abs(gaze.x) * 0.5, y: gaze.y } : gaze,
-      mouth,
-    };
-  };
-  const travelFacing = (): 1 | -1 => (clip.to.x < clip.from.x - 4 ? -1 : 1);
-
-  switch (clip.kind) {
-    case 'HOLD': {
-      // Settle out of a landing, then breathe (a slow, small crouch cycle).
-      const settle = easeOut((ms - clip.startMs) / 280);
-      const target = POSES[clip.pose];
-      const posed = blendPose(POSES.LAND, target, settle);
-      const breathe = Math.sin((ms / 2600) * Math.PI * 2) * 0.025;
-      let look = clip.lookAt;
-      if (clip.lookAlt) look = Math.floor((ms - clip.startMs) / 1100) % 2 === 0 ? clip.lookAt : clip.lookAlt;
-      return state(clip.from.x, clip.from.y, clip.fromScale, { ...posed, crouch: posed.crouch + breathe }, 1, look);
-    }
-    case 'TRAVEL':
-    case 'EXIT_JUMP': {
-      const prep = clip.kind === 'EXIT_JUMP' ? 0.3 : 0.18;
-      const land = clip.kind === 'EXIT_JUMP' ? 1.01 : 0.84;
-      const scale = lerp(clip.fromScale, clip.toScale, easeInOut(p));
-      if (p < prep) return state(clip.from.x, clip.from.y, clip.fromScale, blendPose(POSES[clip.pose], POSES.PREPARE_JUMP, easeOut(p / prep)), 1, clip.to, travelFacing());
-      if (p < land) {
-        const f = easeInOut((p - prep) / (land - prep));
-        const x = lerp(clip.from.x, clip.to.x, f);
-        const y = lerp(clip.from.y, clip.to.y, f) - clip.arc * 4 * f * (1 - f);
-        return state(x, y, scale, AIRBORNE, 1, clip.to, travelFacing());
-      }
-      return state(clip.to.x, clip.to.y, clip.toScale, blendPose(AIRBORNE, POSES.LAND, easeOut((p - land) / (1 - land))), 1, clip.lookAt, travelFacing());
-    }
-    case 'TRAVERSE': {
-      const f = easeInOut(p);
-      const at = pointAlong(clip.path, f);
-      const travelled = f * clip.path.slice(1).reduce((n, q, i) => n + dist(clip.path[i]!, q), 0);
-      const step = Math.abs(Math.sin((travelled / 120) * Math.PI));
-      const pose = blendPose(POSES.LAND, AIRBORNE, step * 0.6);
-      return state(at.x, at.y - step * 14, lerp(clip.fromScale, clip.toScale, f), pose, 1, clip.lookAt, travelFacing());
-    }
-    case 'PUSH': {
-      if (p < 0.35) return state(clip.from.x, clip.from.y, clip.fromScale, blendPose(POSES[clip.pose], POSES.PREPARE_JUMP, easeOut(p / 0.35)), 1, clip.to);
-      const f = easeInOut((p - 0.35) / 0.65);
-      const x = lerp(clip.from.x, clip.to.x, f);
-      const y = lerp(clip.from.y, clip.to.y, f) - 90 * Math.sin(f * Math.PI);
-      return state(x, y, lerp(clip.fromScale, clip.toScale, f), AIRBORNE, 1 - f, clip.to);
-    }
-    case 'DROP_IN': {
-      const f = easeInOut(Math.min(1, p / 0.8));
-      const y = lerp(clip.from.y, clip.to.y, f);
-      const pose = p < 0.8 ? AIRBORNE : blendPose(AIRBORNE, POSES.LAND, easeOut((p - 0.8) / 0.2));
-      return state(clip.to.x, y, clip.fromScale, pose, Math.min(1, p / 0.4), clip.lookAt);
-    }
-  }
-  return HIDDEN_STATE;
 }
 
 /**

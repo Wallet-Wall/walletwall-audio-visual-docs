@@ -8,15 +8,23 @@
 import type { TOKENS } from '../../brand/tokens.ts';
 import type { WallabyExpression, WallabyPose } from '../../spec/vocabulary.ts';
 
-/** Which brand token paints each part of the figure. Names only: values live in the brand contract. */
+/**
+ * Which brand token paints each part of the figure. Names only: values live in
+ * the brand contract. WalletWallaby wears WalletWall terracotta: the coat, tail,
+ * and outer ears are the canonical terracotta; belly, muzzle, and inner ears are
+ * cream; outline, eyes, nose, and claws are charcoal. The far-side shade is
+ * derived from two canonical tokens (terracotta toward the dark terracotta),
+ * never typed in.
+ */
 export const RIG_PALETTE = {
-  fur: 'tan',
-  furFar: 'stoneLow',
+  fur: 'terracotta',
+  furShade: { from: 'terracotta', to: 'terracottaDark', t: 0.42 },
   belly: 'cream',
   innerEar: 'mortar',
   ink: 'charcoal',
-  tag: 'terracotta',
-} as const satisfies Record<string, keyof typeof TOKENS>;
+  highlight: 'cream',
+  tag: 'tan',
+} as const satisfies Record<string, keyof typeof TOKENS | { from: keyof typeof TOKENS; to: keyof typeof TOKENS; t: number }>;
 
 export interface PoseParams {
   /** 0..1 knee bend (anticipation, landing, perching). */

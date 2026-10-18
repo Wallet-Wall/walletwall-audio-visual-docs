@@ -12,6 +12,18 @@ export const CSS_TOKEN_MIRROR = CSS_ROOT;
 
 export type CssToken = keyof typeof CSS_TOKEN_MIRROR;
 
+/**
+ * A shade between two opaque #rrggbb tokens (t = 0 -> a, 1 -> b). Derived shades
+ * are computed from canonical tokens, never typed in, so they move with the brand.
+ */
+export function mixTokens(a: string, b: string, t: number): string {
+  const pa = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(a);
+  const pb = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(b);
+  if (!pa || !pb || !Number.isFinite(t) || t < 0 || t > 1) throw new Error(`mixTokens(${a}, ${b}, ${t}): needs two opaque tokens and 0..1`);
+  const ch = (k: number): string => Math.round(parseInt(pa[k]!, 16) * (1 - t) + parseInt(pb[k]!, 16) * t).toString(16).padStart(2, '0');
+  return `#${ch(1)}${ch(2)}${ch(3)}`.toUpperCase();
+}
+
 /** An opaque #rrggbb token at the given alpha, formatted like the app's own rgba() tokens. */
 export function withAlpha(hex: string, alpha: number): string {
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
