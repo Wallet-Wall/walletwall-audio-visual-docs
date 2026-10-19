@@ -2,6 +2,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { loadAttentionConfig } from '../attention/config.ts';
 import { voiceRequestFor, type VoiceProvider } from '../audio/voice-provider.ts';
 import { loadVisualConfig } from '../blender/visual.ts';
 import { RIVE_ASSET, RIVE_RUNTIME } from '../character/walletwallaby/versions.ts';
@@ -86,5 +87,6 @@ export function buildProps(spec: VideoSpec, source: NormalizedSource, track: Nar
     overlays,
     provenance: { blob: spec.source.blob, contentHash: spec.source.contentHash },
     material: loadVisualConfig(),
+    direction: loadAttentionConfig(),
   };
 }

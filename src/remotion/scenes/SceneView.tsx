@@ -1,15 +1,18 @@
 // Scene renderers. Each draws exactly the regions computed by
 // src/layout/scene-layout.ts, so what validation measured is what appears.
+// Attention direction (src/attention/direction.ts) only changes how much of
+// each element is on screen (its opacity, its wash, its rule), never where.
 
 import React from 'react';
 import { AbsoluteFill, Img, staticFile } from 'remotion';
+import { routeDrawn } from '../../attention/direction.ts';
 import { TOKENS } from '../../brand/tokens.ts';
-import type { Point } from '../../layout/geometry.ts';
+import type { Point, Rect } from '../../layout/geometry.ts';
 import { EYEBROW_RECT, SUMMIT_LEDGE, type Route } from '../../layout/scene-layout.ts';
 import type { CardScene, GraphScene, SceneSpec, TakeawayScene, UiScene, VideoSpec } from '../../spec/types.ts';
 import { rectStyle, settle, textStyle } from '../style.ts';
 import { useMaterial } from '../material.tsx';
-import { Attention, BrickMarker, dipStyle, Platform, regionFor, TextAt, type SceneState } from './common.tsx';
+import { Attention, BrickMarker, dipStyle, emphasisOf, FocusRule, Platform, regionFor, TextAt, type SceneState } from './common.tsx';
 import { Formation, Ground, RockSlab } from './terrain-art.tsx';
 
 export const SceneView: React.FC<{ scene: SceneSpec; state: SceneState; spec: VideoSpec }> = ({ scene, state, spec }) => {
@@ -27,6 +30,9 @@ export const SceneView: React.FC<{ scene: SceneSpec; state: SceneState; spec: Vi
   );
 };
 
+const washOf = (state: SceneState, id: string): number => state.direction.wash[id] ?? 0;
+const resolvedOf = (state: SceneState, id: string): number => state.direction.resolved[id] ?? 0;
+
 const CardView: React.FC<{ scene: CardScene; state: SceneState }> = ({ scene, state }) => {
   const card = state.layout.platforms.find((p) => p.kind === 'CARD')!;
   const items = [scene.heading, ...scene.body];
@@ -42,14 +48,14 @@ const CardView: React.FC<{ scene: CardScene; state: SceneState }> = ({ scene, st
         : null}
       {items.map((el) => {
         const r = regionFor(state.layout, el.id);
-        return <Attention key={`a-${el.id}`} rect={r?.rect} on={state.attention.has(el.id)} resolved={state.resolved.has(el.id)} />;
+        return <Attention key={`a-${el.id}`} rect={r?.rect} wash={washOf(state, el.id)} resolved={resolvedOf(state, el.id)} />;
       })}
       {items.map((el, i) => {
         const r = regionFor(state.layout, el.id);
         const reveal = settle(state.ms, state.seg.reveals[el.id]);
         return (
           <React.Fragment key={el.id}>
-            {i > 0 && r && scene.layout === 'STACK' ? <BrickMarker x={r.rect.x - 30} y={r.rect.y + 17} opacity={reveal.opacity} /> : null}
+            {i > 0 && r && scene.layout === 'STACK' ? <BrickMarker x={r.rect.x - 30} y={r.rect.y + 17} opacity={reveal.opacity * emphasisOf(state, el.id)} /> : null}
             <TextAt region={r} state={state} />
           </React.Fragment>
         );
@@ -70,22 +76,54 @@ function routePath(route: Route): string {
   return `M ${a.x} ${a.y} Q ${mid.x} ${mid.y - 24} ${b.x} ${b.y}`;
 }
 
+/**
+ * The route entrance: the part of a route drawn so far, from its source toward its destination, as a clip box that
+ * grows along the route's dominant direction (left-to-right, right-to-left, upward, or downward). Null once drawn,
+ * so a drawn route renders exactly as it always has.
+ */
+function drawClip(route: Route, drawn: number): Rect | null {
+  if (drawn >= 1) return null;
+  const a = route.points[0]!;
+  const b = route.points[route.points.length - 1]!;
+  const xs = route.points.map((p) => p.x);
+  const ys = route.points.map((p) => p.y);
+  const PAD = 8;
+  if (Math.abs(b.x - a.x) >= Math.abs(b.y - a.y)) {
+    const x0 = Math.min(...xs) - PAD;
+    const x1 = Math.max(...xs) + PAD;
+    const w = (x1 - x0) * drawn;
+    return b.x >= a.x ? { x: x0, y: 0, w, h: 1080 } : { x: x1 - w, y: 0, w, h: 1080 };
+  }
+  const y0 = Math.min(...ys) - PAD;
+  const y1 = Math.max(...ys) + PAD;
+  const h = (y1 - y0) * drawn;
+  return b.y >= a.y ? { x: 0, y: y0, w: 1920, h } : { x: 0, y: y1 - h, w: 1920, h };
+}
+
 const Routes: React.FC<{ routes: Route[]; state: SceneState }> = ({ routes, state }) => {
   const m = useMaterial();
+  const segId = state.seg.id.replace(/[^a-zA-Z0-9-]/g, '-');
   return (
   <svg style={{ position: 'absolute', inset: 0 }} width={1920} height={1080} viewBox="0 0 1920 1080">
-    {routes.map((route) => {
-      const shown = settle(state.ms, state.seg.reveals[route.id]).opacity;
+    {routes.map((route, i) => {
+      const drawn = routeDrawn(state.ms, state.seg.reveals[route.id], state.routeDrawMs);
+      if (drawn <= 0) return null;
+      const clip = drawClip(route, drawn);
+      const clipId = `route-${segId}-${i}`;
       const traced = state.traced[route.id] ?? 0;
       const d = routePath(route);
+      const end = route.points[route.points.length - 1]!;
+      const emphasis = emphasisOf(state, route.id);
       return (
-        <g key={route.id} opacity={shown} fill="none">
+        <g key={route.id} fill="none" {...(clip ? { clipPath: `url(#${clipId})` } : {})} {...(emphasis < 1 ? { opacity: emphasis } : {})}>
+          {clip ? (
+            <clipPath id={clipId}>
+              <rect x={clip.x} y={clip.y} width={clip.w} height={clip.h} />
+            </clipPath>
+          ) : null}
           <path d={d} stroke={TOKENS.charcoalRail} strokeWidth={2} strokeDasharray="7 9" />
           {traced > 0 ? <path d={d} stroke={TOKENS.terracotta} strokeWidth={3} pathLength={1} strokeDasharray={`${traced} 1`} /> : null}
-          {(() => {
-            const end = route.points[route.points.length - 1]!;
-            return <rect x={end.x - 5} y={end.y - 5} width={10} height={10} fill={traced >= 1 ? TOKENS.terracotta : m.flat.surface} stroke={TOKENS.charcoalRail} />;
-          })()}
+          <rect x={end.x - 5} y={end.y - 5} width={10} height={10} fill={traced >= 1 ? TOKENS.terracotta : m.flat.surface} stroke={TOKENS.charcoalRail} />
         </g>
       );
     })}
@@ -103,7 +141,7 @@ const RouteView: React.FC<{ scene: GraphScene; state: SceneState }> = ({ scene, 
       .map((p) => {
         const nodeId = p.id.slice('pillar:'.length);
         return (
-          <div key={p.id} style={{ opacity: settle(state.ms, state.seg.reveals[nodeId]).opacity }}>
+          <div key={p.id} style={{ opacity: settle(state.ms, state.seg.reveals[nodeId]).opacity * emphasisOf(state, nodeId) }}>
             <Formation kind="pillar" id={p.id} rect={p.rect} />
           </div>
         );
@@ -112,10 +150,10 @@ const RouteView: React.FC<{ scene: GraphScene; state: SceneState }> = ({ scene, 
     {scene.nodes.map((n) => {
       const platform = state.layout.platforms.find((p) => p.id === `node:${n.id}`)!;
       const reveal = settle(state.ms, state.seg.reveals[n.id]);
-      const focus = state.attention.has(n.id);
       return (
-        <div key={n.id} style={{ ...reveal, ...dipStyle(state, `node:${n.id}`, reveal.transform) }}>
-          <Platform rect={platform.rect} style={focus ? { borderTop: `3px solid ${TOKENS.terracotta}` } : {}} />
+        <div key={n.id} style={{ ...reveal, opacity: reveal.opacity * emphasisOf(state, n.id), ...dipStyle(state, `node:${n.id}`, reveal.transform) }}>
+          <Platform rect={platform.rect} />
+          <FocusRule rect={platform.rect} strength={washOf(state, n.id)} />
           <TextAt region={regionFor(state.layout, n.id)} state={state} />
           <TextAt region={n.detail ? regionFor(state.layout, n.detail.id) : undefined} state={state} color={m.flat.text.muted} />
         </div>
@@ -140,8 +178,9 @@ const LayeredView: React.FC<{ scene: GraphScene; state: SceneState }> = ({ scene
       const platform = state.layout.platforms.find((p) => p.id === `node:${n.id}`)!;
       const reveal = settle(state.ms, state.seg.reveals[n.id]);
       return (
-        <div key={n.id} style={{ ...reveal, ...dipStyle(state, `node:${n.id}`, reveal.transform) }}>
-          <Platform rect={platform.rect} style={state.attention.has(n.id) ? { borderTop: `3px solid ${TOKENS.terracotta}` } : {}} />
+        <div key={n.id} style={{ ...reveal, opacity: reveal.opacity * emphasisOf(state, n.id), ...dipStyle(state, `node:${n.id}`, reveal.transform) }}>
+          <Platform rect={platform.rect} />
+          <FocusRule rect={platform.rect} strength={washOf(state, n.id)} />
           <TextAt region={regionFor(state.layout, n.id)} state={state} />
           <TextAt region={n.detail ? regionFor(state.layout, n.detail.id) : undefined} state={state} color={m.flat.text.muted} />
         </div>
@@ -173,14 +212,14 @@ const TakeawayView: React.FC<{ scene: TakeawayScene; state: SceneState }> = ({ s
       <Formation kind="ledge" id="ledge" rect={SUMMIT_LEDGE} />
     </div>
     {[scene.statement, ...scene.support].map((el) => (
-      <Attention key={`a-${el.id}`} rect={regionFor(state.layout, el.id)?.rect} on={state.attention.has(el.id)} resolved={state.resolved.has(el.id)} />
+      <Attention key={`a-${el.id}`} rect={regionFor(state.layout, el.id)?.rect} wash={washOf(state, el.id)} resolved={resolvedOf(state, el.id)} />
     ))}
     <TextAt region={regionFor(state.layout, scene.statement.id)} state={state} />
     {scene.support.map((el) => {
       const r = regionFor(state.layout, el.id);
       return (
         <React.Fragment key={el.id}>
-          {r ? <BrickMarker x={r.rect.x} y={r.rect.y - 14} opacity={settle(state.ms, state.seg.reveals[el.id]).opacity} /> : null}
+          {r ? <BrickMarker x={r.rect.x} y={r.rect.y - 14} opacity={settle(state.ms, state.seg.reveals[el.id]).opacity * emphasisOf(state, el.id)} /> : null}
           <TextAt region={r} state={state} color={m.flat.text.muted} />
         </React.Fragment>
       );

@@ -1,9 +1,19 @@
 // The WalletWall docs-video composition. Everything visible is a pure function
-// of (props, current time): the timeline, scene layouts, and WalletWallaby's
-// clips and motion plan are computed once from the spec, then sampled per frame.
+// of (props, current time): the timeline, scene layouts, WalletWallaby's clips
+// and motion plan, and the attention direction schedule are computed once from
+// the spec, then sampled per frame.
+//
+// Two layers. The CONTENT WORLD (the scenes with their transitions, and the
+// character drawn on them) is framed as one unit by attention direction's
+// bounded camera: a single transform about the frame centre, so the character
+// stays registered with its support exactly. The provenance chip shares the eyebrow
+// row the scene lays out, so it rides the world with it. The FIXED EDITORIAL LAYER
+// (a staged depth reveal, review captions, debug guides, the
+// end screen's reserved zones) is never framed.
 
 import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { AbsoluteFill, cancelRender, continueRender, delayRender, Img, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
+import { cameraAt, directionAt, framingCss, planAttention, type AttentionPlan } from '../attention/direction.ts';
 import { buildCaptions } from '../audio/captions.ts';
 import { TOKENS, withAlpha } from '../brand/tokens.ts';
 import { choreograph, layoutsFor, mouthAt, type Clip } from '../character/walletwallaby/choreography.ts';
@@ -11,7 +21,6 @@ import { planMotion, platformOffsets, traverseProgress, type MotionPlan } from '
 import { CONTENT_BOTTOM, easeInOut, TITLE_SAFE } from '../layout/geometry.ts';
 import { END_SCREEN_ZONES, PROVENANCE_CHIP } from '../layout/brand-layout.ts';
 import type { SceneLayout } from '../layout/scene-layout.ts';
-import type { SceneSpec } from '../spec/types.ts';
 import { bindMotionEngine, sampleWithEngine, type BoundMotionEngine } from '../motion/rust-path.ts';
 import { buildTimeline, type TimedSegment, type Timeline } from '../timeline/timeline.ts';
 import { BrandSegment } from './brand/BrandSegment.tsx';
@@ -31,6 +40,8 @@ interface Model {
   motion: MotionPlan;
   /** The Rust/WASM engine's plans for the paths it owns (none unless the render selected it), and the contacts the scene reacts to. */
   engine: BoundMotionEngine;
+  /** Where the viewer's eye is guided, when (src/attention/direction.ts): derived from the same beats and layouts. */
+  attention: AttentionPlan;
   captions: ReturnType<typeof buildCaptions>;
 }
 
@@ -41,41 +52,19 @@ export function buildModel(props: DocsVideoProps): Model {
   const motion = planMotion(clips, layouts);
   // Fails closed: an engine plan that does not answer exactly these clips stops the render.
   const engine = bindMotionEngine(props.motionEngine, motion, timeline.fps, props.spec.id);
-  return { timeline, layouts, clips, motion, engine, captions: buildCaptions(timeline) };
-}
-
-/** Map a Wallaby anchor id to the scene element it designates. */
-function elementForAnchor(anchor: string | undefined, scene: SceneSpec): string[] {
-  if (!anchor) return [];
-  if (anchor === 'card:heading' && scene.type === 'CARD') return [scene.heading.id];
-  if (anchor === 'takeaway:statement' && scene.type === 'TAKEAWAY') return [scene.statement.id];
-  for (const prefix of ['card:body:', 'node:', 'takeaway:support:']) if (anchor.startsWith(prefix)) return [anchor.slice(prefix.length)];
-  if (anchor.startsWith('edge:')) return [anchor.split('->')[1] ?? ''];
-  return [];
+  const attention = planAttention(timeline, layouts, clips, props.direction);
+  return { timeline, layouts, clips, motion, engine, attention, captions: buildCaptions(timeline) };
 }
 
 /** `contacts`: what the platforms react to (the TypeScript plan's contacts, or the engine's on the paths it performs). */
-function sceneState(seg: TimedSegment, layout: SceneLayout, motion: MotionPlan, contacts: BoundMotionEngine['contacts'], ms: number): SceneState {
-  const scene = seg.scene!;
-  const attention = new Set<string>();
-  const resolved = new Set<string>();
-  const started = seg.beats.filter((b) => b.startMs <= ms);
-  const current = started[started.length - 1];
-  if (current) {
-    const { action, target, secondaryTarget } = current.beat;
-    if (action === 'INSPECT' || action === 'REVEAL' || action === 'RESOLVE' || action === 'PERCH' || action === 'LAND' || action === 'COMPARE' || action === 'TRACE') {
-      for (const id of elementForAnchor(target, scene)) attention.add(id);
-      if (action === 'COMPARE') for (const id of elementForAnchor(secondaryTarget, scene)) attention.add(id);
-    }
-  }
-  for (const b of started) if (b.beat.action === 'RESOLVE') for (const id of elementForAnchor(b.beat.target, scene)) resolved.add(id);
+function sceneState(seg: TimedSegment, layout: SceneLayout, motion: MotionPlan, contacts: BoundMotionEngine['contacts'], attention: AttentionPlan, ms: number): SceneState {
   const traced: Record<string, number> = {};
   for (const c of motion.clips) {
     if (c.segmentId !== seg.id || c.kind !== 'TRAVERSE' || !c.target) continue;
     // The trail fills in as WalletWallaby's feet cover it.
     traced[c.target] = ms < c.startMs ? 0 : traverseProgress(motion, c, ms);
   }
-  return { ms, seg, layout, attention, resolved, traced, platformDip: platformOffsets(motion, seg.id, ms, contacts) };
+  return { ms, seg, layout, direction: directionAt(attention, seg.id, ms), routeDrawMs: attention.config.entrance.routeDrawMs, traced, platformDip: platformOffsets(motion, seg.id, ms, contacts) };
 }
 
 function transitionStyles(type: TimedSegment['transitionIn']['type'], e: number): { exit: React.CSSProperties; enter: React.CSSProperties } {
@@ -133,7 +122,7 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
   const renderSegment = (s: TimedSegment, at: number): React.ReactNode => {
     if (s.scene) {
       const layout = model.layouts.get(s.id)!;
-      return <SceneView scene={s.scene} state={sceneState(s, layout, model.motion, model.engine.contacts, at)} spec={props.spec} />;
+      return <SceneView scene={s.scene} state={sceneState(s, layout, model.motion, model.engine.contacts, model.attention, at)} spec={props.spec} />;
     }
     const template = s.templateId ? props.templates.templates[s.templateId] : undefined;
     return template ? <BrandSegment seg={s} ms={at} spec={props.spec} template={template} docTitle={props.docTitle} provenance={props.provenance} /> : null;
@@ -144,28 +133,35 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
   const reveal = props.overlays.characterless ? undefined : props.depthReveals?.find((r) => frame >= r.range.first && frame <= r.range.last);
   const cue = props.overlays.captions ? model.captions.find((c) => ms >= c.startMs && ms < c.endMs) : undefined;
   const section = seg.scene ? props.headings[seg.scene.eyebrowSectionId] : undefined;
+  // The content world's framing: identity (`none`) wherever attention direction frames nothing, so those frames are untouched.
+  const framing = cameraAt(model.attention, ms);
 
   return (
     <MaterialContext.Provider value={props.material}>
     <AbsoluteFill style={{ backgroundColor: TOKENS.paper, overflow: 'hidden' }}>
-      {inTransition && prev ? <AbsoluteFill style={styles.exit}>{renderSegment(prev, prev.endMs - 1)}</AbsoluteFill> : null}
-      <AbsoluteFill style={inTransition ? styles.enter : undefined}>{renderSegment(seg, ms)}</AbsoluteFill>
+      {/* The content world: scenes, their transitions, and the character, framed as ONE unit (one transform, one origin). */}
+      <AbsoluteFill data-layer="content-world" style={{ transform: framingCss(framing), transformOrigin: '960px 540px' }}>
+        {inTransition && prev ? <AbsoluteFill style={styles.exit}>{renderSegment(prev, prev.endMs - 1)}</AbsoluteFill> : null}
+        <AbsoluteFill style={inTransition ? styles.enter : undefined}>{renderSegment(seg, ms)}</AbsoluteFill>
+        {/* The provenance chip shares the eyebrow row the scene grammar lays out, so it rides the world with it (title-safe-checked like any text) and stays under the character. */}
+        {seg.scene && !inTransition ? (
+          <div style={{ ...rectStyle(PROVENANCE_CHIP), ...textStyle('chip', true), color: props.material.flat.text.muted, textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {`${props.spec.source.docPath.replace(/^docs\//, '')}${section ? ` § ${section}` : ''}`}
+          </div>
+        ) : null}
+        {reveal || props.overlays.characterless ? null : props.characterRenderer ? (
+          <WallabyBlender frame={frame} visible={wallaby.visible} opacity={wallaby.opacity} source={props.characterRenderer} />
+        ) : (
+          <WallabyRive states={[wallaby]} opacity={wallaby.opacity} />
+        )}
+      </AbsoluteFill>
 
-      {seg.scene && !inTransition ? (
-        <div style={{ ...rectStyle(PROVENANCE_CHIP), ...textStyle('chip', true), color: props.material.flat.text.muted, textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {`${props.spec.source.docPath.replace(/^docs\//, '')}${section ? ` § ${section}` : ''}`}
-        </div>
-      ) : null}
-
+      {/* The fixed editorial layer: never framed. */}
       {reveal ? (
         <AbsoluteFill style={{ backgroundColor: TOKENS.paper }}>
           <Img src={staticFile(`${reveal.dir}/f${String(frame).padStart(5, '0')}.png`)} style={{ position: 'absolute', left: 0, top: 0, width: 1920, height: 1080 }} />
         </AbsoluteFill>
-      ) : props.overlays.characterless ? null : props.characterRenderer ? (
-        <WallabyBlender frame={frame} visible={wallaby.visible} opacity={wallaby.opacity} source={props.characterRenderer} />
-      ) : (
-        <WallabyRive states={[wallaby]} opacity={wallaby.opacity} />
-      )}
+      ) : null}
 
       {cue ? (
         <div style={{ position: 'absolute', left: 260, width: 1400, top: 948, display: 'flex', justifyContent: 'center' }}>

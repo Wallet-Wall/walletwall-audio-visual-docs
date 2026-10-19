@@ -12,8 +12,10 @@ import templatesJson from '../../config/copy-templates.json';
 import lexiconJson from '../../config/pronunciation.json';
 import voiceJson from '../../config/voice-identity.json';
 import visualJson from '../../config/blender-visual.json';
+import attentionJson from '../../config/attention.json';
 import specJson from '../../specs/migration-readiness/spec.json';
 import snapshotJson from '../../specs/migration-readiness/source.snapshot.json';
+import { resolveAttentionConfig } from '../attention/direction.ts';
 import { resolveVisual, type RawVisual } from '../blender/visual-core.ts';
 import { DocsVideo } from './DocsVideo.tsx';
 import type { DocsVideoProps } from './props.ts';
@@ -37,6 +39,7 @@ const defaultProps: DocsVideoProps = {
   overlays: { captions: true, characterless: false, guides: false },
   provenance: { blob: spec.source.blob, contentHash: spec.source.contentHash },
   material: resolveVisual(visualJson as unknown as RawVisual),
+  direction: resolveAttentionConfig(attentionJson),
 };
 
 const calculateMetadata: CalculateMetadataFunction<DocsVideoProps> = ({ props }) => {

@@ -4,6 +4,7 @@
 // the Rust/WASM motion engine, the engine's plans (data: one state per frame).
 // It never receives credentials, prompts, or provider handles.
 
+import type { AttentionConfig } from '../attention/direction.ts';
 import type { BlenderVisual } from '../blender/visual-core.ts';
 import type { CopyTemplates } from '../config/types.ts';
 import type { MotionEngineProps } from '../motion/rust-path.ts';
@@ -63,6 +64,8 @@ export interface DocsVideoProps {
   provenance: { blob: string; contentHash: string };
   /** The resolved material (config/blender-visual.json): authored cards in parchment, text colours, and the terrain formations' palette. */
   material: BlenderVisual;
+  /** The resolved attention direction (config/attention.json): the mode grammar's treatments and the framing bounds. */
+  direction: AttentionConfig;
   /** Rust/WASM Motion Intelligence plans for the paths it owns; absent = the TypeScript solver alone. */
   motionEngine?: MotionEngineProps;
   /** WalletWallaby drawn from a staged Blender sequence; absent = the Rive rig. */
