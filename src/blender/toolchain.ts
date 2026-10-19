@@ -124,5 +124,18 @@ export function runBlender(blender: { exe: string }, cfg: BlenderConfig, entry: 
   return { ms };
 }
 
+/**
+ * A file's text in one read, or null when it does not exist (any other error is thrown). Callers never test for a
+ * file and then open it: what was checked is exactly what is used.
+ */
+export function readIfPresent(file: string): string | null {
+  try {
+    return readFileSync(file, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
 /** A file Blender wrote, by its path relative to dist/blender/out. */
 export const outFile = (rel: string): string => path.join(BLENDER_OUT, ...rel.split('/'));

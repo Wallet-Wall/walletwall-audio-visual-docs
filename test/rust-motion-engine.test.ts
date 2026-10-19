@@ -14,7 +14,7 @@ import { buildCueSheet } from '../src/audio/cue-sheet.ts';
 import { estimateTrack } from '../src/audio/voice-provider.ts';
 import { choreograph, layoutsFor } from '../src/character/walletwallaby/choreography.ts';
 import { MOTION_CONFIG, MotionPlanError, planHop, planMotion, platformOffsets, sampleWallaby, SETTLE_RESERVE_MS, type HopMotion, type MotionEvent, type MotionPlan as TsMotionPlan } from '../src/character/walletwallaby/motion.ts';
-import { rigControls } from '../src/character/walletwallaby/rive/rig-controls.ts';
+import { rigControls } from '../src/character/walletwallaby/rig/rig-controls.ts';
 import { WALLABY_HEIGHT } from '../src/character/walletwallaby/rig.ts';
 import { MOTION } from '../src/character/walletwallaby/versions.ts';
 import { VIDEO_ROOT } from '../src/config/load.ts';

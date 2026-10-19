@@ -11,9 +11,9 @@
 
 import { mixTokens } from '../../../brand/tokens.ts';
 import { WALLABY_HEIGHT } from '../rig.ts';
-import { slotColor, type RigModel } from '../rive/rig-compile.ts';
-import type { Vec } from '../rive/rig-math.ts';
-import { BONES, IKS, RIG_ENVELOPE, TAIL_BONES, TAIL_REST, TOE_PLANT, type IkGroup, type RigBone } from '../rive/rig-source.ts';
+import { slotColor, type RigModel } from '../rig/rig-compile.ts';
+import type { Vec } from '../rig/rig-math.ts';
+import { BONES, IKS, RIG_ENVELOPE, TAIL_BONES, TAIL_REST, TOE_PLANT, type IkGroup, type RigBone } from '../rig/rig-source.ts';
 import { UNITS_PER_PX } from './bridge.ts';
 
 export const BLENDER_RIG_SCHEMA = 'walletwall.blender-rig/v1';

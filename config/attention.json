@@ -1,0 +1,46 @@
+{
+  "schema": "walletwall.attention-direction/v1",
+  "note": "Editorial attention direction (docs/ATTENTION.md): how the renderer guides the eye to meaning the lesson already authored. The planner never reads this file. A mode is derived from the current beat (src/attention/direction.ts); each mode names a visual hierarchy (the opacity of what is not the subject: 1 = untouched, never below the floor the loader enforces) and a bounded whole-world framing (a scale about the frame centre and a lean toward the subject, clamped so the world still covers the frame and every text stays title-safe; identity when it cannot). ESTABLISH and TRANSITION are always neutral and have no entry here. Pixels change with this file, so it is part of the build identity (src/manifest/build-identity.ts).",
+  "settleMs": 700,
+  "minHoldMs": 1400,
+  "modes": {
+    "GUIDE": {
+      "scale": 1,
+      "lean": 0,
+      "others": 0.84,
+      "context": 1,
+      "routes": 0.84
+    },
+    "INSPECT": {
+      "scale": 1.03,
+      "lean": 0.5,
+      "others": 0.72,
+      "context": 0.88,
+      "routes": 0.72
+    },
+    "COMPARE": {
+      "scale": 1,
+      "lean": 0,
+      "others": 0.78,
+      "context": 0.9,
+      "routes": 0.78
+    },
+    "RESOLVE": {
+      "scale": 1.03,
+      "lean": 0.5,
+      "others": 0.85,
+      "context": 0.92,
+      "routes": 0.85
+    }
+  },
+  "framing": {
+    "note": "Hard ceilings, derived from visual review: a 1.04 scale with the full coverage lean (38 x 22 px) pushed captions to the title-safe edge and split the header row for no gain in direction. The coverage rule (|tx| <= 960 (s - 1), |ty| <= 540 (s - 1)) and the title-safe rule still bind on top of these.",
+    "maxScale": 1.05,
+    "maxTranslateX": 16,
+    "maxTranslateY": 9
+  },
+  "entrance": {
+    "note": "The one addition to the laid-brick settle: a route draws on from its source to its destination, so its direction is seen, not faded in.",
+    "routeDrawMs": 420
+  }
+}

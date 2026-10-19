@@ -3,11 +3,9 @@
 
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { MOTION, MOTION_PINS, motionDefinition, RIG, RIG_PINS, rigDefinition, RIVE_ASSET, RIVE_RUNTIME } from '../src/character/walletwallaby/versions.ts';
-import { VIDEO_ROOT } from '../src/config/load.ts';
-import { contentAddress, sha256Hex } from '../src/core/hash.ts';
+import { blenderConfigSha256, blenderSourceSha256, loadBlenderConfig } from '../src/blender/toolchain.ts';
+import { BLENDER_CHARACTER, MOTION, MOTION_PINS, motionDefinition, RIG, RIG_PINS, rigDefinition } from '../src/character/walletwallaby/versions.ts';
+import { contentAddress } from '../src/core/hash.ts';
 import { buildIdentity } from '../src/manifest/build-identity.ts';
 import { buildProvenanceManifest } from '../src/manifest/provenance.ts';
 import { committedSpec } from './helpers.ts';
@@ -42,23 +40,21 @@ describe('build identity', () => {
     assert.equal(a.character.motion.definition, MOTION_PINS[MOTION.version]);
   });
 
-  test('records the exact Rive asset and runtime the renderer loads', () => {
-    const { rive } = buildIdentity().character;
-    const committed = sha256Hex(readFileSync(path.join(VIDEO_ROOT, ...RIVE_ASSET.path.split('/'))));
-    assert.equal(rive.asset.sha256, committed, 'the hash of the bytes on disk');
-    assert.equal(rive.asset.sha256, RIVE_ASSET.sha256, 'equal to the pin the renderer enforces');
-    assert.equal(rive.asset.rigVersion, RIG.version);
-    assert.equal(rive.runtime.package, '@rive-app/canvas-advanced');
-    assert.equal(rive.runtime.version, RIVE_RUNTIME.version);
-    assert.equal(rive.runtime.wasmSha256, RIVE_RUNTIME.wasmSha256);
-    assert.equal(buildIdentity().toolchain.packages[RIVE_RUNTIME.package], RIVE_RUNTIME.version);
-    const pkg = JSON.parse(readFileSync(path.join(VIDEO_ROOT, 'package.json'), 'utf8')) as { dependencies: Record<string, string> };
-    assert.equal(pkg.dependencies[RIVE_RUNTIME.package], RIVE_RUNTIME.version, 'exact-pinned dependency');
+  test('records the Blender renderer: the pinned build, its config and lane source, and the pinned character', () => {
+    const { blender } = buildIdentity().character;
+    const cfg = loadBlenderConfig();
+    assert.equal(blender.version, cfg.blender.version);
+    assert.equal(blender.buildHash, cfg.blender.buildHash);
+    assert.equal(blender.configSha256, blenderConfigSha256(cfg));
+    assert.equal(blender.sceneSourceSha256, blenderSourceSha256().sha256);
+    assert.deepEqual(blender.model, { version: BLENDER_CHARACTER.modelVersion, sha256: BLENDER_CHARACTER.modelSha256 });
+    assert.deepEqual(blender.materials, { version: BLENDER_CHARACTER.materialsVersion, sha256: BLENDER_CHARACTER.materialsSha256 });
+    for (const rel of ['config/blender.json', 'config/blender-environments.json']) assert.match(buildIdentity().configs[rel] ?? '', /^[0-9a-f]{64}$/, rel);
   });
 
-  test('the Rive asset and runtime are part of the provenance manifest', () => {
+  test('the Blender renderer is part of the provenance manifest', () => {
     const manifest = buildProvenanceManifest({ spec: committedSpec(), track: { providerId: 'fixture', voiceIdentityId: 'v', synthetic: true, estimated: true, lines: [] } as never, timeline: { totalMs: 1, segments: [] } as never, cueSheet: { identAsset: null, musicBed: { id: null }, cues: [], suppressed: [] } as never, validation: { ok: true, errors: 0, warnings: 0, issues: [] } as never, render: null, identity: buildIdentity() });
-    assert.equal(manifest.identity.character.rive.asset.sha256, RIVE_ASSET.sha256);
-    assert.equal(manifest.identity.character.rive.runtime.wasmSha256, RIVE_RUNTIME.wasmSha256);
+    assert.equal(manifest.identity.character.blender.model.sha256, BLENDER_CHARACTER.modelSha256);
+    assert.equal(manifest.identity.character.blender.sceneSourceSha256, blenderSourceSha256().sha256);
   });
 });

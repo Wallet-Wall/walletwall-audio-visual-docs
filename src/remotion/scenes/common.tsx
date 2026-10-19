@@ -1,7 +1,8 @@
 // Building blocks shared by every scene: positioned text, platforms, the ground
-// line, masonry courses, and attention / resolution treatments.
+// line, masonry courses, and the attention / resolution treatments.
 
 import React from 'react';
+import type { SceneDirection } from '../../attention/direction.ts';
 import { TOKENS } from '../../brand/tokens.ts';
 import type { Rect } from '../../layout/geometry.ts';
 import type { SceneLayout, TextRegion } from '../../layout/scene-layout.ts';
@@ -13,15 +14,18 @@ export interface SceneState {
   ms: number;
   seg: TimedSegment;
   layout: SceneLayout;
-  /** Elements the guide is currently directing attention to. */
-  attention: Set<string>;
-  /** Elements a RESOLVE beat has settled. */
-  resolved: Set<string>;
+  /** Where the viewer's eye is being guided (src/attention/direction.ts): the mode, the subjects, and every element's eased emphasis. */
+  direction: SceneDirection;
+  /** How long a route takes to draw on from its source to its destination (the route entrance). */
+  routeDrawMs: number;
   /** Route id -> traced fraction 0..1. */
   traced: Record<string, number>;
   /** Platform id -> downward contact displacement in px (a few px at most, returning to 0). */
   platformDip: Record<string, number>;
 }
+
+/** The eased opacity multiplier attention direction gives an element (1 = untouched). */
+export const emphasisOf = (state: SceneState, elementId: string): number => state.direction.emphasis[elementId] ?? 1;
 
 /**
  * Translate a platform and everything printed on it by its contact displacement,
@@ -37,31 +41,39 @@ export function regionFor(layout: SceneLayout, elementId: string): TextRegion | 
   return layout.texts.find((t) => t.elementId === elementId);
 }
 
+/** An opacity style only when it is not 1, so an untouched element renders exactly as it always has. */
+export const opacityStyle = (opacity: number): React.CSSProperties => (opacity >= 1 ? {} : { opacity });
+
 export const TextAt: React.FC<{ region: TextRegion | undefined; state: SceneState; color?: string }> = ({ region, state, color }) => {
   const m = useMaterial();
   if (!region) return null;
   const reveal = settle(state.ms, state.seg.reveals[region.elementId]);
+  const opacity = reveal.opacity * emphasisOf(state, region.elementId);
   return (
-    <div style={{ ...rectStyle(region.rect), ...textStyle(region.styleKey, region.mono, color ?? m.flat.text.ink), ...reveal }}>{region.text}</div>
+    <div style={{ ...rectStyle(region.rect), ...textStyle(region.styleKey, region.mono, color ?? m.flat.text.ink), ...reveal, opacity }}>{region.text}</div>
   );
 };
 
-/** Attention: a quiet terracotta wash and rule behind the element, never a glow. */
-export const Attention: React.FC<{ rect: Rect | undefined; on: boolean; resolved: boolean }> = ({ rect, on, resolved }) => {
-  if (!rect || (!on && !resolved)) return null;
+/**
+ * Attention: a quiet terracotta wash and rule behind the element, never a glow. `wash` (0..1) is the guide /
+ * inspect strength of the wash and its 3px rule; `resolved` (0..1) the strength of the heavier terracotta rule a
+ * RESOLVE beat leaves behind. Both ease in and out; at full strength the drawing is exactly the accepted treatment.
+ */
+export const Attention: React.FC<{ rect: Rect | undefined; wash: number; resolved: number }> = ({ rect, wash, resolved }) => {
+  if (!rect || (wash <= 0 && resolved <= 0)) return null;
+  const box: React.CSSProperties = { position: 'absolute', left: rect.x - 16, top: rect.y - 8, width: rect.w + 24, height: rect.h + 16 };
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: rect.x - 16,
-        top: rect.y - 8,
-        width: rect.w + 24,
-        height: rect.h + 16,
-        background: on ? TOKENS.accentWash(0.07) : 'transparent',
-        borderLeft: `${resolved ? 4 : 3}px solid ${resolved ? TOKENS.terracotta : TOKENS.accentWash(0.55)}`,
-      }}
-    />
+    <>
+      {wash > 0 ? <div style={{ ...box, background: TOKENS.accentWash(0.07), borderLeft: `3px solid ${TOKENS.accentWash(0.55)}`, ...opacityStyle(wash) }} /> : null}
+      {resolved > 0 ? <div style={{ ...box, borderLeft: `4px solid ${TOKENS.terracotta}`, ...opacityStyle(resolved) }} /> : null}
+    </>
   );
+};
+
+/** A node's focus: its top edge in terracotta (the platform's rule), easing in and out with the guide's attention. */
+export const FocusRule: React.FC<{ rect: Rect; strength: number }> = ({ rect, strength }) => {
+  if (strength <= 0) return null;
+  return <div style={{ position: 'absolute', left: rect.x, top: rect.y, width: rect.w + 2, height: 3, background: TOKENS.terracotta, borderRadius: `${TOKENS.radiusPanel}px ${TOKENS.radiusPanel}px 0 0`, ...opacityStyle(strength) }} />;
 };
 
 /** A raised card / platform with WalletWall's fine border and 2px corners, in the warm parchment of the material rule (never white). */

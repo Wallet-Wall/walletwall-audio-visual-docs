@@ -18,15 +18,25 @@ import { blenderRigDocument } from '../src/character/walletwallaby/blender/rig-e
 import { terrainSegment } from '../src/character/walletwallaby/blender/terrain-export.ts';
 import { choreograph, layoutsFor, mouthAt } from '../src/character/walletwallaby/choreography.ts';
 import { planMotion, sampleWallaby } from '../src/character/walletwallaby/motion.ts';
-import { RigPlayer, TARGETS, type RiveArtboard } from '../src/character/walletwallaby/rive/rig-apply.ts';
-import { compileRig } from '../src/character/walletwallaby/rive/rig-compile.ts';
-import { rigControls } from '../src/character/walletwallaby/rive/rig-controls.ts';
-import { RIG_BONES } from '../src/character/walletwallaby/rive/rig-source.ts';
+import { compileRig } from '../src/character/walletwallaby/rig/rig-compile.ts';
+import { rigControls } from '../src/character/walletwallaby/rig/rig-controls.ts';
+import { RIG_BONES } from '../src/character/walletwallaby/rig/rig-source.ts';
 import { BLENDER_LANE_DIR, blenderSourceSha256, loadBlenderConfig, REQUIRED_ARGS, runBlender, writeJob } from '../src/blender/toolchain.ts';
+import { environmentClass, loadEnvironments } from '../src/blender/identity.ts';
+import { characterProofFrames } from '../src/blender/proof-set.ts';
+import { contentAddress } from '../src/core/hash.ts';
+import { assertPinnedCharacter, BlenderProductionError } from '../src/blender/production.ts';
+import { hexRgb, paletteCheck } from '../src/blender/palette-check.ts';
+import { BLENDER_CHARACTER } from '../src/character/walletwallaby/versions.ts';
+import { characterCrop, interiorEdges } from '../src/character/walletwallaby/blender/crop.ts';
+import { RIG_ENVELOPE } from '../src/character/walletwallaby/rig/rig-source.ts';
 import { terrainsFor } from '../src/layout/terrain.ts';
 import { buildTimeline } from '../src/timeline/timeline.ts';
 import { committedSnapshot, committedSpec, config } from './helpers.ts';
-import { loadRig } from './rive-runtime.ts';
+
+/** Captured 2026-10-18 while the Rive runtime parity test passed in the same run (see below). */
+const RESOLVED_POSES_PIN = 'f8e79d0b1c2cbc3588d6f09a5e0273537624a2a009970ac0730988f783d7467a';
+const RIG_DOCUMENT_PIN = 'cd49bd326c3fe914e57f7f5123ba65489282357fc022d2ea90e411d6d9e4cc38';
 
 const spec = committedSpec();
 const headings = Object.fromEntries(committedSnapshot().sections.map((s) => [s.id, s.heading]));
@@ -58,33 +68,19 @@ const doc = (first: number, last: number): BlenderMotionDocument => ({
 });
 
 describe('the Blender bridge carries the decisions, not new ones', () => {
-  test('the resolved pose is exactly the Rive player\'s own pose before IK, on the real runtime', async () => {
-    const { rive, file } = await loadRig();
-    let checked = 0;
+  // The Rive runtime was retired after it proved, frame for frame, that resolvePose is the pose its player would have
+  // drawn (a parity test on the real runtime, until the cutover; these pins were captured in the same run, in the commit
+  // before the runtime was removed). These pins freeze what it proved: the resolved pose of every 23rd frame
+  // of the lesson, and the rig document Blender builds the character from. A change to either is a declared rig change.
+  test('the resolved pose and the rig document are the ones the Rive runtime proved (pinned)', () => {
+    const round = (v: unknown): unknown => (typeof v === 'number' ? Math.round(v * 1e9) / 1e9 : Array.isArray(v) ? v.map(round) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, round(x)])) : v);
+    const poses = [];
     for (let f = 0; f < frames; f += 23) {
       const { state } = at(f);
-      if (!state.visible) continue;
-      const controls = rigControls(state);
-      const mine = resolvePose(model, controls);
-      const artboard = file.artboardByName(model.artboard.name) as RiveArtboard & { delete?(): void };
-      const player = new RigPlayer(rive, artboard, model);
-      try {
-        player.pose(controls);
-        const theirs = player.read();
-        // Rive stores properties as 32-bit floats: compare at that precision.
-        for (const b of RIG_BONES) assert.ok(Math.abs(theirs.rot[b] - mine.rot[b]) < 2e-5, `frame ${f} ${b}: rive ${theirs.rot[b]} vs bridge ${mine.rot[b]}`);
-        assert.ok(Math.abs(theirs.hipX - mine.hip[0]) < 1e-3 && Math.abs(theirs.hipY - mine.hip[1]) < 1e-3, `frame ${f} hip`);
-        for (const t of TARGETS) {
-          const n = artboard.node(t);
-          assert.ok(Math.abs(n.x - mine.targets[t][0]) < 1e-3 && Math.abs(n.y - mine.targets[t][1]) < 1e-3, `frame ${f} ${t}: rive (${n.x}, ${n.y}) vs bridge (${mine.targets[t][0]}, ${mine.targets[t][1]})`);
-        }
-      } finally {
-        player.dispose();
-        artboard.delete?.();
-      }
-      checked++;
+      if (state.visible) poses.push({ frame: f, pose: round(resolvePose(model, rigControls(state))) });
     }
-    assert.ok(checked > 150, `compared ${checked} frames`);
+    assert.equal(contentAddress(poses), RESOLVED_POSES_PIN, `${poses.length} resolved poses`);
+    assert.equal(contentAddress(blenderRigDocument(model)), RIG_DOCUMENT_PIN);
   });
 
   test('positive control: a 0.01 degree change in one bone is caught', () => {
@@ -116,10 +112,18 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
   test('the bridge refuses anything that is not exactly v1', () => {
     const good = doc(1840, 1845);
     assert.doesNotThrow(() => validateBridge(JSON.parse(JSON.stringify(good))));
+    // A subset of the range (review stills, the proof set, some frames of a reveal) is a bridge too.
+    const subset = JSON.parse(JSON.stringify(good));
+    subset.frames.splice(2, 2);
+    assert.doesNotThrow(() => validateBridge(subset));
     const bad: [string, (d: Record<string, any>) => void][] = [
       ['unknown top-level field', (d) => (d.python = 'import os')],
       ['unknown frame field', (d) => (d.frames[0].script = 'x')],
-      ['a gap in the frames', (d) => d.frames.splice(2, 1)],
+      ['no frames', (d) => (d.frames = [])],
+      ['a repeated frame', (d) => (d.frames[2] = JSON.parse(JSON.stringify(d.frames[1])))],
+      ['frames out of order', (d) => d.frames.reverse()],
+      ['a frame outside the range', (d) => (d.range.last = 1844)],
+      ['more frames than the range holds', (d) => (d.range.first = 1841)],
       ['non-finite rotation', (d) => (d.frames[1].pose.rot.head = Number.NaN)],
       ['an unknown clip', (d) => (d.frames[1].pose.clips = { dance: 1 })],
       ['clip weights not summing to 1', (d) => (d.frames[1].pose.clips = { idle_alert: 0.5 })],
@@ -138,6 +142,23 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
     }
   });
 
+  test('production draws only the pinned character: another model or materials is refused (positive control: the pin passes)', () => {
+    const pinned = { schema: 'walletwall.blender-model/v1' as const, modelVersion: BLENDER_CHARACTER.modelVersion, materialsVersion: BLENDER_CHARACTER.materialsVersion, modelSha256: BLENDER_CHARACTER.modelSha256, modelRealizationSha256: 'f'.repeat(64), materialsSha256: BLENDER_CHARACTER.materialsSha256, blenderVersion: '5.2.2 LTS', blenderBuildHash: 'd13f752e3b9c' };
+    assert.doesNotThrow(() => assertPinnedCharacter(pinned));
+    for (const change of [{ modelSha256: 'a'.repeat(64) }, { modelVersion: 2 }, { materialsSha256: 'b'.repeat(64) }, { materialsVersion: 1 }]) {
+      assert.throws(() => assertPinnedCharacter({ ...pinned, ...change }), BlenderProductionError, JSON.stringify(change));
+    }
+  });
+
+  test('brand colours: palette colours and their mixes pass; a highlight, a tint, or a foreign hue does not', () => {
+    const p = paletteCheck(['#BA6F38', '#9D6136', '#2B2B2E', '#E9D3AD', '#B99568', '#562E28'].map(hexRgb));
+    assert.ok(p.exact(186, 111, 56) && p.inHull(186, 111, 56), 'the coat itself');
+    assert.ok(!p.exact(106, 69, 49) && p.inHull(106, 69, 49), 'an antialiased edge between the coat shade and the ink (a mix in linear light)');
+    for (const [r, g, b, what] of [[255, 255, 255, 'a white highlight'], [80, 120, 200, 'a blue tint'], [90, 160, 80, 'green'], [200, 60, 60, 'a saturated red'], [250, 240, 200, 'paler than the stone']] as const) {
+      assert.equal(p.inHull(r, g, b), false, what);
+    }
+  });
+
   test('declared terrain becomes blocks under the same surface ids the judge uses', () => {
     const seg = terrainSegment('signals', terrains.get('signals')!);
     const ids = seg.blocks.flatMap((b) => b.surfaceIds);
@@ -152,6 +173,80 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
     assert.deepEqual(rig.bones.map((b) => b.name), [...RIG_BONES]);
     for (const c of Object.values(rig.palette)) assert.match(c, /^#[0-9A-Fa-f]{6}$/);
     assert.equal(rig.palette.coat.toLowerCase(), '#ba6f38', 'the coat is WalletWallrus\'s own');
+  });
+});
+
+describe('character crops and the proof set', () => {
+  const frameSize = { width: 1920, height: 1080 };
+  const lesson = doc(0, frames - 1);
+
+  test('every crop is integer, inside the frame, decided by the placement alone, and holds the whole envelope', () => {
+    for (const f of lesson.frames) {
+      const c = characterCrop(f, RIG_ENVELOPE, 40, frameSize);
+      if (!f.visible) {
+        assert.equal(c, null);
+        continue;
+      }
+      if (c === null) continue;
+      for (const v of [c.x, c.y, c.width, c.height]) assert.ok(Number.isInteger(v), `frame ${f.frame}`);
+      assert.ok(c.x >= 0 && c.y >= 0 && c.x + c.width <= 1920 && c.y + c.height <= 1080, `frame ${f.frame}`);
+      // Recomputing gives the same bounds (no state, no growth).
+      assert.deepEqual(characterCrop(f, RIG_ENVELOPE, 40, frameSize), c);
+      // Where the crop is not clamped by the frame, it contains the padded envelope at this placement.
+      const { x, y, scale: s, facing } = f.place;
+      const xs = [x + facing * s * (RIG_ENVELOPE.minX - 40), x + facing * s * (RIG_ENVELOPE.maxX + 40)];
+      const e = interiorEdges(c, frameSize);
+      if (e.left) assert.ok(c.x <= Math.min(...xs), `frame ${f.frame} left`);
+      if (e.right) assert.ok(c.x + c.width >= Math.max(...xs), `frame ${f.frame} right`);
+      if (e.top) assert.ok(c.y <= y + s * (RIG_ENVELOPE.minY - 40), `frame ${f.frame} top`);
+      if (e.bottom) assert.ok(c.y + c.height >= y + s * (RIG_ENVELOPE.maxY + 40), `frame ${f.frame} bottom`);
+    }
+  });
+
+  test('a crop needs a visible frame and a non-negative pad; a frame wholly outside the picture has none', () => {
+    const f = lesson.frames[1850]!;
+    assert.throws(() => characterCrop(f, RIG_ENVELOPE, -1, frameSize));
+    assert.equal(characterCrop({ ...f, place: { ...f.place, x: 5000 } }, RIG_ENVELOPE, 40, frameSize), null);
+    assert.equal(characterCrop({ ...f, visible: false }, RIG_ENVELOPE, 40, frameSize), null);
+  });
+
+  test('the proof set is chosen by fixed rules from the lesson, the same every time', () => {
+    const a = characterProofFrames(lesson, 40, { first: 1719, last: 1814 });
+    const b = characterProofFrames(JSON.parse(JSON.stringify(lesson)), 40, { first: 1719, last: 1814 });
+    assert.deepEqual(a, b);
+    const at = (n: number) => lesson.frames[n]!.semantic;
+    assert.equal(at(a.idle).action, 'IDLE');
+    assert.equal(at(a.crouch).phase, 'PRELOAD');
+    assert.equal(at(a.airborne).contact, 'NONE');
+    assert.equal(at(a.landing).phase, 'CONTACT');
+    assert.ok(at(a['tail-brace']).landingImpulse > 0.9);
+    assert.equal(at(a.inspect).action, 'INSPECT');
+    for (const n of Object.values(a)) assert.ok(n < 1719 || n > 1814, 'character roles stay outside the reveal');
+  });
+});
+
+describe('render-environment classes and tolerances', () => {
+  const cfg = loadBlenderConfig();
+  const envs = loadEnvironments();
+  const rtx = { os: 'windows', blenderVersion: '5.2.2 LTS', blenderBuildHash: 'd13f752e3b9c', engine: 'BLENDER_EEVEE', gpu: { backend: 'OPENGL', vendor: 'NVIDIA Corporation', renderer: 'NVIDIA GeForce RTX 5080/PCIe/SSE2', version: '4.6.0 NVIDIA 616.56', deviceType: 'NVIDIA' } };
+  const soft = { ...rtx, os: 'linux', gpu: { backend: 'OPENGL', vendor: 'Mesa', renderer: 'llvmpipe (LLVM 21.1.8, 256 bits)', version: '4.5 (Core Profile) Mesa 26.0.3', deviceType: 'SOFTWARE' } };
+
+  test('a render is matched to the approved class it was made in, and only one with a publication purpose can publish', () => {
+    assert.equal(environmentClass(rtx, cfg, envs).approvedAs?.purpose, 'publication');
+    assert.equal(environmentClass(soft, cfg, envs).approvedAs?.purpose, 'proof');
+    // Positive control: another driver is another class, not approved.
+    assert.equal(environmentClass({ ...rtx, gpu: { ...rtx.gpu, version: '4.6.0 NVIDIA 617.00' } }, cfg, envs).approvedAs, null);
+    assert.notEqual(environmentClass(rtx, cfg, envs).id, environmentClass(soft, cfg, envs).id);
+  });
+
+  test('every pinned tolerance is above what was measured, and none lets a pixel appear or vanish', () => {
+    const all = [envs.crossClassTolerance.character, envs.crossClassTolerance.scene, envs.cropEquivalenceTolerance] as (typeof envs.cropEquivalenceTolerance & { measured: { fractionOverNoise: number; meanAbsDelta: number } })[];
+    for (const t of all) {
+      assert.ok(t.maxFractionOverNoise > t.measured.fractionOverNoise && t.maxMeanAbsDelta > t.measured.meanAbsDelta);
+      assert.equal(t.maxCoverageDeltaPx, 0);
+      assert.equal(t.noiseLevel, 2);
+    }
+    assert.equal(envs.sameClass, 'byte-identical');
   });
 });
 

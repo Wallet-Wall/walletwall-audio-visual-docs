@@ -3,7 +3,7 @@
 
 import type { MotionChannels, WallabyState } from '../../character/walletwallaby/motion.ts';
 import { EXPRESSIONS, type PoseParams } from '../../character/walletwallaby/rig.ts';
-import type { PoseClip } from '../../character/walletwallaby/rive/rig-source.ts';
+import type { PoseClip } from '../../character/walletwallaby/rig/rig-source.ts';
 
 /** Clips whose pose is a flight or a hang: no ground under the feet. */
 export const UNSUPPORTED_CLIPS: ReadonlySet<PoseClip> = new Set<PoseClip>(['takeoff', 'airborne', 'mantle']);

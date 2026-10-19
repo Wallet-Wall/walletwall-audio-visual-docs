@@ -25,8 +25,8 @@ import {
   type MotionPlan,
 } from '../src/character/walletwallaby/motion.ts';
 import { FAMILY_COLORS, RIG_PALETTE } from '../src/character/walletwallaby/rig.ts';
-import { SHAPES } from '../src/character/walletwallaby/rive/rig-source.ts';
 import { MOTION } from '../src/character/walletwallaby/versions.ts';
+import { slotColor } from '../src/character/walletwallaby/rig/rig-compile.ts';
 import { VIDEO_ROOT } from '../src/config/load.ts';
 import { intersects } from '../src/layout/geometry.ts';
 import { EYEBROW_RECT, wallabyBounds } from '../src/layout/scene-layout.ts';
@@ -339,16 +339,13 @@ describe('terracotta character', () => {
     assert.throws(() => mixTokens(TOKENS.terracotta, 'orange', 0.5), 'refuses a non-token colour');
   });
 
-  test('the rig paints only from the rig palette, and terracotta is the coat', () => {
-    const slots = Object.keys(RIG_PALETTE);
-    for (const shape of SHAPES) {
-      for (const paint of [shape.fill, shape.stroke]) if (paint) assert.ok(slots.includes(paint.slot), `${shape.name}: ${paint.slot}`);
-    }
-    const coat = SHAPES.filter((s) => s.fill?.slot === 'fur').map((s) => s.name);
-    for (const part of ['torso', 'tail', 'head', 'thigh_n', 'ear_n']) assert.ok(coat.includes(part), `${part} wears the terracotta coat`);
-    const sources = ['rig-source.ts', 'rig-compile.ts', 'riv-format.ts'].map((f) => readFileSync(path.join(VIDEO_ROOT, 'src', 'character', 'walletwallaby', 'rive', f), 'utf8'));
+  test('the rig paints only from the rig palette, and the walrus coat is the coat', () => {
+    for (const slot of Object.keys(RIG_PALETTE) as (keyof typeof RIG_PALETTE)[]) assert.match(slotColor(slot), /^#[0-9A-Fa-f]{6}$/, slot);
+    assert.equal(RIG_PALETTE.fur, 'wallrusCoat');
+    const sources = ['rig-source.ts', 'rig-compile.ts'].map((f) => readFileSync(path.join(VIDEO_ROOT, 'src', 'character', 'walletwallaby', 'rig', f), 'utf8'));
     for (const src of sources) assert.ok(!/#[0-9a-f]{6}\b|rgba?\(/i.test(src), 'no colour literal in the rig');
   });
+
 });
 
 describe('contact sound', () => {

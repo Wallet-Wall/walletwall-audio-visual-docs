@@ -23,3 +23,6 @@ motion-intelligence/target/
 Thumbs.db
 .vscode/
 .idea/
+
+# Python bytecode (Blender imports the lane modules)
+__pycache__/

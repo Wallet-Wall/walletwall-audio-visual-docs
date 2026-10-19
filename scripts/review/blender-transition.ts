@@ -16,16 +16,16 @@ import { renderMedia, renderStill, selectComposition } from '@remotion/renderer'
 import { FixtureVoiceProvider } from '../../src/audio/voice-provider.ts';
 import { blenderIdentity, CHARACTER } from '../../src/blender/identity.ts';
 import { lessonBridge, lessonMotion, lessonTerrain } from '../../src/blender/lesson.ts';
-import { stageBlenderSequence, stageBlenderTransition } from '../../src/blender/stage.ts';
+import { clearStagedBlender, recordedLayout, stageBlenderSequence, stageBlenderTransition } from '../../src/blender/stage.ts';
 import { BLENDER_JOBS, findBlender, loadBlenderConfig, outFile, runBlender, writeJob } from '../../src/blender/toolchain.ts';
 import { BLENDER_MOTION_SCHEMA } from '../../src/character/walletwallaby/blender/bridge.ts';
 import { blenderRigDocument } from '../../src/character/walletwallaby/blender/rig-export.ts';
-import { compileRig } from '../../src/character/walletwallaby/rive/rig-compile.ts';
+import { compileRig } from '../../src/character/walletwallaby/rig/rig-compile.ts';
 import { RIG } from '../../src/character/walletwallaby/versions.ts';
 import { DIST_ROOT, loadPipelineConfig, VIDEO_ROOT } from '../../src/config/load.ts';
 import { prettyJson } from '../../src/core/canonical-json.ts';
 import { loadCommittedSpec } from '../../src/pipeline/context.ts';
-import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, stageRendererAssets, synthesize } from '../../src/pipeline/render-input.ts';
+import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, synthesize } from '../../src/pipeline/render-input.ts';
 
 const args = process.argv.slice(2);
 const opt = (n: string): string | undefined => args.find((a) => a.startsWith(`--${n}=`))?.slice(n.length + 3);
@@ -57,7 +57,6 @@ const layerDir = path.join(BLENDER_JOBS, NAME);
 mkdirSync(layerDir, { recursive: true });
 if (!(reuseLayers && existsSync(path.join(layerDir, 'layer-0.png')) && existsSync(path.join(layerDir, 'layer-1.png')))) {
   stageDeclaredAssets(spec);
-  stageRendererAssets();
   const serveUrl = await bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'index.ts'), publicDir: PUBLIC_DIR });
   const bare = buildProps(spec, source, track, config, { captions: false, characterless: true, guides: false });
   const bareComp = await selectComposition({ serveUrl, id: 'WalletWallDocsVideo', inputProps: bare });
@@ -106,11 +105,12 @@ if (stillsOnly) {
 }
 
 // 3. Verified, staged, and composited across the seam.
-const reveal = stageBlenderTransition(NAME, { first, last });
+clearStagedBlender();
+const reveal = stageBlenderTransition(NAME, lesson);
 const props = {
   ...buildProps(spec, source, track, config, { captions: false, characterless: false, guides: false }),
   depthReveals: [reveal],
-  ...(context ? { characterRenderer: stageBlenderSequence(context, lesson) } : {}),
+  ...(context ? { characterRenderer: stageBlenderSequence(context, lesson, recordedLayout(context)) } : {}),
 };
 // The bundle copies the public dir when it is made: bundle again now that the reveal's frames are staged.
 const serveUrl2 = await bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'index.ts'), publicDir: PUBLIC_DIR });

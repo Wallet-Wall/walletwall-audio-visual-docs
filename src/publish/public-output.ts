@@ -14,6 +14,10 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileS
 import os from 'node:os';
 import path from 'node:path';
 import { buildCaptions, checkCaptions, toSrt, toWebVtt } from '../audio/captions.ts';
+import { environmentClass, loadEnvironments, type RenderEnvironment } from '../blender/identity.ts';
+import { lessonBridge, lessonBridgeFor, lessonMotionWith, type LessonMotion } from '../blender/lesson.ts';
+import { findRevealSeam } from '../blender/reveal.ts';
+import { loadBlenderConfig } from '../blender/toolchain.ts';
 import { FIXTURE_VOICE_PROVIDER_ID, FixtureVoiceProvider } from '../audio/voice-provider.ts';
 import { DOCS_URL } from '../brand/repo-constants.ts';
 import { choreograph, layoutsFor } from '../character/walletwallaby/choreography.ts';
@@ -38,6 +42,17 @@ import type { Lineage } from './lineage.ts';
 import { buildPublishManifest, checkPublishManifest, type PublishManifest } from './manifest.ts';
 import type { UploadReceipt } from './upload-provider.ts';
 
+type EnvironmentRecord = { classId?: unknown; approvedClass?: unknown; purpose?: unknown; record?: unknown };
+
+/** What render.json and stills.json record about the Blender character (scripts/render.ts). */
+type CharacterRecord = {
+  renderer?: unknown;
+  layout?: unknown;
+  sequence?: { name?: unknown; frames?: unknown; renderSha256?: unknown; bridgeSha256?: unknown; environment?: EnvironmentRecord };
+  reveals?: { name?: unknown; range?: { first?: unknown; last?: unknown }; frames?: unknown; renderSha256?: unknown; bridgeSha256?: unknown; environment?: EnvironmentRecord }[];
+  identity?: unknown;
+};
+
 /** Stable codes, like the validation codes: CI and reviewers act on these, not on prose. */
 export const PUBLIC_OUTPUT_CODES = {
   ARTIFACT_MISSING: 'A required publication artifact is missing.',
@@ -54,6 +69,8 @@ export const PUBLIC_OUTPUT_CODES = {
   IDENTITY_STALE: 'An artifact was made with a different build identity than this checkout.',
   MOTION_ENGINE_STALE: 'An artifact names a motion engine, WASM artifact, config, or plan this checkout would not produce.',
   RENDER_INCONSISTENT: 'The rendered file is not the one its records name.',
+  CHARACTER_STALE: 'Blender character frames were made by another Blender, config, lane source, character, or MotionPlan than this checkout produces.',
+  RENDER_ENVIRONMENT_UNAPPROVED: 'Blender frames were rendered outside an approved render-environment class, or a publication render outside a publication class.',
   DEBUG_OUTPUT: 'A publication render carries a debug overlay or is a design-test variant.',
   STILLS_INCONSISTENT: 'A review still is missing, unlisted, ambiguous, or not the bytes stills.json names.',
   CHARACTERLESS_MISSING: 'A review frame has no characterless twin.',
@@ -108,6 +125,8 @@ export interface PublicState {
   rustEngine: () => MotionEngineIdentity;
   /** Whether a frame draws WalletWallaby on canvas: visible, not transparent, feet inside the frame. */
   onCanvas: (frame: number) => boolean;
+  /** The lesson's motion as Blender receives it, per engine (solved on first use). */
+  lesson: (engine: 'typescript' | 'rust-wasm') => LessonMotion;
   /**
    * The publish manifest this checkout produces for a render (or none), built by the same function
    * publish:dry-run uses. It covers inputs the build identity does not hash, such as config/playlists.json.
@@ -136,6 +155,7 @@ export async function currentPublicState(videoId: string, env: Record<string, st
   const specHash = contentAddress(spec);
   const vtt = toWebVtt(cues);
   let rust: MotionEngineIdentity | undefined;
+  const lessons = new Map<string, LessonMotion>();
   return {
     videoId,
     spec,
@@ -152,6 +172,10 @@ export async function currentPublicState(videoId: string, env: Record<string, st
     publicCopy: onScreenCopy(spec, source, config.templates),
     typescriptEngine: typescriptEngineIdentity(),
     rustEngine: () => (rust ??= planRustMotion({ spec, track, templates: config.templates, headings }).identity),
+    lesson: (engine) => {
+      if (!lessons.has(engine)) lessons.set(engine, lessonMotionWith(videoId, engine, track));
+      return lessons.get(engine)!;
+    },
     onCanvas: (frame) => {
       const w = sampleWallaby(plan, (frame * 1000) / timeline.fps);
       return w.visible && w.opacity > 0 && w.x >= 0 && w.x <= spec.output.width && w.y >= 0 && w.y <= spec.output.height;
@@ -537,8 +561,9 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
     overlays?: { captions?: unknown; characterless?: unknown; guides?: unknown };
     identity?: unknown;
     motionEngine?: MotionEngineIdentity;
+    character?: CharacterRecord;
   };
-  const render = readJsonFile<RenderInfo>(at('render.json'), bp('render.json'), 'walletwall.render-info/v4', opts.requireRender === true);
+  const render = readJsonFile<RenderInfo>(at('render.json'), bp('render.json'), 'walletwall.render-info/v5', opts.requireRender === true);
   let renderSha: string | null = null;
   if (render) {
     const where = (p: string) => `${bp('render.json')}.${p}`;
@@ -558,6 +583,7 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
     }
     if (render.narration?.providerId !== narrationProvider) fail('RENDER_INCONSISTENT', where('narration.providerId'), 'the render and the manifest name different narration');
     checkMotionEngine(render.motionEngine, where('motionEngine'));
+    checkCharacter(render.character, where('character'), { engine: render.motionEngine?.motionEngine, frames: null, publication: true });
     if (render.output?.path !== `dist/${id}/${mp4Name}`) fail('RENDER_INCONSISTENT', where('output.path'), `is not dist/${id}/${mp4Name}`);
     const video = readFile(at(mp4Name), bp(mp4Name));
     if (video) {
@@ -615,7 +641,7 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
   const stillsSummary: PublicOutputReport['summary']['stills'] = [];
   const engines = new Set<string>();
   for (const stillsDir of opts.stills ?? []) {
-    type StillsInfo = { videoId?: unknown; revision?: unknown; specHash?: unknown; motionEngine?: MotionEngineIdentity; identity?: unknown; stills?: { file?: unknown; frame?: unknown; sha256?: unknown }[] };
+    type StillsInfo = { videoId?: unknown; revision?: unknown; specHash?: unknown; motionEngine?: MotionEngineIdentity; identity?: unknown; character?: CharacterRecord; stills?: { file?: unknown; frame?: unknown; sha256?: unknown }[] };
     const engineName = (() => {
       try {
         const doc = JSON.parse(readFileSync(path.join(stillsDir, 'stills.json'), 'utf8')) as StillsInfo;
@@ -630,13 +656,15 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
       continue;
     }
     engines.add(engineName);
-    const info = readJsonFile<StillsInfo>(path.join(stillsDir, 'stills.json'), `${base}/stills.json`, 'walletwall.stills-info/v2');
+    const info = readJsonFile<StillsInfo>(path.join(stillsDir, 'stills.json'), `${base}/stills.json`, 'walletwall.stills-info/v3');
     if (!info) continue;
     const where = (p: string) => `${base}/stills.json.${p}`;
     if (info.videoId !== id || info.revision !== spec.revision || info.specHash !== state.specHash) fail('SPEC_STALE', where('specHash'), 'the stills are not of the committed spec');
     if (!same(info.identity, state.identity)) fail('IDENTITY_STALE', where('identity'), 'the stills were made with a different toolchain, configuration, or character version');
     checkMotionEngine(info.motionEngine, where('motionEngine'));
     const list = Array.isArray(info.stills) ? info.stills : [];
+    const frames = list.flatMap((s) => (Number.isInteger(s.frame) ? [s.frame as number] : []));
+    if (frames.length > 0) checkCharacter(info.character, where('character'), { engine: info.motionEngine?.motionEngine, frames, publication: false });
     if (list.length === 0) fail('STILLS_INCONSISTENT', where('stills'), 'lists no stills');
     const byFile = new Map<string, { frame: number; sha256: string }>();
     const frameCount = state.frames;
@@ -685,6 +713,73 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
       }
     }
     stillsSummary.push({ engine: engineName, stills: list.length, characterlessTwins: twins, onCanvasTwins });
+  }
+
+  /**
+   * What drew WalletWallaby: the pinned Blender, this checkout's config, lane source, and character; frames rendered
+   * from exactly the plan this checkout produces for the frames in question; and an approved render-environment class
+   * (for a publication render: a publication class). The class label is re-derived from the recorded environment, so
+   * a forged label fails.
+   */
+  function checkCharacter(recorded: CharacterRecord | undefined, where: string, ctx: { engine: unknown; frames: number[] | null; publication: boolean }): void {
+    if (!recorded || typeof recorded !== 'object' || recorded.renderer !== 'blender') {
+      fail('ARTIFACT_INVALID', where, 'does not record the Blender character renderer');
+      return;
+    }
+    if (recorded.layout !== 'crop' && recorded.layout !== 'full-frame') fail('ARTIFACT_INVALID', `${where}.layout`, 'is neither crop nor full-frame');
+    const b = state.identity.character.blender;
+    const id = (recorded.identity ?? {}) as Record<string, unknown>;
+    const pins: [string, unknown][] = [
+      ['blenderVersion', b.version],
+      ['blenderBuildHash', b.buildHash],
+      ['blenderConfigSha256', b.configSha256],
+      ['blenderSceneSourceSha256', b.sceneSourceSha256],
+      ['walletwallabyModelVersion', b.model.version],
+      ['walletwallabyModelSha256', b.model.sha256],
+      ['materialsVersion', b.materials.version],
+      ['materialsSha256', b.materials.sha256],
+    ];
+    for (const [k, v] of pins) if (id[k] !== v) fail('CHARACTER_STALE', `${where}.identity.${k}`, `${String(id[k]).slice(0, 16)} is not this checkout's ${String(v).slice(0, 16)}`);
+    const checkEnvironment = (env: EnvironmentRecord | undefined, at: string) => {
+      if (!env || typeof env !== 'object' || !env.record || typeof env.record !== 'object') {
+        fail('ARTIFACT_INVALID', at, 'records no render environment');
+        return;
+      }
+      const cls = environmentClass(env.record as unknown as RenderEnvironment, loadBlenderConfig(), loadEnvironments());
+      if (cls.id !== env.classId || (cls.approvedAs?.name ?? null) !== env.approvedClass || (cls.approvedAs?.purpose ?? null) !== env.purpose) {
+        fail('RENDER_ENVIRONMENT_UNAPPROVED', at, `the recorded class ${String(env.classId)} (${String(env.approvedClass)}) is not what its environment record derives (${cls.id}, ${cls.approvedAs?.name ?? 'unapproved'})`);
+        return;
+      }
+      if (!cls.approvedAs) fail('RENDER_ENVIRONMENT_UNAPPROVED', at, `class ${cls.id} is not an approved render-environment class (config/blender-environments.json)`);
+      else if (ctx.publication && cls.approvedAs.purpose !== 'publication') fail('RENDER_ENVIRONMENT_UNAPPROVED', at, `a publication render must come from a publication class, not ${cls.approvedAs.name} (${cls.approvedAs.purpose})`);
+    };
+    if (ctx.engine !== 'typescript' && ctx.engine !== 'rust-wasm') return; // checkMotionEngine already failed it
+    const lesson = state.lesson(ctx.engine);
+    const seam = findRevealSeam(lesson);
+    const inReveal = (f: number) => seam !== null && f >= seam.first && f <= seam.last;
+    const unique = ctx.frames ? [...new Set(ctx.frames)].sort((x, y) => x - y) : null;
+    // The character sequence: the whole lesson, or the requested frames outside the reveal.
+    const seqFrames = unique ? unique.filter((f) => !inReveal(f)) : undefined;
+    const seq = recorded.sequence;
+    if (!seq || typeof seq !== 'object') fail('ARTIFACT_INVALID', `${where}.sequence`, 'records no character sequence');
+    else {
+      checkEnvironment(seq.environment, `${where}.sequence.environment`);
+      const expected = contentAddress(lessonBridgeFor(lesson, seqFrames));
+      if (seq.bridgeSha256 !== expected || id.motionPlanSha256 !== expected) fail('CHARACTER_STALE', `${where}.sequence.bridgeSha256`, `the frames were rendered from ${String(seq.bridgeSha256).slice(0, 12)}, not this checkout's MotionPlan ${expected.slice(0, 12)}`);
+    }
+    // The depth reveal: exactly one where the lesson has a seam and the frames reach it, none otherwise.
+    const revealFrames = seam ? (unique ? unique.filter(inReveal) : null) : [];
+    const reveals = Array.isArray(recorded.reveals) ? recorded.reveals : [];
+    if (!seam || (revealFrames && revealFrames.length === 0)) {
+      if (reveals.length > 0) fail('CHARACTER_STALE', `${where}.reveals`, 'records a depth reveal this render has no frames of');
+    } else if (reveals.length !== 1) fail('CHARACTER_STALE', `${where}.reveals`, `records ${reveals.length} depth reveals, not the one at ${seam.first}..${seam.last}`);
+    else {
+      const r = reveals[0]!;
+      checkEnvironment(r.environment, `${where}.reveals[0].environment`);
+      const full = lessonBridge(lesson, seam.first, seam.last);
+      const expected = contentAddress(revealFrames ? { ...full, frames: full.frames.filter((f) => revealFrames.includes(f.frame)) } : full);
+      if (r.range?.first !== seam.first || r.range?.last !== seam.last || r.bridgeSha256 !== expected) fail('CHARACTER_STALE', `${where}.reveals[0]`, `is not the reveal this checkout's MotionPlan gives at ${seam.first}..${seam.last}`);
+    }
   }
 
   function checkMotionEngine(recorded: MotionEngineIdentity | undefined, where: string): void {

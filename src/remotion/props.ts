@@ -4,6 +4,7 @@
 // the Rust/WASM motion engine, the engine's plans (data: one state per frame).
 // It never receives credentials, prompts, or provider handles.
 
+import type { AttentionConfig } from '../attention/direction.ts';
 import type { BlenderVisual } from '../blender/visual-core.ts';
 import type { CopyTemplates } from '../config/types.ts';
 import type { MotionEngineProps } from '../motion/rust-path.ts';
@@ -19,17 +20,30 @@ export interface ReviewOverlays {
   guides: boolean;
 }
 
+/** Where Blender frames were rendered: the environment class id, the approved class it matched (if any), and the record. */
+export interface BlenderEnvironmentProps {
+  classId: string;
+  approvedClass: string | null;
+  purpose: 'publication' | 'proof' | null;
+  record: Record<string, unknown>;
+}
+
 /** A staged, hash-verified Blender frame sequence of WalletWallaby (docs/BLENDER.md). */
 export interface BlenderCharacterProps {
   schema: 'walletwall.blender-character-props/v1';
   renderer: 'blender';
+  /** Production draws small crops; the full-frame layout is the approved reference and fallback. */
+  layout: 'crop' | 'full-frame';
   /** The sequence's name and where it is served from in the bundle's public dir. */
   name: string;
   dir: string;
   /** The bridge range it was rendered from. */
   range: { first: number; last: number };
-  /** The visible frames the sequence holds, one full-frame PNG each. */
-  frames: number[];
+  /** One crop per drawn frame: integer frame-px bounds, decided from the placement before rendering. */
+  crops: { frame: number; x: number; y: number; width: number; height: number }[];
+  /** Visible frames whose whole envelope lies outside the frame: nothing to draw. */
+  offFrame: number[];
+  environment: BlenderEnvironmentProps;
   /** sha256 of Blender's render manifest (every PNG's hash), and of the bridge the frames were rendered from. */
   renderSha256: string;
   bridgeSha256: string;
@@ -47,7 +61,11 @@ export interface BlenderTransitionProps {
   name: string;
   dir: string;
   range: { first: number; last: number };
+  /** The frames it holds (all of the range, or the ones a stills render asked for); any other frame of the range fails closed. */
+  frames: number[];
+  environment: BlenderEnvironmentProps;
   renderSha256: string;
+  bridgeSha256: string;
   identity: Record<string, string | number | null>;
 }
 
@@ -63,6 +81,8 @@ export interface DocsVideoProps {
   provenance: { blob: string; contentHash: string };
   /** The resolved material (config/blender-visual.json): authored cards in parchment, text colours, and the terrain formations' palette. */
   material: BlenderVisual;
+  /** The resolved attention direction (config/attention.json): the mode grammar's treatments and the framing bounds. */
+  direction: AttentionConfig;
   /** Rust/WASM Motion Intelligence plans for the paths it owns; absent = the TypeScript solver alone. */
   motionEngine?: MotionEngineProps;
   /** WalletWallaby drawn from a staged Blender sequence; absent = the Rive rig. */
