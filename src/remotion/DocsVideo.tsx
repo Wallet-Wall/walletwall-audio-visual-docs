@@ -131,6 +131,8 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
   const wallaby = sampleWithEngine(model.engine, model.motion, frame, ms, mouthAt(timeline, ms));
   // A staged depth reveal draws the whole frame (surfaces and character) for its range; the flat transition steps aside.
   const reveal = props.overlays.characterless ? undefined : props.depthReveals?.find((r) => frame >= r.range.first && frame <= r.range.last);
+  // Fail closed: a frame of the reveal's range that the staged reveal does not hold stops the render.
+  if (reveal && !reveal.frames.includes(frame)) cancelRender(new Error(`the staged depth reveal ${reveal.name} has no frame ${frame}`));
   const cue = props.overlays.captions ? model.captions.find((c) => ms >= c.startMs && ms < c.endMs) : undefined;
   const section = seg.scene ? props.headings[seg.scene.eyebrowSectionId] : undefined;
   // The content world's framing: identity (`none`) wherever attention direction frames nothing, so those frames are untouched.

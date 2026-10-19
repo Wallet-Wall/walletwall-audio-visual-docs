@@ -13,7 +13,7 @@ This repository produces public-facing WalletWall videos, so CI checks two thing
 | Public Output (`public-output.yml`) | `Public surface` | pull requests, pushes to `main` | yes |
 | Public Output (`public-output.yml`) | `Render determinism` | pull requests, pushes to `main` | yes |
 | Public Output (`public-output.yml`) | `Dependency review` | pull requests | not yet: it needs the repository's dependency graph (Settings → Code security), and fails until that is enabled |
-| Publication Proof (`publication-proof.yml`) | `Publication proof` | manual dispatch; pushes to `main` that change render inputs | no |
+| Blender proof (`blender-proof.yml`) | `Blender proof (same-class bytes, cross-class tolerance)` | manual dispatch | no |
 
 No required check is path-filtered: a required check that does not run on a pull request would block it forever.
 
@@ -36,6 +36,7 @@ CI can prove publication readiness. CI must not publish.
 - The manifest is internally consistent (platform rules from `checkPublishManifest`, the human review gate, chapters inside the video, and the captions, video, spec hash, and docs identity it names), and it is exactly the manifest this checkout produces: the gate re-derives it with the same function the dry run uses, which also covers inputs the build identity does not hash, such as `config/playlists.json`.
 - Provenance exists and matches the committed spec, its canonical docs binding (doc path, URL, blob, content hash), the cue sheet, the render, and this checkout's build identity.
 - A render, when present (required with `--require-render`): `render.json` matches the MP4 bytes, the committed spec (its hash: an on-screen text edit changes neither the timeline nor the build identity), this checkout's build identity and renderer, the committed timeline, and a motion engine identity this checkout reproduces (for rust-wasm: the exact WASM artifact, config, and re-solved plans). The debug guides overlay and the characterless design test are refused as a publication render. `publish:dry-run` also refuses a render of a different spec.
+- The Blender character, for a render and for stills: the pinned Blender build, this checkout's Blender config, lane source, and pinned character model and materials; frames rendered from exactly the MotionPlan this checkout gives for those frames (the whole lesson, or the stills' frames), and the depth reveal wherever the frames reach it; and an approved render-environment class (`config/blender-environments.json`), re-derived from the recorded environment so a forged label fails. A render to publish must come from a publication class.
 - Review stills, with `--stills=<dir>`: every PNG is the bytes `stills.json` names, nothing unlisted is left over, the spec hash, identity, and motion engine are current, every frame has a characterless twin, and a twin differs from its frame wherever WalletWallaby is on canvas (this catches a variant that silently rendered the default props). PNGs may not carry text or unknown metadata chunks.
 - Public copy (the YouTube title, description, tags, chapter and playlist titles, the captions, and the on-screen text) has no unresolved placeholder or leaked value: `TODO`, `TBD`, `FIXME`, lorem ipsum, `[object Object]`, `undefined`, `NaN`, `${…}`, `{{…}}`.
 - No artifact contains a local machine path: Windows drive and UNC paths, home directories (`/home/`, `/Users/`, `/root/`, `~/`), temporary and system directories (`/tmp/`, `/var/`, `/opt/`, `/mnt/`, `/private/`, and the like), `file://` URLs, or this machine's checkout, home, temporary, and CI workspace directories. Repo-relative paths, `video/…` workspace paths, and URLs are not paths.
@@ -49,6 +50,8 @@ npm run public:check
 ```
 
 ## Render determinism
+
+WalletWallaby is drawn by the pinned Blender (docs/BLENDER.md), which the job installs and verifies like `blender-proof.yml` does; on a hosted runner it renders in the proof class (CPU software GL), about ten seconds per character frame. Both renders run on the same runner, in sequence: Chrome's software rasterizer and Mesa's llvmpipe choose code paths by the host CPU, so byte identity is a promise about one machine, never across runners. Render A builds the character from code (`--fresh-blender`); render B renders every Blender frame again from that build (two builds of the same source are proven identical by the Blender proof workflow).
 
 The default engine renders the standard review stills (one settled frame per segment and the midpoint of every non-cut transition, each with and without WalletWallaby) twice, each in a fresh Node process, and `npm run stills:compare` requires every PNG and `stills.json` to be byte-identical. The opt-in Rust/WASM engine does the same on one airborne frame of every path it performs: the middle of the frames where the engine's own plan has the feet off every surface (`scripts/engine-path-frames.ts`), so the review set draws the flight the engine solves. Rust frames are never compared with default-engine frames, because the body motion intentionally differs. MP4 bytes are not run-to-run stable, so an MP4 hash is never used as determinism evidence.
 
@@ -66,7 +69,7 @@ When `stills:compare` reports a difference, diff the two PNGs (pixel count, maxi
 
 ## Publication proof
 
-Run **Actions → Publication Proof → Run workflow** and choose the motion engine (`typescript` by default; `rust-wasm` stays opt-in). It renders the full video with the fixture voice, runs the publish dry run against that exact render, runs the gate with the render required, and uploads `publication-proof-<attempt>` for 14 days: the MP4, `render.json`, provenance, the manifest, captions, cue sheet, media QA, validation, receipt, and the gate report. The proof render is a review render (silent fixture narration, captions burned in), and it is never uploaded anywhere else. Human review remains mandatory before any publication.
+The whole-video proof runs on the production render host, not in CI: a hosted runner would render every Blender frame of the lesson in software GL, which takes many hours, and only the production host is a publication class. Run `npm run publication:proof` there (`-- --motion-engine=rust-wasm` for the opt-in engine). It validates the spec, renders the full video with the fixture voice (reusing verified Blender frames), runs the publish dry run against that exact render, and runs the gate with the render required, which refuses a render from any class that is not a publication class. On PASS the proof package is in `dist/publication-proof/`: the MP4, `render.json`, provenance, the manifest, captions, cue sheet, media QA, validation, receipt, and the gate report. The proof render is a review render (silent fixture narration, captions burned in), and nothing uploads it anywhere. Human review remains mandatory before any publication.
 
 ## Supply chain
 

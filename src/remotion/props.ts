@@ -20,10 +20,20 @@ export interface ReviewOverlays {
   guides: boolean;
 }
 
+/** Where Blender frames were rendered: the environment class id, the approved class it matched (if any), and the record. */
+export interface BlenderEnvironmentProps {
+  classId: string;
+  approvedClass: string | null;
+  purpose: 'publication' | 'proof' | null;
+  record: Record<string, unknown>;
+}
+
 /** A staged, hash-verified Blender frame sequence of WalletWallaby (docs/BLENDER.md). */
 export interface BlenderCharacterProps {
   schema: 'walletwall.blender-character-props/v1';
   renderer: 'blender';
+  /** Production draws small crops; the full-frame layout is the approved reference and fallback. */
+  layout: 'crop' | 'full-frame';
   /** The sequence's name and where it is served from in the bundle's public dir. */
   name: string;
   dir: string;
@@ -33,8 +43,7 @@ export interface BlenderCharacterProps {
   crops: { frame: number; x: number; y: number; width: number; height: number }[];
   /** Visible frames whose whole envelope lies outside the frame: nothing to draw. */
   offFrame: number[];
-  /** Where the frames were rendered: the environment class id, the approved class it matched (if any), and the record. */
-  environment: { classId: string; approvedClass: string | null; purpose: 'publication' | 'proof' | null; record: Record<string, unknown> };
+  environment: BlenderEnvironmentProps;
   /** sha256 of Blender's render manifest (every PNG's hash), and of the bridge the frames were rendered from. */
   renderSha256: string;
   bridgeSha256: string;
@@ -52,7 +61,11 @@ export interface BlenderTransitionProps {
   name: string;
   dir: string;
   range: { first: number; last: number };
+  /** The frames it holds (all of the range, or the ones a stills render asked for); any other frame of the range fails closed. */
+  frames: number[];
+  environment: BlenderEnvironmentProps;
   renderSha256: string;
+  bridgeSha256: string;
   identity: Record<string, string | number | null>;
 }
 

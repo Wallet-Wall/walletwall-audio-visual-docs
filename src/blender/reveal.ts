@@ -14,6 +14,13 @@ export interface RevealSeam {
   last: number;
 }
 
+/** The lesson's depth-reveal seam, or null when it has no PUSH_THROUGH followed by a DEPTH_ENTER segment. */
+export function findRevealSeam(lesson: LessonMotion): RevealSeam | null {
+  const push = lesson.motion.clips.find((c) => c.kind === 'PUSH');
+  if (!push) return null;
+  return lesson.timeline.segments.some((s) => s.startMs >= push.endMs - 1 && s.transitionIn.type === 'DEPTH_ENTER') ? revealSeam(lesson) : null;
+}
+
 export function revealSeam(lesson: LessonMotion): RevealSeam {
   const fps = lesson.timeline.fps;
   const push = lesson.motion.clips.find((c) => c.kind === 'PUSH');

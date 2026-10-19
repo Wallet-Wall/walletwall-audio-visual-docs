@@ -25,6 +25,8 @@ import { RIG_BONES } from '../src/character/walletwallaby/rive/rig-source.ts';
 import { BLENDER_LANE_DIR, blenderSourceSha256, loadBlenderConfig, REQUIRED_ARGS, runBlender, writeJob } from '../src/blender/toolchain.ts';
 import { environmentClass, loadEnvironments } from '../src/blender/identity.ts';
 import { characterProofFrames } from '../src/blender/proof-set.ts';
+import { assertPinnedCharacter, BlenderProductionError } from '../src/blender/production.ts';
+import { BLENDER_CHARACTER } from '../src/character/walletwallaby/versions.ts';
 import { characterCrop, interiorEdges } from '../src/character/walletwallaby/blender/crop.ts';
 import { RIG_ENVELOPE } from '../src/character/walletwallaby/rive/rig-source.ts';
 import { terrainsFor } from '../src/layout/terrain.ts';
@@ -120,10 +122,18 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
   test('the bridge refuses anything that is not exactly v1', () => {
     const good = doc(1840, 1845);
     assert.doesNotThrow(() => validateBridge(JSON.parse(JSON.stringify(good))));
+    // A subset of the range (review stills, the proof set, some frames of a reveal) is a bridge too.
+    const subset = JSON.parse(JSON.stringify(good));
+    subset.frames.splice(2, 2);
+    assert.doesNotThrow(() => validateBridge(subset));
     const bad: [string, (d: Record<string, any>) => void][] = [
       ['unknown top-level field', (d) => (d.python = 'import os')],
       ['unknown frame field', (d) => (d.frames[0].script = 'x')],
-      ['a gap in the frames', (d) => d.frames.splice(2, 1)],
+      ['no frames', (d) => (d.frames = [])],
+      ['a repeated frame', (d) => (d.frames[2] = JSON.parse(JSON.stringify(d.frames[1])))],
+      ['frames out of order', (d) => d.frames.reverse()],
+      ['a frame outside the range', (d) => (d.range.last = 1844)],
+      ['more frames than the range holds', (d) => (d.range.first = 1841)],
       ['non-finite rotation', (d) => (d.frames[1].pose.rot.head = Number.NaN)],
       ['an unknown clip', (d) => (d.frames[1].pose.clips = { dance: 1 })],
       ['clip weights not summing to 1', (d) => (d.frames[1].pose.clips = { idle_alert: 0.5 })],
@@ -139,6 +149,14 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
       const d = JSON.parse(JSON.stringify(good));
       mutate(d);
       assert.throws(() => validateBridge(d), BlenderBridgeError, what);
+    }
+  });
+
+  test('production draws only the pinned character: another model or materials is refused (positive control: the pin passes)', () => {
+    const pinned = { schema: 'walletwall.blender-model/v1' as const, modelVersion: BLENDER_CHARACTER.modelVersion, materialsVersion: BLENDER_CHARACTER.materialsVersion, modelSha256: BLENDER_CHARACTER.modelSha256, modelRealizationSha256: 'f'.repeat(64), materialsSha256: BLENDER_CHARACTER.materialsSha256, blenderVersion: '5.2.2 LTS', blenderBuildHash: 'd13f752e3b9c' };
+    assert.doesNotThrow(() => assertPinnedCharacter(pinned));
+    for (const change of [{ modelSha256: 'a'.repeat(64) }, { modelVersion: 2 }, { materialsSha256: 'b'.repeat(64) }, { materialsVersion: 1 }]) {
+      assert.throws(() => assertPinnedCharacter({ ...pinned, ...change }), BlenderProductionError, JSON.stringify(change));
     }
   });
 

@@ -193,8 +193,14 @@ export function validateBridge(doc: unknown): BlenderMotionDocument {
   if (coords.unitsPerPx !== UNITS_PER_PX) throw new BlenderBridgeError(`coordinates.unitsPerPx must be ${UNITS_PER_PX}`);
   const origin = closedKeys(coords.planeOrigin, ['x', 'y'], 'coordinates.planeOrigin');
   if (origin.x !== PLANE_ORIGIN.x || origin.y !== PLANE_ORIGIN.y) throw new BlenderBridgeError('coordinates.planeOrigin must be the frame centre');
-  if (!Array.isArray(d.frames) || d.frames.length !== (range.last as number) - (range.first as number) + 1) throw new BlenderBridgeError('frames must hold every frame of the range');
-  d.frames.forEach((f, i) => validateFrame(f, (range.first as number) + i));
+  // Every frame of the range, or a subset of it (review stills, the proof set, some frames of a depth reveal, whose
+  // range stays the reveal's): strictly ascending, so no frame repeats and none lies outside the range.
+  if (!Array.isArray(d.frames) || d.frames.length === 0 || d.frames.length > (range.last as number) - (range.first as number) + 1) throw new BlenderBridgeError('frames must hold the frames of the range');
+  const numbers = d.frames.map((f) => (f !== null && typeof f === 'object' ? (f as { frame?: unknown }).frame : undefined));
+  numbers.forEach((n, i) => {
+    if (!Number.isInteger(n) || (n as number) < (range.first as number) || (n as number) > (range.last as number) || (i > 0 && (n as number) <= (numbers[i - 1] as number))) throw new BlenderBridgeError('frames must be strictly ascending frames of the range');
+  });
+  d.frames.forEach((f, i) => validateFrame(f, numbers[i] as number));
   return doc as BlenderMotionDocument;
 }
 

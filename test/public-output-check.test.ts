@@ -15,6 +15,10 @@ import { after, before, describe, test } from 'node:test';
 import { crc32, deflateSync } from 'node:zlib';
 import { buildCaptions, checkCaptions, toSrt, toWebVtt } from '../src/audio/captions.ts';
 import { buildCueSheet } from '../src/audio/cue-sheet.ts';
+import { environmentClass, loadEnvironments } from '../src/blender/identity.ts';
+import { lessonBridge, lessonBridgeFor } from '../src/blender/lesson.ts';
+import { findRevealSeam } from '../src/blender/reveal.ts';
+import { loadBlenderConfig } from '../src/blender/toolchain.ts';
 import { FixtureVoiceProvider } from '../src/audio/voice-provider.ts';
 import { choreograph, layoutsFor } from '../src/character/walletwallaby/choreography.ts';
 import { planMotion } from '../src/character/walletwallaby/motion.ts';
@@ -140,8 +144,54 @@ const mp4 = (media = 'frames', meta = 'Lavf61.7.100'): Buffer =>
 const ON = 100;
 const OFF = 200;
 
+/** Render environments as Blender records them (render.py render_environment): the two approved classes, and one that is not. */
+const ENVIRONMENTS = {
+  'production-rtx5080': { os: 'windows', blenderVersion: '5.2.2 LTS', blenderBuildHash: 'd13f752e3b9c', engine: 'BLENDER_EEVEE', gpu: { backend: 'OPENGL', vendor: 'NVIDIA Corporation', renderer: 'NVIDIA GeForce RTX 5080/PCIe/SSE2', version: '4.6.0 NVIDIA 616.56', deviceType: 'NVIDIA' } },
+  'proof-linux-software-gl': { os: 'linux', blenderVersion: '5.2.2 LTS', blenderBuildHash: 'd13f752e3b9c', engine: 'BLENDER_EEVEE', gpu: { backend: 'OPENGL', vendor: 'Mesa', renderer: 'llvmpipe (LLVM 21.1.8, 256 bits)', version: '4.5 (Core Profile) Mesa 26.0.3-1ubuntu1', deviceType: 'SOFTWARE' } },
+  unapproved: { os: 'windows', blenderVersion: '5.2.2 LTS', blenderBuildHash: 'd13f752e3b9c', engine: 'BLENDER_EEVEE', gpu: { backend: 'OPENGL', vendor: 'NVIDIA Corporation', renderer: 'NVIDIA GeForce RTX 5080/PCIe/SSE2', version: '4.6.0 NVIDIA 999.99', deviceType: 'NVIDIA' } },
+} as const;
+
+/** The character record scripts/render.ts writes: this checkout's Blender identity and plan, rendered in `environment`. */
+function characterRecord(state: PublicState, engine: 'typescript' | 'rust-wasm', frames: number[] | null, environment: keyof typeof ENVIRONMENTS = 'production-rtx5080') {
+  const record = ENVIRONMENTS[environment];
+  const cls = environmentClass(record, loadBlenderConfig(), loadEnvironments());
+  const env = { classId: cls.id, approvedClass: cls.approvedAs?.name ?? null, purpose: cls.approvedAs?.purpose ?? null, record };
+  const lesson = state.lesson(engine);
+  const seam = findRevealSeam(lesson);
+  const inReveal = (f: number) => seam !== null && f >= seam.first && f <= seam.last;
+  const unique = frames ? [...new Set(frames)].sort((a, b) => a - b) : null;
+  const sequenceBridge = contentAddress(lessonBridgeFor(lesson, unique ? unique.filter((f) => !inReveal(f)) : undefined));
+  const revealFrames = unique ? unique.filter(inReveal) : null;
+  const reveals =
+    seam && (!revealFrames || revealFrames.length > 0)
+      ? [(() => {
+          const full = lessonBridge(lesson, seam.first, seam.last);
+          const bridge = revealFrames ? { ...full, frames: full.frames.filter((f) => revealFrames.includes(f.frame)) } : full;
+          return { name: 'reveal', range: { first: seam.first, last: seam.last }, frames: bridge.frames.length, renderSha256: '1'.repeat(64), bridgeSha256: contentAddress(bridge), environment: env };
+        })()]
+      : [];
+  const b = state.identity.character.blender;
+  return {
+    renderer: 'blender',
+    layout: 'crop',
+    sequence: { name: 'sequence', frames: 1, renderSha256: '0'.repeat(64), bridgeSha256: sequenceBridge, environment: env },
+    reveals,
+    identity: {
+      blenderVersion: b.version,
+      blenderBuildHash: b.buildHash,
+      blenderConfigSha256: b.configSha256,
+      blenderSceneSourceSha256: b.sceneSourceSha256,
+      walletwallabyModelVersion: b.model.version,
+      walletwallabyModelSha256: b.model.sha256,
+      materialsVersion: b.materials.version,
+      materialsSha256: b.materials.sha256,
+      motionPlanSha256: sequenceBridge,
+    },
+  };
+}
+
 /** A stills set as render:stills writes one: each frame twice (with and without WalletWallaby) and stills.json. */
-function writeStills(dir: string, opts: { motionEngine?: unknown; twinOn?: 'differs' | 'same' } = {}): string {
+function writeStills(dir: string, opts: { motionEngine?: unknown; twinOn?: 'differs' | 'same'; character?: unknown } = {}): string {
   mkdirSync(dir, { recursive: true });
   const files: { file: string; frame: number; bytes: Buffer }[] = [
     { file: '00-on.png', frame: ON, bytes: png(1) },
@@ -151,12 +201,13 @@ function writeStills(dir: string, opts: { motionEngine?: unknown; twinOn?: 'diff
   ];
   for (const f of files) writeFileSync(path.join(dir, f.file), f.bytes);
   const info = {
-    schema: 'walletwall.stills-info/v2',
+    schema: 'walletwall.stills-info/v3',
     videoId: VIDEO_ID,
     revision: 1,
     specHash: contentAddress(loadCommittedSpec(VIDEO_ID)),
     motionEngine: opts.motionEngine ?? typescriptEngineIdentity(),
     identity: buildIdentity(),
+    character: opts.character ?? characterRecord(state, 'typescript', [ON, OFF], 'proof-linux-software-gl'),
     stills: files.map((f) => ({ file: f.file, frame: f.frame, sha256: sha256Hex(f.bytes) })),
   };
   writeFileSync(path.join(dir, 'stills.json'), prettyJson(info));
@@ -164,7 +215,7 @@ function writeStills(dir: string, opts: { motionEngine?: unknown; twinOn?: 'diff
 }
 
 /** Attach a render the way scripts/render.ts and publish-dry-run.ts record one. */
-function attachRender(dir: string, state: PublicState, opts: { bytes?: Buffer; overlays?: Record<string, boolean>; motionEngine?: unknown } = {}): void {
+function attachRender(dir: string, state: PublicState, opts: { bytes?: Buffer; overlays?: Record<string, boolean>; motionEngine?: unknown; character?: unknown } = {}): void {
   const bytes = opts.bytes ?? mp4();
   writeFileSync(path.join(dir, MP4), bytes);
   const output = { path: `dist/${VIDEO_ID}/${MP4}`, sha256: sha256Hex(bytes) };
@@ -172,7 +223,7 @@ function attachRender(dir: string, state: PublicState, opts: { bytes?: Buffer; o
   writeFileSync(
     path.join(dir, 'render.json'),
     prettyJson({
-      schema: 'walletwall.render-info/v4',
+      schema: 'walletwall.render-info/v5',
       videoId: VIDEO_ID,
       revision: 1,
       specHash: state.specHash,
@@ -185,6 +236,7 @@ function attachRender(dir: string, state: PublicState, opts: { bytes?: Buffer; o
       overlays: opts.overlays ?? { captions: true, characterless: false, guides: false },
       identity: state.identity,
       motionEngine,
+      character: opts.character ?? characterRecord(state, (motionEngine as { motionEngine?: string }).motionEngine === 'rust-wasm' ? 'rust-wasm' : 'typescript', null),
     }),
   );
   editJson<{ files: { video: unknown } }>(path.join(dir, 'publish-manifest.json'), (m) => {
@@ -431,7 +483,7 @@ describe('public output: renders', () => {
     refuses(
       withRender('render-v3', {}, (d) =>
         editJson<{ schema: string; specHash?: string }>(path.join(d, 'render.json'), (r) => {
-          r.schema = 'walletwall.render-info/v3';
+          r.schema = 'walletwall.render-info/v4';
           delete r.specHash;
         }),
       ),
@@ -474,6 +526,35 @@ describe('public output: renders', () => {
     const stale = structuredClone(state.rustEngine()) as { paths: { planSha256: string }[] };
     stale.paths[0]!.planSha256 = 'e'.repeat(64);
     refuses(withRender('render-rust-plan', { motionEngine: stale }), 'MOTION_ENGINE_STALE');
+  });
+  test('a render that records no Blender character is refused', () => {
+    refuses(withRender('render-no-character', { character: { renderer: 'none' } }), 'ARTIFACT_INVALID');
+  });
+  test('a publication render from the proof class is refused: only a publication class may be published', () => {
+    refuses(withRender('render-proof-class', { character: characterRecord(state, 'typescript', null, 'proof-linux-software-gl') }), 'RENDER_ENVIRONMENT_UNAPPROVED');
+  });
+  test('a render from an unapproved environment (a new driver) is refused', () => {
+    refuses(withRender('render-unapproved', { character: characterRecord(state, 'typescript', null, 'unapproved') }), 'RENDER_ENVIRONMENT_UNAPPROVED');
+  });
+  test('a forged class label is refused: the class is re-derived from the environment record', () => {
+    const forged = characterRecord(state, 'typescript', null, 'unapproved');
+    forged.sequence.environment = { ...forged.sequence.environment, approvedClass: 'production-rtx5080', purpose: 'publication' };
+    refuses(withRender('render-forged-class', { character: forged }), 'RENDER_ENVIRONMENT_UNAPPROVED');
+  });
+  test('character frames rendered from another MotionPlan are refused', () => {
+    const other = characterRecord(state, 'typescript', null);
+    other.sequence.bridgeSha256 = 'c'.repeat(64);
+    refuses(withRender('render-other-plan', { character: other }), 'CHARACTER_STALE');
+  });
+  test('character frames from another built model are refused', () => {
+    const other = characterRecord(state, 'typescript', null);
+    other.identity.walletwallabyModelSha256 = 'd'.repeat(64);
+    refuses(withRender('render-other-model', { character: other }), 'CHARACTER_STALE');
+  });
+  test('a render without the depth reveal its lesson has is refused', () => {
+    const other = characterRecord(state, 'typescript', null);
+    other.reveals = [];
+    refuses(withRender('render-no-reveal', { character: other }), 'CHARACTER_STALE');
   });
 });
 
@@ -520,6 +601,13 @@ describe('public output: review stills', () => {
     const stills = writeStills(freshDir('stills-identity'));
     editJson<{ identity: { configs: Record<string, string> } }>(path.join(stills, 'stills.json'), (s) => (s.identity.configs['config/youtube.json'] = '1'.repeat(64)));
     refuses(clean, 'IDENTITY_STALE', { stills: [stills] });
+  });
+  test('stills from the proof class pass; from an unapproved class they are refused', () => {
+    passes(clean, { stills: [writeStills(freshDir('stills-proof-class'))] });
+    refuses(clean, 'RENDER_ENVIRONMENT_UNAPPROVED', { stills: [writeStills(freshDir('stills-unapproved'), { character: characterRecord(state, 'typescript', [ON, OFF], 'unapproved') })] });
+  });
+  test('stills whose character frames were rendered for other frames are refused', () => {
+    refuses(clean, 'CHARACTER_STALE', { stills: [writeStills(freshDir('stills-other-frames'), { character: characterRecord(state, 'typescript', [ON, OFF + 1], 'proof-linux-software-gl') })] });
   });
   test('stills naming a stale motion engine are refused', () => {
     refuses(clean, 'MOTION_ENGINE_STALE', { stills: [writeStills(freshDir('stills-engine'), { motionEngine: { motionEngine: 'typescript', motion: { id: 'walletwallaby-motion', version: 1 } } })] });

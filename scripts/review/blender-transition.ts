@@ -16,7 +16,7 @@ import { renderMedia, renderStill, selectComposition } from '@remotion/renderer'
 import { FixtureVoiceProvider } from '../../src/audio/voice-provider.ts';
 import { blenderIdentity, CHARACTER } from '../../src/blender/identity.ts';
 import { lessonBridge, lessonMotion, lessonTerrain } from '../../src/blender/lesson.ts';
-import { stageBlenderSequence, stageBlenderTransition } from '../../src/blender/stage.ts';
+import { clearStagedBlender, recordedLayout, stageBlenderSequence, stageBlenderTransition } from '../../src/blender/stage.ts';
 import { BLENDER_JOBS, findBlender, loadBlenderConfig, outFile, runBlender, writeJob } from '../../src/blender/toolchain.ts';
 import { BLENDER_MOTION_SCHEMA } from '../../src/character/walletwallaby/blender/bridge.ts';
 import { blenderRigDocument } from '../../src/character/walletwallaby/blender/rig-export.ts';
@@ -106,11 +106,12 @@ if (stillsOnly) {
 }
 
 // 3. Verified, staged, and composited across the seam.
-const reveal = stageBlenderTransition(NAME, { first, last });
+clearStagedBlender();
+const reveal = stageBlenderTransition(NAME, lesson);
 const props = {
   ...buildProps(spec, source, track, config, { captions: false, characterless: false, guides: false }),
   depthReveals: [reveal],
-  ...(context ? { characterRenderer: stageBlenderSequence(context, lesson) } : {}),
+  ...(context ? { characterRenderer: stageBlenderSequence(context, lesson, recordedLayout(context)) } : {}),
 };
 // The bundle copies the public dir when it is made: bundle again now that the reveal's frames are staged.
 const serveUrl2 = await bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'index.ts'), publicDir: PUBLIC_DIR });

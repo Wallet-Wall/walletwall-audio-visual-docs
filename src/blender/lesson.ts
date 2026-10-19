@@ -16,7 +16,7 @@ import { bindMotionEngine, sampleWithEngine, type BoundMotionEngine } from '../m
 import { planRustMotion } from '../motion/rust-adapter.ts';
 import { loadCommittedSpec } from '../pipeline/context.ts';
 import { loadSnapshot, synthesize } from '../pipeline/render-input.ts';
-import { buildTimeline, totalFrames, type Timeline } from '../timeline/timeline.ts';
+import { buildTimeline, totalFrames, type NarrationTrack, type Timeline } from '../timeline/timeline.ts';
 import { contentAddress } from '../core/hash.ts';
 
 export interface LessonMotion {
@@ -33,8 +33,14 @@ export interface LessonMotion {
 export async function lessonMotion(videoId: string, engineName: 'typescript' | 'rust-wasm' = 'typescript'): Promise<LessonMotion> {
   const config = loadPipelineConfig();
   const spec = loadCommittedSpec(videoId);
+  return lessonMotionWith(videoId, engineName, await synthesize(spec, new FixtureVoiceProvider(), config));
+}
+
+/** The lesson's motion for an already-synthesized narration track (the same as lessonMotion with the fixture voice). */
+export function lessonMotionWith(videoId: string, engineName: 'typescript' | 'rust-wasm', track: NarrationTrack): LessonMotion {
+  const config = loadPipelineConfig();
+  const spec = loadCommittedSpec(videoId);
   const source = loadSnapshot(spec);
-  const track = await synthesize(spec, new FixtureVoiceProvider(), config);
   const timeline = buildTimeline(spec, track, config.templates);
   const headings: Record<string, string> = Object.fromEntries(source.sections.map((s) => [s.id, s.heading]));
   const layouts = layoutsFor(timeline, (id) => headings[id] ?? '');
@@ -77,6 +83,15 @@ export function lessonBridge(lesson: LessonMotion, first: number, last: number):
   }
   const doc: BlenderMotionDocument = { schema: BLENDER_MOTION_SCHEMA, videoId: lesson.videoId, fps: lesson.timeline.fps, range: { first, last }, motionEngine: lesson.engineId, coordinates: { unitsPerPx: UNITS_PER_PX, planeOrigin: { ...PLANE_ORIGIN } }, frames };
   return validateBridge(JSON.parse(JSON.stringify(doc)));
+}
+
+/** The bridge for the whole lesson, or exactly the given frames (a subset of the range they span). */
+export function lessonBridgeFor(lesson: LessonMotion, frames: readonly number[] | undefined): BlenderMotionDocument {
+  if (!frames) return lessonBridge(lesson, 0, lesson.frames - 1);
+  if (frames.length === 0) throw new Error('no frames were asked for');
+  const want = new Set(frames);
+  const full = lessonBridge(lesson, Math.min(...want), Math.max(...want));
+  return { ...full, frames: full.frames.filter((f) => want.has(f.frame)) };
 }
 
 /** The declared terrain of every segment the bridge touches. */

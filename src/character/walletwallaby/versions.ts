@@ -44,6 +44,19 @@ export const MOTION_PINS: Readonly<Record<number, string>> = {
 };
 
 /**
+ * The Blender character the production renderer draws (docs/BLENDER.md): the canonical model (quantized, ordered by
+ * position, the same on every host that builds this source) and its materials, as built from blender/walletwallaby/
+ * by the pinned Blender. A render refuses a built character whose hashes differ, so a change to the body or its
+ * materials is declared here, deliberately, together with its model or materials version.
+ */
+export const BLENDER_CHARACTER = {
+  modelVersion: 1,
+  modelSha256: 'f8124e59dab3bcf578f62db4cbe20fec12be7ee78e3a13701df45d6bc0118a1a',
+  materialsVersion: 2,
+  materialsSha256: 'de8c55f5725372035b3358311fe07d9096d60e8ca6cefbc9281e51222f421db3',
+} as const;
+
+/**
  * The compiled rig: where it lives in this repository, where the render bundle
  * serves it from, and the sha256 of its bytes (`npm run rive:build` prints it).
  * The renderer refuses any other bytes.
