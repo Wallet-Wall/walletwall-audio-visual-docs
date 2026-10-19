@@ -1,0 +1,1042 @@
+{
+  "schema": "walletwall.narration-bakeoff-results/v1",
+  "corpus": {
+    "id": "walletwallaby-narration-eval",
+    "version": 1,
+    "sha256": "6aa5e3cb7efd8379b6e9232fdc3fa6425f69c421e6ac2e2b0708db605406cf36"
+  },
+  "lineup": [
+    "chatterbox-multilingual:paced-calm",
+    "magpie-nemo-speech:jason-cool"
+  ],
+  "candidates": [
+    {
+      "provider": "chatterbox-multilingual",
+      "variant": "paced-calm",
+      "passageId": "long-form",
+      "artifact": {
+        "identity": "f89264b89be443c74d76425cfabf9245a2fbf27b4dae1a275692d172d497f3fb",
+        "synthesis": "adapter",
+        "audioSha256": "dda27db3a5a5e170d6f8283c0a8a91a35111846f5fc0a0fe2cd878f36d071738",
+        "durationMs": 30280,
+        "sampleRate": 24000,
+        "channels": 1,
+        "modelId": "ResembleAI/chatterbox",
+        "modelVersion": "v3@5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18",
+        "modelContent": {
+          "Cangjie5_TC.json": "7073fd9de919443ae88e0bd2449917a65fe54898a4413ed1edcc4b67f28bce8c",
+          "conds.pt": "6552d70568833628ba019c6b03459e77fe71ca197d5c560cef9411bee9d87f4e",
+          "grapheme_mtl_merged_expanded_v1.json": "69632f47220a788a52ce2661d096453c5655e9bf25289d89a8d832c46ee07dbf",
+          "s3gen.pt": "9b9ff07e60b20c136e2b1b3d7563a24604e8d2c4c267888d1ee929dd0151d2a3",
+          "t3_mtl23ls_v3.safetensors": "5abca8321ede76f8e61f1cc0d19aea6c946b28871017ce8726f8a69203f05953",
+          "ve.pt": "4b16d836bc598509860f6fa068165a8bb5e9ac84f05582dfcf278a5a372879f1"
+        },
+        "voiceId": "built-in",
+        "seed": 7,
+        "settings": {
+          "t3Model": "v3",
+          "languageId": "en",
+          "exaggeration": 0.3,
+          "cfgWeight": 0.3,
+          "temperature": 0.6,
+          "repetitionPenalty": 1.2,
+          "minP": 0.05,
+          "topP": 1,
+          "seed": 7,
+          "device": "cuda",
+          "audioPrompt": null,
+          "watermark": "perth"
+        },
+        "runtime": {
+          "name": "chatterbox-tts@5de7a54aa4e5 / torch 2.11.0+cu128 cuda 12.8",
+          "version": "0.1.7",
+          "device": "cuda"
+        },
+        "text": {
+          "corpusId": "walletwallaby-narration-eval",
+          "corpusVersion": 1,
+          "passageId": "long-form",
+          "displaySha256": "767c86b702c52ac2331316880fd107cf763671d3a991af88f19c60d9f287f222",
+          "spokenSha256": "767c86b702c52ac2331316880fd107cf763671d3a991af88f19c60d9f287f222",
+          "spokenChars": 998,
+          "spokenWords": 178
+        }
+      },
+      "performance": {
+        "wallMs": 59084.0613,
+        "coldStart": true,
+        "vramPeakMiB": 5334
+      },
+      "metrics": {
+        "sampleRate": 24000,
+        "durationMs": 30280,
+        "peakDbfs": -0.00026507636037961915,
+        "rmsDbfs": -16.688238963219412,
+        "dcOffset": -0.0001641660679389285,
+        "integratedLufs": -16.99754524938673,
+        "clipping": {
+          "samples": 1,
+          "runs": 0,
+          "longestRun": 1
+        },
+        "silence": {
+          "thresholdDbfs": -50,
+          "leadingMs": 30,
+          "trailingMs": 270,
+          "speechMs": 27670,
+          "minPauseMs": 200,
+          "pauses": {
+            "count": 1,
+            "maxMs": 220,
+            "totalMs": 220
+          }
+        },
+        "pitch": {
+          "voicedRatio": 0.6485768500948766,
+          "medianHz": 165.545698578275,
+          "semitoneStd": 6.124049811573889,
+          "p10Hz": 93.84954827509964,
+          "p90Hz": 237.88478640071685
+        }
+      },
+      "transcript": {
+        "text": "Here is how a readiness review usually goes. It starts with a wallet that someone has already decided is important. Maybe it holds a large stablecoin balance, maybe it signs for a treasury. Either way, the first job is not to score it. The first job is to find out what is actually known. That means three checks in order. First, the evidence which on-chain fonds and under what conditions. Third, the state whether the wallet today still matches the wallet in the record. That is fine. An uncertain answer, stated plainly, is more useful than a current. Second, the authority, who can actually",
+        "diff": {
+          "referenceWords": 178,
+          "hypothesisWords": 104,
+          "substitutions": 7,
+          "deletions": 74,
+          "insertions": 0,
+          "wordErrorRate": 0.4550561797752809,
+          "missing": [
+            "facts",
+            "are",
+            "current",
+            "and",
+            "which",
+            "are",
+            "inherited",
+            "from",
+            "an",
+            "older",
+            "scan",
+            "second",
+            "the",
+            "authority",
+            "who",
+            "can",
+            "actually",
+            "move",
+            "funds",
+            "the",
+            "third",
+            "check",
+            "is",
+            "where",
+            "most",
+            "reviews",
+            "get",
+            "uncomfortable",
+            "because",
+            "the",
+            "honest",
+            "answer",
+            "is",
+            "often",
+            "not",
+            "sure",
+            "yet",
+            "a",
+            "confident",
+            "one",
+            "that",
+            "cannot",
+            "be",
+            "traced",
+            "so",
+            "the",
+            "conclusion",
+            "is",
+            "simple",
+            "a",
+            "readiness",
+            "tier",
+            "is",
+            "a",
+            "place",
+            "in",
+            "a",
+            "queue",
+            "not",
+            "verdict",
+            "treat",
+            "it",
+            "as",
+            "the",
+            "start",
+            "of",
+            "the",
+            "work",
+            "keep",
+            "the",
+            "evidence",
+            "attached",
+            "and",
+            "let",
+            "record",
+            "say",
+            "exactly",
+            "how",
+            "much",
+            "is",
+            "known"
+          ],
+          "extra": [
+            "fonds",
+            "current",
+            "second",
+            "authority",
+            "who",
+            "can",
+            "actually"
+          ],
+          "repeatedPhrases": []
+        },
+        "asr": {
+          "model": "nvidia/parakeet-tdt-0.6b-v3",
+          "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+          "file": "parakeet-tdt-0.6b-v3.q8_0.gguf",
+          "sha256": "e3880d0aaaaf2c308ea2c35016b2b895c423eb3fda924c1b463d1c19b7f4d32e",
+          "runtime": {
+            "name": "nemo-speech",
+            "version": "0.2.0"
+          },
+          "device": "cuda"
+        }
+      },
+      "determinism": null
+    },
+    {
+      "provider": "chatterbox-multilingual",
+      "variant": "paced-calm",
+      "passageId": "normal-explanation",
+      "artifact": {
+        "identity": "4b1b1b40cf01ea07a30f3d567cf3ce88552f7728cab1db25cfbee663627ce615",
+        "synthesis": "adapter",
+        "audioSha256": "7707df349d6cf9403da9d0f912bb5ce3465af2cec13932cf6f6d1a39051ce622",
+        "durationMs": 16640,
+        "sampleRate": 24000,
+        "channels": 1,
+        "modelId": "ResembleAI/chatterbox",
+        "modelVersion": "v3@5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18",
+        "modelContent": {
+          "Cangjie5_TC.json": "7073fd9de919443ae88e0bd2449917a65fe54898a4413ed1edcc4b67f28bce8c",
+          "conds.pt": "6552d70568833628ba019c6b03459e77fe71ca197d5c560cef9411bee9d87f4e",
+          "grapheme_mtl_merged_expanded_v1.json": "69632f47220a788a52ce2661d096453c5655e9bf25289d89a8d832c46ee07dbf",
+          "s3gen.pt": "9b9ff07e60b20c136e2b1b3d7563a24604e8d2c4c267888d1ee929dd0151d2a3",
+          "t3_mtl23ls_v3.safetensors": "5abca8321ede76f8e61f1cc0d19aea6c946b28871017ce8726f8a69203f05953",
+          "ve.pt": "4b16d836bc598509860f6fa068165a8bb5e9ac84f05582dfcf278a5a372879f1"
+        },
+        "voiceId": "built-in",
+        "seed": 7,
+        "settings": {
+          "t3Model": "v3",
+          "languageId": "en",
+          "exaggeration": 0.3,
+          "cfgWeight": 0.3,
+          "temperature": 0.6,
+          "repetitionPenalty": 1.2,
+          "minP": 0.05,
+          "topP": 1,
+          "seed": 7,
+          "device": "cuda",
+          "audioPrompt": null,
+          "watermark": "perth"
+        },
+        "runtime": {
+          "name": "chatterbox-tts@5de7a54aa4e5 / torch 2.11.0+cu128 cuda 12.8",
+          "version": "0.1.7",
+          "device": "cuda"
+        },
+        "text": {
+          "corpusId": "walletwallaby-narration-eval",
+          "corpusVersion": 1,
+          "passageId": "normal-explanation",
+          "displaySha256": "16a2ed760fd009598015946bfc56024ed4907ce551ce1ea0894eb243da8934e2",
+          "spokenSha256": "16a2ed760fd009598015946bfc56024ed4907ce551ce1ea0894eb243da8934e2",
+          "spokenChars": 342,
+          "spokenWords": 68
+        }
+      },
+      "performance": {
+        "wallMs": 52830.246,
+        "coldStart": true,
+        "vramPeakMiB": 4209
+      },
+      "metrics": {
+        "sampleRate": 24000,
+        "durationMs": 16640,
+        "peakDbfs": -0.00026507636037961915,
+        "rmsDbfs": -17.355498844777976,
+        "dcOffset": -0.00016082364779252274,
+        "integratedLufs": -17.55967943727918,
+        "clipping": {
+          "samples": 1,
+          "runs": 0,
+          "longestRun": 1
+        },
+        "silence": {
+          "thresholdDbfs": -50,
+          "leadingMs": 100,
+          "trailingMs": 310,
+          "speechMs": 14280,
+          "minPauseMs": 200,
+          "pauses": {
+            "count": 5,
+            "maxMs": 320,
+            "totalMs": 1320
+          }
+        },
+        "pitch": {
+          "voicedRatio": 0.6664270309130123,
+          "medianHz": 140.46770207638286,
+          "semitoneStd": 5.219313608177313,
+          "p10Hz": 101.25493683334962,
+          "p90Hz": 220.15297063007006
+        }
+      },
+      "transcript": {
+        "text": "A dashboard can label a wallet as a vault candidate. That label is a starting point, not a conclusion. Three things have to hold. The evidence behind it has to be real and current. The authority to act has to exist, and the wallet's state has to be the state the dashboard thinks it is. If any of those slips, the label is a word on a screen.",
+        "diff": {
+          "referenceWords": 68,
+          "hypothesisWords": 68,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "wordErrorRate": 0,
+          "missing": [],
+          "extra": [],
+          "repeatedPhrases": []
+        },
+        "asr": {
+          "model": "nvidia/parakeet-tdt-0.6b-v3",
+          "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+          "file": "parakeet-tdt-0.6b-v3.q8_0.gguf",
+          "sha256": "e3880d0aaaaf2c308ea2c35016b2b895c423eb3fda924c1b463d1c19b7f4d32e",
+          "runtime": {
+            "name": "nemo-speech",
+            "version": "0.2.0"
+          },
+          "device": "cuda"
+        }
+      },
+      "determinism": {
+        "repeats": 2,
+        "identical": true,
+        "sha256": [
+          "7707df349d6cf9403da9d0f912bb5ce3465af2cec13932cf6f6d1a39051ce622",
+          "7707df349d6cf9403da9d0f912bb5ce3465af2cec13932cf6f6d1a39051ce622"
+        ]
+      }
+    },
+    {
+      "provider": "chatterbox-multilingual",
+      "variant": "paced-calm",
+      "passageId": "short-instruction",
+      "artifact": {
+        "identity": "984511606de38743157569a1d83153a255d0a978816e83cafcc1bc5338d0969e",
+        "synthesis": "adapter",
+        "audioSha256": "9b1aff2fced0e9ecfcd292dcfd6de90577c09f151e651332cb12902b655bb409",
+        "durationMs": 4920,
+        "sampleRate": 24000,
+        "channels": 1,
+        "modelId": "ResembleAI/chatterbox",
+        "modelVersion": "v3@5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18",
+        "modelContent": {
+          "Cangjie5_TC.json": "7073fd9de919443ae88e0bd2449917a65fe54898a4413ed1edcc4b67f28bce8c",
+          "conds.pt": "6552d70568833628ba019c6b03459e77fe71ca197d5c560cef9411bee9d87f4e",
+          "grapheme_mtl_merged_expanded_v1.json": "69632f47220a788a52ce2661d096453c5655e9bf25289d89a8d832c46ee07dbf",
+          "s3gen.pt": "9b9ff07e60b20c136e2b1b3d7563a24604e8d2c4c267888d1ee929dd0151d2a3",
+          "t3_mtl23ls_v3.safetensors": "5abca8321ede76f8e61f1cc0d19aea6c946b28871017ce8726f8a69203f05953",
+          "ve.pt": "4b16d836bc598509860f6fa068165a8bb5e9ac84f05582dfcf278a5a372879f1"
+        },
+        "voiceId": "built-in",
+        "seed": 7,
+        "settings": {
+          "t3Model": "v3",
+          "languageId": "en",
+          "exaggeration": 0.3,
+          "cfgWeight": 0.3,
+          "temperature": 0.6,
+          "repetitionPenalty": 1.2,
+          "minP": 0.05,
+          "topP": 1,
+          "seed": 7,
+          "device": "cuda",
+          "audioPrompt": null,
+          "watermark": "perth"
+        },
+        "runtime": {
+          "name": "chatterbox-tts@5de7a54aa4e5 / torch 2.11.0+cu128 cuda 12.8",
+          "version": "0.1.7",
+          "device": "cuda"
+        },
+        "text": {
+          "corpusId": "walletwallaby-narration-eval",
+          "corpusVersion": 1,
+          "passageId": "short-instruction",
+          "displaySha256": "afbdf9ee8fc331f1e346e2de3ca897503202111ebbcdc73c01bc1e7ba145a3fd",
+          "spokenSha256": "afbdf9ee8fc331f1e346e2de3ca897503202111ebbcdc73c01bc1e7ba145a3fd",
+          "spokenChars": 96,
+          "spokenWords": 15
+        }
+      },
+      "performance": {
+        "wallMs": 54798.7667,
+        "coldStart": true,
+        "vramPeakMiB": 3608
+      },
+      "metrics": {
+        "sampleRate": 24000,
+        "durationMs": 4920,
+        "peakDbfs": -0.21115791143284882,
+        "rmsDbfs": -17.94106552604742,
+        "dcOffset": -0.00013042491302903752,
+        "integratedLufs": -17.927083196044407,
+        "clipping": {
+          "samples": 0,
+          "runs": 0,
+          "longestRun": 0
+        },
+        "silence": {
+          "thresholdDbfs": -50,
+          "leadingMs": 10,
+          "trailingMs": 300,
+          "speechMs": 4290,
+          "minPauseMs": 200,
+          "pauses": {
+            "count": 1,
+            "maxMs": 250,
+            "totalMs": 250
+          }
+        },
+        "pitch": {
+          "voicedRatio": 0.7033248081841432,
+          "medianHz": 131.2667383369744,
+          "semitoneStd": 5.617222659795543,
+          "p10Hz": 94.60035051251376,
+          "p90Hz": 216.55067860273894
+        }
+      },
+      "transcript": {
+        "text": "Before you move stablecoins into a vault, check whether the evidence actually supports the move.",
+        "diff": {
+          "referenceWords": 15,
+          "hypothesisWords": 15,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "wordErrorRate": 0,
+          "missing": [],
+          "extra": [],
+          "repeatedPhrases": []
+        },
+        "asr": {
+          "model": "nvidia/parakeet-tdt-0.6b-v3",
+          "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+          "file": "parakeet-tdt-0.6b-v3.q8_0.gguf",
+          "sha256": "e3880d0aaaaf2c308ea2c35016b2b895c423eb3fda924c1b463d1c19b7f4d32e",
+          "runtime": {
+            "name": "nemo-speech",
+            "version": "0.2.0"
+          },
+          "device": "cuda"
+        }
+      },
+      "determinism": null
+    },
+    {
+      "provider": "chatterbox-multilingual",
+      "variant": "paced-calm",
+      "passageId": "technical-passage",
+      "artifact": {
+        "identity": "e03e5c721c806d6e8a148da44ac64a645c1ef2d68f5990444e06cacbd3449776",
+        "synthesis": "adapter",
+        "audioSha256": "0aacc54e3c6d01010d045b7f81dc2c2db446559bdfba2be3166550c416a0f70d",
+        "durationMs": 27760,
+        "sampleRate": 24000,
+        "channels": 1,
+        "modelId": "ResembleAI/chatterbox",
+        "modelVersion": "v3@5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18",
+        "modelContent": {
+          "Cangjie5_TC.json": "7073fd9de919443ae88e0bd2449917a65fe54898a4413ed1edcc4b67f28bce8c",
+          "conds.pt": "6552d70568833628ba019c6b03459e77fe71ca197d5c560cef9411bee9d87f4e",
+          "grapheme_mtl_merged_expanded_v1.json": "69632f47220a788a52ce2661d096453c5655e9bf25289d89a8d832c46ee07dbf",
+          "s3gen.pt": "9b9ff07e60b20c136e2b1b3d7563a24604e8d2c4c267888d1ee929dd0151d2a3",
+          "t3_mtl23ls_v3.safetensors": "5abca8321ede76f8e61f1cc0d19aea6c946b28871017ce8726f8a69203f05953",
+          "ve.pt": "4b16d836bc598509860f6fa068165a8bb5e9ac84f05582dfcf278a5a372879f1"
+        },
+        "voiceId": "built-in",
+        "seed": 7,
+        "settings": {
+          "t3Model": "v3",
+          "languageId": "en",
+          "exaggeration": 0.3,
+          "cfgWeight": 0.3,
+          "temperature": 0.6,
+          "repetitionPenalty": 1.2,
+          "minP": 0.05,
+          "topP": 1,
+          "seed": 7,
+          "device": "cuda",
+          "audioPrompt": null,
+          "watermark": "perth"
+        },
+        "runtime": {
+          "name": "chatterbox-tts@5de7a54aa4e5 / torch 2.11.0+cu128 cuda 12.8",
+          "version": "0.1.7",
+          "device": "cuda"
+        },
+        "text": {
+          "corpusId": "walletwallaby-narration-eval",
+          "corpusVersion": 1,
+          "passageId": "technical-passage",
+          "displaySha256": "448324380edec31844688d9e940d88b63ebd717c3f3f6483b9f43ce4e1e945d9",
+          "spokenSha256": "b607e2d70a5e3838aaf31a8371198aec301018ce99b71b7aa9c4c70a66fba60f",
+          "spokenChars": 560,
+          "spokenWords": 94
+        }
+      },
+      "performance": {
+        "wallMs": 65661.5885,
+        "coldStart": true,
+        "vramPeakMiB": 4892
+      },
+      "metrics": {
+        "sampleRate": 24000,
+        "durationMs": 27760,
+        "peakDbfs": -0.00026507636037961915,
+        "rmsDbfs": -17.35596144064256,
+        "dcOffset": -0.00013490117134438696,
+        "integratedLufs": -17.603824567519702,
+        "clipping": {
+          "samples": 1,
+          "runs": 0,
+          "longestRun": 1
+        },
+        "silence": {
+          "thresholdDbfs": -50,
+          "leadingMs": 60,
+          "trailingMs": 440,
+          "speechMs": 24130,
+          "minPauseMs": 200,
+          "pauses": {
+            "count": 6,
+            "maxMs": 370,
+            "totalMs": 1690
+          }
+        },
+        "pitch": {
+          "voicedRatio": 0.6853028377806014,
+          "medianHz": 134.93343727148397,
+          "semitoneStd": 5.577838560082462,
+          "p10Hz": 94.1371450134344,
+          "p90Hz": 219.7363508743524
+        }
+      },
+      "transcript": {
+        "text": "Under the hood, wallet wall treats every wallet address as a question, and Wallet Wallaby walks the answer. Each stablecoin balance is read on-chain, then recorded with its provenance, which block, which source, and which rule produced it. The scoring runs in BigQuery and it is deterministic. The same inputs always produce the same migration readiness tier. That matters when a tier is challenged because the evidence can be replayed instead of argued about. If a wallet address looks ready, the readiness is a claim with a trail behind it, not a feeling.",
+        "diff": {
+          "referenceWords": 91,
+          "hypothesisWords": 91,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "wordErrorRate": 0,
+          "missing": [],
+          "extra": [],
+          "repeatedPhrases": []
+        },
+        "asr": {
+          "model": "nvidia/parakeet-tdt-0.6b-v3",
+          "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+          "file": "parakeet-tdt-0.6b-v3.q8_0.gguf",
+          "sha256": "e3880d0aaaaf2c308ea2c35016b2b895c423eb3fda924c1b463d1c19b7f4d32e",
+          "runtime": {
+            "name": "nemo-speech",
+            "version": "0.2.0"
+          },
+          "device": "cuda"
+        }
+      },
+      "determinism": null
+    },
+    {
+      "provider": "magpie-nemo-speech",
+      "variant": "jason-cool",
+      "passageId": "long-form",
+      "artifact": {
+        "identity": "12dd2a7429c10ed3ed8be9219b49349fc7b2eb57f4688846e0ad8c3ad60aef63",
+        "synthesis": "adapter",
+        "audioSha256": "8bccbc77197b4d4431d7f4f7fa1c633bac5dacd82da7e578f2db55436ee5c22d",
+        "durationMs": 77183,
+        "sampleRate": 22050,
+        "channels": 1,
+        "modelId": "nvidia/magpie_tts_multilingual_357m",
+        "modelVersion": "v2607@19806879b16d3f2ccf28fb112b1bcd16a3c7923e",
+        "modelContent": {
+          "magpie_tts_multilingual_357m.v2607.f16.gguf": "30d27551fc4a050e8095139f0185796024493373e83d49443c8ddba33c514e68",
+          "nemo_nano_codec_22khz_1.89kbps_21.5fps.decoder.f16.gguf": "cc86d36d821a27cdc1d4ef600a3e2b0dabe76e88fcc2a8652d9543134c07ef2d",
+          "tokenizer/": "36529a70c72a7cc60e301579eab88a945ba58d915573bf0a2bc8ba0ec5acf036"
+        },
+        "voiceId": "Jason",
+        "seed": 7,
+        "settings": {
+          "voice": "Jason",
+          "seed": 7,
+          "cfgScale": 2.5,
+          "temperature": 0.4,
+          "topK": 40,
+          "steps": null,
+          "device": "cuda"
+        },
+        "runtime": {
+          "name": "nemo-speech",
+          "version": "0.2.0",
+          "device": "cuda"
+        },
+        "text": {
+          "corpusId": "walletwallaby-narration-eval",
+          "corpusVersion": 1,
+          "passageId": "long-form",
+          "displaySha256": "767c86b702c52ac2331316880fd107cf763671d3a991af88f19c60d9f287f222",
+          "spokenSha256": "767c86b702c52ac2331316880fd107cf763671d3a991af88f19c60d9f287f222",
+          "spokenChars": 998,
+          "spokenWords": 178
+        }
+      },
+      "performance": {
+        "wallMs": 3136.540400000001,
+        "coldStart": true,
+        "vramPeakMiB": 1866
+      },
+      "metrics": {
+        "sampleRate": 22050,
+        "durationMs": 77183,
+        "peakDbfs": -4.894956257437993,
+        "rmsDbfs": -24.39420659323826,
+        "dcOffset": -0.000014304146439590179,
+        "integratedLufs": -23.947694333419175,
+        "clipping": {
+          "samples": 0,
+          "runs": 0,
+          "longestRun": 0
+        },
+        "silence": {
+          "thresholdDbfs": -50,
+          "leadingMs": 20,
+          "trailingMs": 0,
+          "speechMs": 55450,
+          "minPauseMs": 200,
+          "pauses": {
+            "count": 40,
+            "maxMs": 700,
+            "totalMs": 16370
+          }
+        },
+        "pitch": {
+          "voicedRatio": 0.7630396561828482,
+          "medianHz": 177.0362067374664,
+          "semitoneStd": 4.0229835842482125,
+          "p10Hz": 128.49499101804642,
+          "p90Hz": 225.36468633346112
+        }
+      },
+      "transcript": {
+        "text": "Here is how a readiness review usually goes. Yo-yo, it starts with a wallet that someone has already decided is important. A maybe it holds a large stablecoin balance. But they, maybe it signs for a treasury. Either way, the first job is not to score it. A thor, the first job is to find out what is actually known. That means three checks, in order. For first, the evidence, which on-chain facts are current and which are inherited from an older scan. Second, the authority, who can actually move funds, and under what conditions. A third, the state, whether the wallet today still matches the wallet in the record. Oh, the third check is where most reviews get uncomfortable because the honest answer is often not sure yet. That is fine. Uncertain answer, stated plainly, is more useful than a confident one that cannot be traced. So the conclusion is simple. A readiness tier is a place in a queue, not a verdict. Retreat it as the start of the work, keep the evidence attached, and let the record say exactly how much is known.",
+        "diff": {
+          "referenceWords": 178,
+          "hypothesisWords": 187,
+          "substitutions": 1,
+          "deletions": 1,
+          "insertions": 10,
+          "wordErrorRate": 0.06741573033707865,
+          "missing": [
+            "an",
+            "treat"
+          ],
+          "extra": [
+            "yo",
+            "yo",
+            "a",
+            "but",
+            "they",
+            "a",
+            "thor",
+            "for",
+            "a",
+            "oh",
+            "retreat"
+          ],
+          "repeatedPhrases": []
+        },
+        "asr": {
+          "model": "nvidia/parakeet-tdt-0.6b-v3",
+          "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+          "file": "parakeet-tdt-0.6b-v3.q8_0.gguf",
+          "sha256": "e3880d0aaaaf2c308ea2c35016b2b895c423eb3fda924c1b463d1c19b7f4d32e",
+          "runtime": {
+            "name": "nemo-speech",
+            "version": "0.2.0"
+          },
+          "device": "cuda"
+        }
+      },
+      "determinism": null
+    },
+    {
+      "provider": "magpie-nemo-speech",
+      "variant": "jason-cool",
+      "passageId": "normal-explanation",
+      "artifact": {
+        "identity": "8dc94a4353103a37d15cb5577204e7d8fe4e87c4c2a68a3aa05259d7da5a2090",
+        "synthesis": "adapter",
+        "audioSha256": "cb26d5dba815b11054ddd3ef628f1a49e722cbf37f3a063b4eb8d14231c24ce8",
+        "durationMs": 27771,
+        "sampleRate": 22050,
+        "channels": 1,
+        "modelId": "nvidia/magpie_tts_multilingual_357m",
+        "modelVersion": "v2607@19806879b16d3f2ccf28fb112b1bcd16a3c7923e",
+        "modelContent": {
+          "magpie_tts_multilingual_357m.v2607.f16.gguf": "30d27551fc4a050e8095139f0185796024493373e83d49443c8ddba33c514e68",
+          "nemo_nano_codec_22khz_1.89kbps_21.5fps.decoder.f16.gguf": "cc86d36d821a27cdc1d4ef600a3e2b0dabe76e88fcc2a8652d9543134c07ef2d",
+          "tokenizer/": "36529a70c72a7cc60e301579eab88a945ba58d915573bf0a2bc8ba0ec5acf036"
+        },
+        "voiceId": "Jason",
+        "seed": 7,
+        "settings": {
+          "voice": "Jason",
+          "seed": 7,
+          "cfgScale": 2.5,
+          "temperature": 0.4,
+          "topK": 40,
+          "steps": null,
+          "device": "cuda"
+        },
+        "runtime": {
+          "name": "nemo-speech",
+          "version": "0.2.0",
+          "device": "cuda"
+        },
+        "text": {
+          "corpusId": "walletwallaby-narration-eval",
+          "corpusVersion": 1,
+          "passageId": "normal-explanation",
+          "displaySha256": "16a2ed760fd009598015946bfc56024ed4907ce551ce1ea0894eb243da8934e2",
+          "spokenSha256": "16a2ed760fd009598015946bfc56024ed4907ce551ce1ea0894eb243da8934e2",
+          "spokenChars": 342,
+          "spokenWords": 68
+        }
+      },
+      "performance": {
+        "wallMs": 1985.1392,
+        "coldStart": true,
+        "vramPeakMiB": 1879
+      },
+      "metrics": {
+        "sampleRate": 22050,
+        "durationMs": 27771,
+        "peakDbfs": -4.872166568464379,
+        "rmsDbfs": -24.330868734502605,
+        "dcOffset": -0.000015260583182242402,
+        "integratedLufs": -23.883802197796467,
+        "clipping": {
+          "samples": 0,
+          "runs": 0,
+          "longestRun": 0
+        },
+        "silence": {
+          "thresholdDbfs": -50,
+          "leadingMs": 10,
+          "trailingMs": 90,
+          "speechMs": 19780,
+          "minPauseMs": 200,
+          "pauses": {
+            "count": 16,
+            "maxMs": 650,
+            "totalMs": 5940
+          }
+        },
+        "pitch": {
+          "voicedRatio": 0.7727022564667033,
+          "medianHz": 178.14424665770196,
+          "semitoneStd": 4.349186126052362,
+          "p10Hz": 126.40063180526148,
+          "p90Hz": 223.68988693581787
+        }
+      },
+      "transcript": {
+        "text": "A dashboard can label a wallet as a vault candidate. Yay, that label is a starting point, not a conclusion. A3 things. Have to hold. The evidence behind it has to be real and current. Kur the authority to act has to exist. And the wallet's state has to be the state. The dashboard thinks it is. Um, if any of those slips, the label is a word on a screen.",
+        "diff": {
+          "referenceWords": 68,
+          "hypothesisWords": 71,
+          "substitutions": 1,
+          "deletions": 0,
+          "insertions": 3,
+          "wordErrorRate": 0.058823529411764705,
+          "missing": [
+            "three"
+          ],
+          "extra": [
+            "yay",
+            "a3",
+            "kur",
+            "um"
+          ],
+          "repeatedPhrases": []
+        },
+        "asr": {
+          "model": "nvidia/parakeet-tdt-0.6b-v3",
+          "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+          "file": "parakeet-tdt-0.6b-v3.q8_0.gguf",
+          "sha256": "e3880d0aaaaf2c308ea2c35016b2b895c423eb3fda924c1b463d1c19b7f4d32e",
+          "runtime": {
+            "name": "nemo-speech",
+            "version": "0.2.0"
+          },
+          "device": "cuda"
+        }
+      },
+      "determinism": {
+        "repeats": 2,
+        "identical": true,
+        "sha256": [
+          "cb26d5dba815b11054ddd3ef628f1a49e722cbf37f3a063b4eb8d14231c24ce8",
+          "cb26d5dba815b11054ddd3ef628f1a49e722cbf37f3a063b4eb8d14231c24ce8"
+        ]
+      }
+    },
+    {
+      "provider": "magpie-nemo-speech",
+      "variant": "jason-cool",
+      "passageId": "short-instruction",
+      "artifact": {
+        "identity": "2460ef752be5e872dba75087c3d61d99020c8f755cfa50ebce40461d08722a4d",
+        "synthesis": "adapter",
+        "audioSha256": "5596acdf7617003c5edf39c43f884b569750b07d21e19976d83ebde802697652",
+        "durationMs": 5759,
+        "sampleRate": 22050,
+        "channels": 1,
+        "modelId": "nvidia/magpie_tts_multilingual_357m",
+        "modelVersion": "v2607@19806879b16d3f2ccf28fb112b1bcd16a3c7923e",
+        "modelContent": {
+          "magpie_tts_multilingual_357m.v2607.f16.gguf": "30d27551fc4a050e8095139f0185796024493373e83d49443c8ddba33c514e68",
+          "nemo_nano_codec_22khz_1.89kbps_21.5fps.decoder.f16.gguf": "cc86d36d821a27cdc1d4ef600a3e2b0dabe76e88fcc2a8652d9543134c07ef2d",
+          "tokenizer/": "36529a70c72a7cc60e301579eab88a945ba58d915573bf0a2bc8ba0ec5acf036"
+        },
+        "voiceId": "Jason",
+        "seed": 7,
+        "settings": {
+          "voice": "Jason",
+          "seed": 7,
+          "cfgScale": 2.5,
+          "temperature": 0.4,
+          "topK": 40,
+          "steps": null,
+          "device": "cuda"
+        },
+        "runtime": {
+          "name": "nemo-speech",
+          "version": "0.2.0",
+          "device": "cuda"
+        },
+        "text": {
+          "corpusId": "walletwallaby-narration-eval",
+          "corpusVersion": 1,
+          "passageId": "short-instruction",
+          "displaySha256": "afbdf9ee8fc331f1e346e2de3ca897503202111ebbcdc73c01bc1e7ba145a3fd",
+          "spokenSha256": "afbdf9ee8fc331f1e346e2de3ca897503202111ebbcdc73c01bc1e7ba145a3fd",
+          "spokenChars": 96,
+          "spokenWords": 15
+        }
+      },
+      "performance": {
+        "wallMs": 1195.351,
+        "coldStart": true,
+        "vramPeakMiB": 1007
+      },
+      "metrics": {
+        "sampleRate": 22050,
+        "durationMs": 5759,
+        "peakDbfs": -6.817918008777753,
+        "rmsDbfs": -23.66426832418854,
+        "dcOffset": -0.00002326071262359619,
+        "integratedLufs": -23.499943719451235,
+        "clipping": {
+          "samples": 0,
+          "runs": 0,
+          "longestRun": 0
+        },
+        "silence": {
+          "thresholdDbfs": -50,
+          "leadingMs": 20,
+          "trailingMs": 10,
+          "speechMs": 4620,
+          "minPauseMs": 200,
+          "pauses": {
+            "count": 1,
+            "maxMs": 460,
+            "totalMs": 460
+          }
+        },
+        "pitch": {
+          "voicedRatio": 0.7400468384074942,
+          "medianHz": 175.2939396302139,
+          "semitoneStd": 4.021453762829405,
+          "p10Hz": 135.35374625923654,
+          "p90Hz": 236.59609159516907
+        }
+      },
+      "transcript": {
+        "text": "Before you move stable coins into a vault, check whether the evidence actually supports the move.",
+        "diff": {
+          "referenceWords": 15,
+          "hypothesisWords": 15,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "wordErrorRate": 0,
+          "missing": [],
+          "extra": [],
+          "repeatedPhrases": []
+        },
+        "asr": {
+          "model": "nvidia/parakeet-tdt-0.6b-v3",
+          "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+          "file": "parakeet-tdt-0.6b-v3.q8_0.gguf",
+          "sha256": "e3880d0aaaaf2c308ea2c35016b2b895c423eb3fda924c1b463d1c19b7f4d32e",
+          "runtime": {
+            "name": "nemo-speech",
+            "version": "0.2.0"
+          },
+          "device": "cuda"
+        }
+      },
+      "determinism": null
+    },
+    {
+      "provider": "magpie-nemo-speech",
+      "variant": "jason-cool",
+      "passageId": "technical-passage",
+      "artifact": {
+        "identity": "2dc3dfc7d949d4e3e86078fa3041feb2cd59d5b2408955682a700f8d0e347fef",
+        "synthesis": "adapter",
+        "audioSha256": "61ab72d9816185bf8afc906621e4b723ca7392911302bfef3f8ad5feae5a7bea",
+        "durationMs": 39567,
+        "sampleRate": 22050,
+        "channels": 1,
+        "modelId": "nvidia/magpie_tts_multilingual_357m",
+        "modelVersion": "v2607@19806879b16d3f2ccf28fb112b1bcd16a3c7923e",
+        "modelContent": {
+          "magpie_tts_multilingual_357m.v2607.f16.gguf": "30d27551fc4a050e8095139f0185796024493373e83d49443c8ddba33c514e68",
+          "nemo_nano_codec_22khz_1.89kbps_21.5fps.decoder.f16.gguf": "cc86d36d821a27cdc1d4ef600a3e2b0dabe76e88fcc2a8652d9543134c07ef2d",
+          "tokenizer/": "36529a70c72a7cc60e301579eab88a945ba58d915573bf0a2bc8ba0ec5acf036"
+        },
+        "voiceId": "Jason",
+        "seed": 7,
+        "settings": {
+          "voice": "Jason",
+          "seed": 7,
+          "cfgScale": 2.5,
+          "temperature": 0.4,
+          "topK": 40,
+          "steps": null,
+          "device": "cuda"
+        },
+        "runtime": {
+          "name": "nemo-speech",
+          "version": "0.2.0",
+          "device": "cuda"
+        },
+        "text": {
+          "corpusId": "walletwallaby-narration-eval",
+          "corpusVersion": 1,
+          "passageId": "technical-passage",
+          "displaySha256": "448324380edec31844688d9e940d88b63ebd717c3f3f6483b9f43ce4e1e945d9",
+          "spokenSha256": "b607e2d70a5e3838aaf31a8371198aec301018ce99b71b7aa9c4c70a66fba60f",
+          "spokenChars": 560,
+          "spokenWords": 94
+        }
+      },
+      "performance": {
+        "wallMs": 2075.2001,
+        "coldStart": true,
+        "vramPeakMiB": 1867
+      },
+      "metrics": {
+        "sampleRate": 22050,
+        "durationMs": 39567,
+        "peakDbfs": -6.198956804310445,
+        "rmsDbfs": -24.441917564504006,
+        "dcOffset": -0.00001352976465449087,
+        "integratedLufs": -24.231570091664974,
+        "clipping": {
+          "samples": 0,
+          "runs": 0,
+          "longestRun": 0
+        },
+        "silence": {
+          "thresholdDbfs": -50,
+          "leadingMs": 0,
+          "trailingMs": 10,
+          "speechMs": 29590,
+          "minPauseMs": 200,
+          "pauses": {
+            "count": 18,
+            "maxMs": 570,
+            "totalMs": 6880
+          }
+        },
+        "pitch": {
+          "voicedRatio": 0.8023546200499465,
+          "medianHz": 170.37370216744807,
+          "semitoneStd": 3.8434187562267925,
+          "p10Hz": 125.49038614094069,
+          "p90Hz": 215.39954915141521
+        }
+      },
+      "transcript": {
+        "text": "Under the hood, wallet wall treats every wallet address as a question, and wallet wallaby walks the answer. Each stablecoin balance is read on chain, then recorded with its provenance, which block, which source, and which rule produced it. The scoring runs in BigQuery and it is deterministic for the same inputs always produce the same migration readiness tier. What are all that matters? When a tier is challenged, because the evidence can be replayed instead of argued about. Howdy, if a wallet address looks ready, the readiness is a claim with a trail behind it, not a feeling.",
+        "diff": {
+          "referenceWords": 91,
+          "hypothesisWords": 96,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 5,
+          "wordErrorRate": 0.054945054945054944,
+          "missing": [],
+          "extra": [
+            "for",
+            "what",
+            "are",
+            "all",
+            "howdy"
+          ],
+          "repeatedPhrases": []
+        },
+        "asr": {
+          "model": "nvidia/parakeet-tdt-0.6b-v3",
+          "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+          "file": "parakeet-tdt-0.6b-v3.q8_0.gguf",
+          "sha256": "e3880d0aaaaf2c308ea2c35016b2b895c423eb3fda924c1b463d1c19b7f4d32e",
+          "runtime": {
+            "name": "nemo-speech",
+            "version": "0.2.0"
+          },
+          "device": "cuda"
+        }
+      },
+      "determinism": null
+    }
+  ]
+}
