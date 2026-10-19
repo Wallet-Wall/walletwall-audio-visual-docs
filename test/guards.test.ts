@@ -101,10 +101,55 @@ describe('repository rules', () => {
   });
 
   test('no generative-media or LLM endpoint is reachable from the pipeline', () => {
+    // The one exception is the voice REFERENCE adapter of the narration bakeoff (docs/NARRATION.md), which may name
+    // ElevenLabs and nothing else; the next test proves the render and publish paths cannot reach it.
     const hosts = /api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis|replicate\.com|stability\.ai|runwayml|api\.elevenlabs\.io|pika\.art|lumalabs|heygen|synthesia/i;
+    const referenceAdapter = path.join(VIDEO_ROOT, 'src', 'narration', 'providers', 'elevenlabs.ts');
+    const referenceHost = 'api.elevenlabs.io';
     for (const file of sources.filter((f) => !f.includes(`${path.sep}test${path.sep}`))) {
-      assert.ok(!hosts.test(readFileSync(file, 'utf8')), path.relative(VIDEO_ROOT, file));
+      const text = readFileSync(file, 'utf8');
+      if (file === referenceAdapter) {
+        const pieces = text.split(referenceHost);
+        assert.ok(pieces.length > 1, 'the reference adapter pins its host');
+        assert.ok(!hosts.test(pieces.join('')), 'and names no other endpoint');
+        continue;
+      }
+      assert.ok(!hosts.test(text), path.relative(VIDEO_ROOT, file));
     }
+  });
+
+  test('no narration provider adapter is reachable from the render bundle or the render and publish scripts', () => {
+    // Walk each entry's import closure; the adapters (and their credentials) belong to scripts/narration.ts alone.
+    const closure = (entry: string): Set<string> => {
+      const seen = new Set<string>();
+      const queue = [entry];
+      while (queue.length) {
+        const file = queue.pop()!;
+        if (seen.has(file)) continue;
+        seen.add(file);
+        for (const m of readFileSync(file, 'utf8').matchAll(/^(?:import|export)\s[^'"]*?from\s+['"]([^'"]+)['"]/gm)) {
+          const spec = m[1]!;
+          if (spec.startsWith('.') && /\.tsx?$/.test(spec)) queue.push(path.resolve(path.dirname(file), spec));
+        }
+      }
+      return seen;
+    };
+    const providers = path.join(VIDEO_ROOT, 'src', 'narration', 'providers') + path.sep;
+    // The render bundle plus every script package.json names (render, publish, planning, proof, Blender, ...), except the bakeoff itself.
+    const pkg = JSON.parse(readFileSync(path.join(VIDEO_ROOT, 'package.json'), 'utf8')) as { scripts: Record<string, string> };
+    const entries = new Set<string>(['src/remotion/index.ts']);
+    for (const [name, command] of Object.entries(pkg.scripts)) {
+      if (name.startsWith('narration')) continue;
+      for (const m of command.matchAll(/scripts\/[\w./-]+\.ts/g)) entries.add(m[0]);
+    }
+    assert.ok(entries.size >= 10, `the scan covers ${entries.size} entries`);
+    for (const entry of [...entries].sort()) {
+      const reached = [...closure(path.join(VIDEO_ROOT, ...entry.split('/')))].filter((f) => f.startsWith(providers));
+      assert.deepEqual(reached, [], `${entry} reaches ${reached.map((f) => path.relative(VIDEO_ROOT, f)).join(', ')}`);
+    }
+    const importers = sources.filter((f) => f.includes(`${path.sep}scripts${path.sep}`) && /narration\/providers/.test(readFileSync(f, 'utf8'))).map((f) => path.relative(VIDEO_ROOT, f).split(path.sep).join('/'));
+    assert.deepEqual(importers, ['scripts/narration.ts'], 'only the bakeoff script imports an adapter');
+    assert.ok(closure(path.join(VIDEO_ROOT, 'scripts', 'narration.ts')).has(path.join(providers, 'elevenlabs.ts')), 'the scan has something to look for');
   });
 
   test('the render bundle never reads the environment or imports Node built-ins', () => {

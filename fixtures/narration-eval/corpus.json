@@ -1,0 +1,36 @@
+{
+  "schema": "walletwall.narration-eval-corpus/v1",
+  "id": "walletwallaby-narration-eval",
+  "version": 1,
+  "note": "Evaluation fixture for the WalletWallaby narration bakeoff (docs/NARRATION.md). Identical text is synthesized by every candidate; the display text is what reviewers read, the synthesizer receives it with config/pronunciation.json aliases applied. This is test material in WalletWall's narration register, not product documentation: it binds no claim to a docs page and is never published.",
+  "passages": [
+    {
+      "id": "short-instruction",
+      "class": "SHORT_INSTRUCTION",
+      "title": "A. Short instruction",
+      "targetSeconds": { "min": 4, "max": 10 },
+      "text": "Before you move stablecoins into a vault, check whether the evidence actually supports the move."
+    },
+    {
+      "id": "normal-explanation",
+      "class": "NORMAL_EXPLANATION",
+      "title": "B. Normal explanation",
+      "targetSeconds": { "min": 20, "max": 32 },
+      "text": "A dashboard can label a wallet as a vault candidate. That label is a starting point, not a conclusion. Three things have to hold. The evidence behind it has to be real and current. The authority to act has to exist. And the wallet's state has to be the state the dashboard thinks it is. If any of those slips, the label is a word on a screen."
+    },
+    {
+      "id": "technical-passage",
+      "class": "TECHNICAL_PASSAGE",
+      "title": "C. Technical passage",
+      "targetSeconds": { "min": 30, "max": 45 },
+      "text": "Under the hood, WalletWall treats every wallet address as a question, and WalletWallaby walks the answer. Each stablecoin balance is read on-chain, then recorded with its provenance: which block, which source, and which rule produced it. The scoring runs in BigQuery, and it is deterministic. The same inputs always produce the same migration readiness tier. That matters when a tier is challenged, because the evidence can be replayed instead of argued about. If a wallet address looks ready, the readiness is a claim with a trail behind it, not a feeling."
+    },
+    {
+      "id": "long-form",
+      "class": "LONG_FORM",
+      "title": "D. Long-form passage",
+      "targetSeconds": { "min": 60, "max": 90 },
+      "text": "Here is how a readiness review usually goes. It starts with a wallet that someone has already decided is important. Maybe it holds a large stablecoin balance. Maybe it signs for a treasury. Either way, the first job is not to score it. The first job is to find out what is actually known. That means three checks, in order. First, the evidence: which on-chain facts are current, and which are inherited from an older scan. Second, the authority: who can actually move funds, and under what conditions. Third, the state: whether the wallet today still matches the wallet in the record. The third check is where most reviews get uncomfortable, because the honest answer is often: not sure yet. That is fine. An uncertain answer, stated plainly, is more useful than a confident one that cannot be traced. So the conclusion is simple. A readiness tier is a place in a queue, not a verdict. Treat it as the start of the work, keep the evidence attached, and let the record say exactly how much is known."
+    }
+  ]
+}

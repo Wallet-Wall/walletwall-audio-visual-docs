@@ -1,0 +1,107 @@
+{
+  "schema": "walletwall.narration-providers/v1",
+  "note": "Bakeoff provider bindings (docs/NARRATION.md). These are evaluation adapters, not the publication voice: scripts/render.ts keeps the fixture voice and config/voice-identity.json still reports the publication binding as NOT_CONFIGURED. Credentials are named by environment variable only; model identities are pinned by revision and sha256; every variant is a complete, closed settings object validated by its adapter.",
+  "voiceIdentity": "walletwallaby-v1",
+  "providers": {
+    "elevenlabs": {
+      "kind": "remote",
+      "role": "Publication-quality reference. Never cloned, scraped, or used as conditioning for another model.",
+      "apiKeyEnv": "ELEVENLABS_API_KEY",
+      "voiceIdEnv": "WALLETWALLABY_ELEVENLABS_VOICE_ID",
+      "voiceId": "DTLT09E2cxHF0DqjKVbc",
+      "variants": {
+        "reference": {
+          "modelId": "eleven_multilingual_v2",
+          "outputFormat": "pcm_44100",
+          "stability": 0.5,
+          "similarityBoost": 0.75,
+          "style": 0,
+          "useSpeakerBoost": true,
+          "speed": 1,
+          "seed": 7,
+          "applyTextNormalization": "auto"
+        },
+        "reference-24k": {
+          "modelId": "eleven_multilingual_v2",
+          "outputFormat": "pcm_24000",
+          "stability": 0.5,
+          "similarityBoost": 0.75,
+          "style": 0,
+          "useSpeakerBoost": true,
+          "speed": 1,
+          "seed": 7,
+          "applyTextNormalization": "auto"
+        }
+      }
+    },
+    "magpie-nemo-speech": {
+      "kind": "local",
+      "binaryEnv": "WALLETWALL_NEMO_SPEECH",
+      "modelDirEnv": "NEMO_SPEECH_MODEL_DIR",
+      "runtime": { "name": "nemo-speech", "version": "0.2.0" },
+      "model": {
+        "repo": "nvidia/magpie_tts_multilingual_357m",
+        "revision": "19806879b16d3f2ccf28fb112b1bcd16a3c7923e",
+        "version": "v2607",
+        "file": "magpie_tts_multilingual_357m.v2607.f16.gguf",
+        "sha256": "30d27551fc4a050e8095139f0185796024493373e83d49443c8ddba33c514e68",
+        "tokenizerDir": "tokenizer",
+        "tokenizerSha256": "36529a70c72a7cc60e301579eab88a945ba58d915573bf0a2bc8ba0ec5acf036"
+      },
+      "codec": {
+        "repo": "nvidia/nemo-nano-codec-22khz-1.89kbps-21.5fps",
+        "revision": "fc00890b604aa2de298d2641ffc6c5f6caf8c4d7",
+        "file": "nemo_nano_codec_22khz_1.89kbps_21.5fps.decoder.f16.gguf",
+        "sha256": "cc86d36d821a27cdc1d4ef600a3e2b0dabe76e88fcc2a8652d9543134c07ef2d"
+      },
+      "variantsNote": "cfgScale 2.5, temperature 0.6, topK 80 are NeMo-Speech.cpp 0.2.0's model defaults for this GGUF (verified: explicit values reproduce the default output byte for byte), stated here so provenance never says 'model default'. steps null = the model's own frame limit.",
+      "variants": {
+        "jason": { "voice": "Jason", "seed": 7, "cfgScale": 2.5, "temperature": 0.6, "topK": 80, "steps": null, "device": "cuda" },
+        "leo": { "voice": "Leo", "seed": 7, "cfgScale": 2.5, "temperature": 0.6, "topK": 80, "steps": null, "device": "cuda" },
+        "john": { "voice": "John", "seed": 7, "cfgScale": 2.5, "temperature": 0.6, "topK": 80, "steps": null, "device": "cuda" },
+        "jason-cool": { "voice": "Jason", "seed": 7, "cfgScale": 2.5, "temperature": 0.4, "topK": 40, "steps": null, "device": "cuda" },
+        "aria": { "voice": "Aria", "seed": 7, "cfgScale": 2.5, "temperature": 0.6, "topK": 80, "steps": null, "device": "cuda" },
+        "sofia": { "voice": "Sofia", "seed": 7, "cfgScale": 2.5, "temperature": 0.6, "topK": 80, "steps": null, "device": "cuda" }
+      }
+    },
+    "chatterbox-multilingual": {
+      "kind": "local",
+      "pythonEnv": "WALLETWALL_CHATTERBOX_PYTHON",
+      "entry": "tools/chatterbox/synthesize.py",
+      "package": { "name": "chatterbox-tts", "version": "0.1.7", "sourceCommit": "5de7a54aa4e5e2baadb0182dde554908b48b85c2" },
+      "model": {
+        "repo": "ResembleAI/chatterbox",
+        "revision": "5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18",
+        "t3Model": "v3",
+        "files": {
+          "Cangjie5_TC.json": "7073fd9de919443ae88e0bd2449917a65fe54898a4413ed1edcc4b67f28bce8c",
+          "conds.pt": "6552d70568833628ba019c6b03459e77fe71ca197d5c560cef9411bee9d87f4e",
+          "grapheme_mtl_merged_expanded_v1.json": "69632f47220a788a52ce2661d096453c5655e9bf25289d89a8d832c46ee07dbf",
+          "s3gen.pt": "9b9ff07e60b20c136e2b1b3d7563a24604e8d2c4c267888d1ee929dd0151d2a3",
+          "t3_mtl23ls_v3.safetensors": "5abca8321ede76f8e61f1cc0d19aea6c946b28871017ce8726f8a69203f05953",
+          "ve.pt": "4b16d836bc598509860f6fa068165a8bb5e9ac84f05582dfcf278a5a372879f1"
+        }
+      },
+      "variants": {
+        "default": { "t3Model": "v3", "languageId": "en", "exaggeration": 0.5, "cfgWeight": 0.5, "temperature": 0.8, "repetitionPenalty": 1.2, "minP": 0.05, "topP": 1, "seed": 7, "device": "cuda", "audioPrompt": null, "watermark": "perth" },
+        "calm": { "t3Model": "v3", "languageId": "en", "exaggeration": 0.3, "cfgWeight": 0.5, "temperature": 0.6, "repetitionPenalty": 1.2, "minP": 0.05, "topP": 1, "seed": 7, "device": "cuda", "audioPrompt": null, "watermark": "perth" },
+        "measured": { "t3Model": "v3", "languageId": "en", "exaggeration": 0.4, "cfgWeight": 0.7, "temperature": 0.7, "repetitionPenalty": 1.2, "minP": 0.05, "topP": 1, "seed": 7, "device": "cuda", "audioPrompt": null, "watermark": "perth" },
+        "paced": { "t3Model": "v3", "languageId": "en", "exaggeration": 0.5, "cfgWeight": 0.3, "temperature": 0.8, "repetitionPenalty": 1.2, "minP": 0.05, "topP": 1, "seed": 7, "device": "cuda", "audioPrompt": null, "watermark": "perth" },
+        "paced-calm": { "t3Model": "v3", "languageId": "en", "exaggeration": 0.3, "cfgWeight": 0.3, "temperature": 0.6, "repetitionPenalty": 1.2, "minP": 0.05, "topP": 1, "seed": 7, "device": "cuda", "audioPrompt": null, "watermark": "perth" }
+      }
+    }
+  },
+  "diagnostics": {
+    "asr": {
+      "binaryEnv": "WALLETWALL_NEMO_SPEECH",
+      "modelDirEnv": "NEMO_SPEECH_MODEL_DIR",
+      "runtime": { "name": "nemo-speech", "version": "0.2.0" },
+      "model": {
+        "repo": "nvidia/parakeet-tdt-0.6b-v3",
+        "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+        "file": "parakeet-tdt-0.6b-v3.q8_0.gguf",
+        "sha256": "e3880d0aaaaf2c308ea2c35016b2b895c423eb3fda924c1b463d1c19b7f4d32e"
+      }
+    }
+  }
+}
