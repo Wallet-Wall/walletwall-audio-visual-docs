@@ -10,6 +10,7 @@
 // publication readiness, CI MUST NOT publish, and neither may this.
 
 import { spawnSync } from 'node:child_process';
+import { rmSync } from 'node:fs';
 import path from 'node:path';
 import { DIST_ROOT, VIDEO_ROOT } from '../src/config/load.ts';
 
@@ -25,6 +26,8 @@ if (videoId !== undefined && !/^[a-z0-9][a-z0-9-]*$/.test(videoId)) {
   process.exit(2);
 }
 const bundle = path.join(DIST_ROOT, 'publication-proof');
+// The gate writes the package only into an empty directory: a run replaces the previous package, never mixes with it.
+rmSync(bundle, { recursive: true, force: true });
 const steps: [string, string[]][] = [
   ['validate the spec', ['scripts/validate.ts']],
   ['the rig invariants on the frames Blender renders (every 9th lesson frame, every lab frame)', ['scripts/blender-invariants.ts']],
