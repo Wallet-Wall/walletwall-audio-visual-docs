@@ -35,6 +35,8 @@ import { distDir, loadCommittedSpec, loadRegistry, validationContextFor } from '
 import { validateSpec } from '../src/validation/validate-spec.ts';
 import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, synthesize } from '../src/pipeline/render-input.ts';
 import { buildTimeline, msToFrame, totalFrames } from '../src/timeline/timeline.ts';
+import { classifyEnvironment, environmentSummary, formatEnvironmentDiff } from '../src/blender/environment.ts';
+import { loadEnvironments } from '../src/blender/identity.ts';
 import { lessonMotion } from '../src/blender/lesson.ts';
 import { ensureCharacter, renderCharacterSequence, renderDepthReveal } from '../src/blender/production.ts';
 import { findRevealSeam } from '../src/blender/reveal.ts';
@@ -172,6 +174,12 @@ if (!overlays.characterless) {
   character = { characterRenderer, depthReveals: reveals };
   const env = characterRenderer.environment;
   console.log(`[render] render environment ${env.classId}: ${env.approvedClass ? `${env.approvedClass} (${env.purpose})` : 'NOT an approved class'}`);
+  if (!env.approvedClass) {
+    // What changed against the nearest approved class (closed-schema fields only): a render here can never be published.
+    const c = classifyEnvironment(env.record, cfg, loadEnvironments());
+    console.log(`[render] ${environmentSummary(c)}`);
+    if (c.diff) console.log(formatEnvironmentDiff(c.diff));
+  }
   // The bundle copies the public dir when it is made: bundle again now that the Blender frames are staged.
   serveUrl = await bundleNow();
 }

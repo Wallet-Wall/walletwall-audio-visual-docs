@@ -83,19 +83,29 @@ function childEnv(): Record<string, string> {
  * the version and hash).
  */
 export function findBlender(cfg: BlenderConfig): { exe: string; version: string; buildHash: string } {
+  const found = probeBlender();
+  if (!found) throw new BlenderToolchainError(`no Blender found: install the official ${cfg.blender.version} build (${cfg.blender.series}) and set WALLETWALL_BLENDER to its executable`);
+  const { exe, version, buildHash } = found;
+  if (version !== cfg.blender.version || buildHash !== cfg.blender.buildHash || version === null || buildHash === null) {
+    throw new BlenderToolchainError(`Blender at ${exe === 'blender' ? 'PATH' : 'WALLETWALL_BLENDER'} is ${version ?? '?'} (${buildHash ?? '?'}); ${BLENDER_CONFIG_REL} pins ${cfg.blender.version} (${cfg.blender.buildHash})`);
+  }
+  return { exe, version, buildHash };
+}
+
+/**
+ * The first Blender that starts (`WALLETWALL_BLENDER`, else `blender` on PATH) and the version and build hash its own
+ * `--version` reports, without judging them: findBlender refuses anything but the pinned build, and production host
+ * qualification reports what is installed instead. Only `--factory-startup --version` runs, in the minimal environment.
+ */
+export function probeBlender(): { exe: string; version: string | null; buildHash: string | null } | null {
   const candidates = [process.env.WALLETWALL_BLENDER, 'blender'].filter((c): c is string => Boolean(c));
   for (const exe of candidates) {
     if (exe !== 'blender' && !existsSync(exe)) continue;
     const r = spawnSync(exe, ['--factory-startup', '--version'], { encoding: 'utf8', env: childEnv(), timeout: 60_000, shell: false });
     if (r.status !== 0 || typeof r.stdout !== 'string') continue;
-    const version = /^Blender (\d+\.\d+\.\d+)/m.exec(r.stdout)?.[1];
-    const buildHash = /build hash: ([0-9a-f]+)/.exec(r.stdout)?.[1];
-    if (version !== cfg.blender.version || buildHash !== cfg.blender.buildHash) {
-      throw new BlenderToolchainError(`Blender at ${exe === 'blender' ? 'PATH' : 'WALLETWALL_BLENDER'} is ${version ?? '?'} (${buildHash ?? '?'}); ${BLENDER_CONFIG_REL} pins ${cfg.blender.version} (${cfg.blender.buildHash})`);
-    }
-    return { exe, version, buildHash };
+    return { exe, version: /^Blender (\d+\.\d+\.\d+)/m.exec(r.stdout)?.[1] ?? null, buildHash: /build hash: ([0-9a-f]+)/.exec(r.stdout)?.[1] ?? null };
   }
-  throw new BlenderToolchainError(`no Blender found: install the official ${cfg.blender.version} build (${cfg.blender.series}) and set WALLETWALL_BLENDER to its executable`);
+  return null;
 }
 
 const JOB_NAME = /^[a-z0-9][a-z0-9.-]{0,80}$/;

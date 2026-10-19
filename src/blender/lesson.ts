@@ -99,6 +99,16 @@ export function lessonBridgeFor(lesson: LessonMotion, frames: readonly number[] 
   return lessonBridge(lesson, Math.min(...want), Math.max(...want), want);
 }
 
+/**
+ * The lesson frames the ported invariants measure at a stride (scripts/blender-invariants.ts): every `every`th frame
+ * on which WalletWallaby is visible. The publication proof receipt re-derives the same list to prove its invariants
+ * evidence was measured on this checkout's plan.
+ */
+export function strideFrames(lesson: LessonMotion, every: number): number[] {
+  if (!Number.isInteger(every) || every < 1) throw new Error('the stride must be a positive integer');
+  return Array.from({ length: lesson.frames }, (_, i) => i).filter((i) => i % every === 0 && lesson.sample(i).state.visible);
+}
+
 /** The declared terrain of every segment the bridge touches. */
 export function lessonTerrain(lesson: LessonMotion, bridge: BlenderMotionDocument): BlenderTerrainDocument {
   const segments = [...new Set(bridge.frames.map((f) => f.segment))];

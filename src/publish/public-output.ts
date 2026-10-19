@@ -14,7 +14,8 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileS
 import os from 'node:os';
 import path from 'node:path';
 import { buildCaptions, checkCaptions, toSrt, toWebVtt } from '../audio/captions.ts';
-import { environmentClass, loadEnvironments, type RenderEnvironment } from '../blender/identity.ts';
+import { classifyEnvironment, environmentSummary, shownClassId, shownClassName } from '../blender/environment.ts';
+import { loadEnvironments } from '../blender/identity.ts';
 import { lessonBridge, lessonBridgeFor, lessonMotionWith, type LessonMotion } from '../blender/lesson.ts';
 import { findRevealSeam } from '../blender/reveal.ts';
 import { loadBlenderConfig } from '../blender/toolchain.ts';
@@ -27,11 +28,12 @@ import type { CopyTemplates, YoutubeChannelConfig } from '../config/types.ts';
 import { canonicalJson, prettyJson } from '../core/canonical-json.ts';
 import { readContainedFile, realPathOrNull } from '../core/contained-read.ts';
 import { contentAddress, sha256Hex } from '../core/hash.ts';
+import { localPathIn, localRoots, machineNameIn, machineNames, credentialPatternIn } from '../core/leak-scan.ts';
 import { IssueCollector, type ValidationIssue, type ValidationReport } from '../core/issues.ts';
 import { buildIdentity, type BuildIdentity } from '../manifest/build-identity.ts';
 import { typescriptEngineIdentity, type MotionEngineIdentity } from '../motion/engine-identity.ts';
 import { planRustMotion } from '../motion/rust-adapter.ts';
-import { loadCommittedSpec, validationContextFor } from '../pipeline/context.ts';
+import { loadCommittedSpec, loadRegistry, validationContextFor } from '../pipeline/context.ts';
 import { loadSnapshot, synthesize } from '../pipeline/render-input.ts';
 import type { NormalizedSource } from '../source/types.ts';
 import type { VideoSpec } from '../spec/types.ts';
@@ -77,6 +79,8 @@ export const PUBLIC_OUTPUT_CODES = {
   CHARACTERLESS_INEFFECTIVE: 'A characterless still equals its frame while WalletWallaby is on canvas.',
   PLACEHOLDER_TEXT: 'Public copy contains unresolved placeholder or leaked-value text.',
   LOCAL_PATH: 'A public or review artifact contains a local machine path.',
+  SECRET_SHAPED: 'A public or review artifact contains a secret-shaped value.',
+  MACHINE_NAME: "A record of the render names this machine's host or user.",
   METADATA_PRESENT: 'A review still carries textual or unknown metadata.',
   CREDENTIAL_PRESENT: 'A publication credential is present in the environment of a credential-free gate.',
 } as const;
@@ -134,7 +138,33 @@ export interface PublicState {
   expectedManifest: (video: { path: string; sha256: string } | null) => PublishManifest;
   /** Absolute paths of this machine that must never appear in an artifact (repository, home, temp, CI workspace). */
   localRoots: string[];
+  /** This machine's host and user names (src/core/leak-scan.ts machineNames): never in a record of the render. */
+  machineNames: string[];
   env: Record<string, string | undefined>;
+}
+
+/** Words of closed records that are no machine's private name (GPU vendors, backends, engines, layouts). */
+const RECORD_WORDS = ['typescript', 'rust-wasm', 'crop', 'full-frame', 'lesson', 'reveal', 'stills', 'remotion', 'blender', 'opengl', 'vulkan', 'metal', 'software', 'nvidia', 'amd', 'intel', 'mesa', 'llvmpipe', 'windows', 'linux', 'macos'];
+
+/**
+ * The words this repository's own committed records are made of (the registered specs, the build identity, the
+ * approved environment classes, the Blender config): a host or user name among them cannot be told apart from the
+ * records, so it is not a leak signal (src/core/leak-scan.ts machineNames).
+ */
+export function publicVocabulary(): string {
+  const specs = loadRegistry().map((v) => loadCommittedSpec(v.videoId));
+  return [canonicalJson(specs), canonicalJson(buildIdentity()), canonicalJson(loadEnvironments()), canonicalJson(loadBlenderConfig()), RECORD_WORDS.join(' ')].join('\n');
+}
+
+/** This machine's host and user names, as the leak scan looks for them. */
+export function thisMachineNames(env: Record<string, string | undefined>): string[] {
+  let user: string | undefined;
+  try {
+    user = os.userInfo().username;
+  } catch {
+    user = undefined;
+  }
+  return machineNames([os.hostname(), user, env.USERNAME, env.USER, env.LOGNAME, env.COMPUTERNAME, env.HOSTNAME], publicVocabulary());
 }
 
 export async function currentPublicState(videoId: string, env: Record<string, string | undefined> = process.env): Promise<PublicState> {
@@ -193,6 +223,7 @@ export async function currentPublicState(videoId: string, env: Record<string, st
         narration: { providerId: track.providerId, estimated: track.estimated },
       }),
     localRoots: localRoots([VIDEO_ROOT, os.homedir(), os.tmpdir(), process.cwd(), env.RUNNER_TEMP, env.GITHUB_WORKSPACE, env.RUNNER_WORKSPACE]),
+    machineNames: thisMachineNames(env),
     env,
   };
 }
@@ -224,18 +255,6 @@ function onScreenCopy(spec: VideoSpec, source: NormalizedSource, templates: Copy
   return out;
 }
 
-function localRoots(candidates: (string | undefined)[]): string[] {
-  const roots = new Set<string>();
-  for (const c of candidates) {
-    if (!c) continue;
-    const abs = path.resolve(c);
-    // Never a filesystem root or a short path like /tmp: those would match ordinary text.
-    if (abs.length < 8 || abs === path.parse(abs).root) continue;
-    for (const form of [abs, abs.split(path.sep).join('/'), abs.split('/').join('\\')]) roots.add(form.toLowerCase());
-  }
-  return [...roots];
-}
-
 // ── Text scanners ───────────────────────────────────────────────────────────────────────────────────
 
 /** Unresolved placeholders and leaked values. Applied to public copy only (what a viewer reads). */
@@ -248,40 +267,13 @@ const PLACEHOLDERS: readonly { re: RegExp; what: string }[] = [
   { re: /\$\{[^}]*\}|\{\{[^}]*\}\}/, what: 'an unresolved template placeholder' },
 ];
 
-/**
- * Local machine paths. Applied to every artifact. Shaped so that repo-relative paths, `video/…`
- * workspace paths, and URLs (including ones whose path contains /home/) are not matched.
- */
-const LOCAL_PATHS: readonly { re: RegExp; what: string }[] = [
-  { re: /(?<![A-Za-z0-9])[A-Za-z]:[\\/](?![\\/])/, what: 'a Windows drive path' },
-  { re: /(?:^|[\s"'`(=,;])\\\\[A-Za-z0-9._$-]+\\/, what: 'a UNC path' },
-  { re: /(?:^|[\s"'`(=,;:])\/(?:Users|home|root)\/(?=[^\s/])/, what: 'a home-directory path' },
-  // Temporary and system directories: where Remotion bundles, browser profiles, and toolchains live on a
-  // Linux runner (/tmp, /opt/hostedtoolcache), a Mac (/private/var/folders), or WSL (/mnt/c).
-  { re: /(?:^|[\s"'`(=,;:])\/(?:tmp|var|opt|mnt|private|proc|usr|etc|srv|run)\/(?=[^\s/])/, what: 'a temporary or system directory path' },
-  { re: /(?:^|[\s"'`(=,;:])~[\\/]/, what: 'a home-relative path' },
-  { re: /\bfile:\/\//i, what: 'a file:// URL' },
-];
-
-/**
- * In binary metadata a path can abut other printable bytes, so boundaries cannot be required there;
- * a home, temporary, or system directory with a name and a trailing separator is specific enough on
- * its own. (Not used on text, where it would match URLs such as https://host/home/page/.)
- */
-const BINARY_LOCAL_PATH = /[\\/](?:Users|home|root|tmp|var|opt|mnt|private)[\\/][^\\/\s]{1,64}[\\/]/;
-
-function localPathIn(text: string, roots: readonly string[], binary = false): string | null {
-  for (const p of LOCAL_PATHS) if (p.re.test(text)) return p.what;
-  if (binary && BINARY_LOCAL_PATH.test(text)) return 'a home, temporary, or system directory path';
-  const lower = text.toLowerCase();
-  for (const root of roots) if (lower.includes(root)) return 'an absolute path of this machine';
-  return null;
-}
+// Local machine paths: the shared leak policy (src/core/leak-scan.ts), which the render-environment schema and the
+// publication proof receipt apply too.
 
 const placeholderIn = (text: string): string | null => PLACEHOLDERS.find((p) => p.re.test(text))?.what ?? null;
 
 /** Every key and string value of a parsed JSON document, with its JSON path. */
-function* jsonStrings(value: unknown, at = '$'): Generator<[string, string]> {
+export function* jsonStrings(value: unknown, at = '$'): Generator<[string, string]> {
   if (typeof value === 'string') yield [at, value];
   else if (Array.isArray(value)) for (let i = 0; i < value.length; i++) yield* jsonStrings(value[i], `${at}[${i}]`);
   else if (value !== null && typeof value === 'object') {
@@ -409,16 +401,26 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
   const fail = (code: PublicOutputCode, where: string, detail?: string): void => {
     findings.push({ code, path: where, message: detail ? `${PUBLIC_OUTPUT_CODES[code]} ${detail}` : PUBLIC_OUTPUT_CODES[code] });
   };
-  const scanForPaths = (where: string, text: string, binary = false): void => {
-    const hit = localPathIn(text, state.localRoots, binary);
+  /**
+   * The shared leak policy (src/core/leak-scan.ts): local paths and secret-shaped values everywhere; this machine's
+   * names only where an artifact records machine facts (`machineFacts`: render and stills records, binary metadata),
+   * never in authored copy. Neither a secret nor a name is printed.
+   */
+  const scanForLeaks = (where: string, text: string, opts: { binary?: boolean; machineFacts?: boolean } = {}): void => {
+    const hit = localPathIn(text, state.localRoots, opts.binary === true);
     if (hit) fail('LOCAL_PATH', where, `(${hit})`);
+    const pattern = credentialPatternIn(text);
+    if (pattern) fail('SECRET_SHAPED', where, `(${pattern}; the value is not printed)`);
+    // In binary metadata only names of five characters or more: shorter runs of printable bytes occur by chance.
+    const names = opts.binary ? state.machineNames.filter((n) => n.length >= 5) : state.machineNames;
+    if (opts.machineFacts && machineNameIn(text, names)) fail('MACHINE_NAME', where, '(the name is not printed)');
   };
-  /** Placeholder text, and local paths unless the string was already scanned as part of a JSON artifact. */
-  const scanPublicCopy = (where: string, text: unknown, alsoPaths = true): void => {
+  /** Placeholder text, and leaks unless the string was already scanned as part of a JSON artifact. */
+  const scanPublicCopy = (where: string, text: unknown, alsoLeaks = true): void => {
     if (typeof text !== 'string') return;
     const hit = placeholderIn(text);
     if (hit) fail('PLACEHOLDER_TEXT', where, `(${hit}): ${JSON.stringify(text.length > 120 ? `${text.slice(0, 117)}...` : text)}`);
-    if (alsoPaths) scanForPaths(where, text);
+    if (alsoLeaks) scanForLeaks(where, text);
   };
 
   /**
@@ -442,7 +444,7 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
     sources.set(bundlePath, abs);
     return bytes;
   };
-  const readJsonFile = <T>(abs: string, bundlePath: string, schema?: string, required = true): T | null => {
+  const readJsonFile = <T>(abs: string, bundlePath: string, schema?: string, required = true, machineFacts = false): T | null => {
     const bytes = readFile(abs, bundlePath, required);
     if (!bytes) return null;
     let doc: unknown;
@@ -460,7 +462,7 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
       fail('ARTIFACT_INVALID', bundlePath, `is not ${schema}`);
       return null;
     }
-    for (const [at, text] of jsonStrings(doc)) scanForPaths(`${bundlePath}${at.slice(1)}`, text);
+    for (const [at, text] of jsonStrings(doc)) scanForLeaks(`${bundlePath}${at.slice(1)}`, text, { machineFacts });
     return doc as T;
   };
   const at = (name: string): string => path.join(dir, name);
@@ -563,7 +565,7 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
     motionEngine?: MotionEngineIdentity;
     character?: CharacterRecord;
   };
-  const render = readJsonFile<RenderInfo>(at('render.json'), bp('render.json'), 'walletwall.render-info/v5', opts.requireRender === true);
+  const render = readJsonFile<RenderInfo>(at('render.json'), bp('render.json'), 'walletwall.render-info/v5', opts.requireRender === true, true);
   let renderSha: string | null = null;
   if (render) {
     const where = (p: string) => `${bp('render.json')}.${p}`;
@@ -591,7 +593,7 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
       if (renderSha !== render.output?.sha256) fail('RENDER_INCONSISTENT', bp(mp4Name), `is ${renderSha.slice(0, 12)}, render.json names ${String(render.output?.sha256).slice(0, 12)}`);
       const boxes = mp4MetadataBoxes(video);
       if (!boxes) fail('ARTIFACT_INVALID', bp(mp4Name), 'is not an ISO-BMFF (MP4) file');
-      else for (const b of boxes) for (const run of printableRuns(b)) scanForPaths(`${bp(mp4Name)}:metadata`, run, true);
+      else for (const b of boxes) for (const run of printableRuns(b)) scanForLeaks(`${bp(mp4Name)}:metadata`, run, { binary: true, machineFacts: true });
     }
     if (manifest && !same(manifest.files?.video, { path: render.output?.path, sha256: render.output?.sha256, durationMs: state.totalMs })) fail('MANIFEST_INCONSISTENT', `${bp('publish-manifest.json')}.files.video`, 'does not name the render');
   } else if (manifest && manifest.files?.video !== null) fail('MANIFEST_INCONSISTENT', `${bp('publish-manifest.json')}.files.video`, 'names a video, but there is no render.json');
@@ -656,7 +658,7 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
       continue;
     }
     engines.add(engineName);
-    const info = readJsonFile<StillsInfo>(path.join(stillsDir, 'stills.json'), `${base}/stills.json`, 'walletwall.stills-info/v3');
+    const info = readJsonFile<StillsInfo>(path.join(stillsDir, 'stills.json'), `${base}/stills.json`, 'walletwall.stills-info/v3', true, true);
     if (!info) continue;
     const where = (p: string) => `${base}/stills.json.${p}`;
     if (info.videoId !== id || info.revision !== spec.revision || info.specHash !== state.specHash) fail('SPEC_STALE', where('specHash'), 'the stills are not of the committed spec');
@@ -686,7 +688,7 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
       for (const c of chunks) {
         if (PNG_ALLOWED_CHUNKS.has(c.type)) continue;
         fail('METADATA_PRESENT', `${base}/${s.file}`, `(${JSON.stringify(c.type)} chunk)`);
-        scanForPaths(`${base}/${s.file}:${c.type}`, c.data.toString('latin1'), true);
+        scanForLeaks(`${base}/${s.file}:${c.type}`, c.data.toString('latin1'), { binary: true, machineFacts: true });
       }
     }
     for (const name of readdirSync(stillsDir)) {
@@ -745,13 +747,16 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
         fail('ARTIFACT_INVALID', at, 'records no render environment');
         return;
       }
-      const cls = environmentClass(env.record as unknown as RenderEnvironment, loadBlenderConfig(), loadEnvironments());
-      if (cls.id !== env.classId || (cls.approvedAs?.name ?? null) !== env.approvedClass || (cls.approvedAs?.purpose ?? null) !== env.purpose) {
-        fail('RENDER_ENVIRONMENT_UNAPPROVED', at, `the recorded class ${String(env.classId)} (${String(env.approvedClass)}) is not what its environment record derives (${cls.id}, ${cls.approvedAs?.name ?? 'unapproved'})`);
+      // The closed schema, the pinned Blender build, and every field the class pins (src/blender/environment.ts); a
+      // refusal carries the diff against the nearest approved class (field names and closed-schema values only).
+      const cls = classifyEnvironment(env.record, loadBlenderConfig(), loadEnvironments());
+      const approvedAs = cls.approvedClass;
+      if (cls.classId !== env.classId || (approvedAs?.name ?? null) !== env.approvedClass || (approvedAs?.purpose ?? null) !== env.purpose) {
+        fail('RENDER_ENVIRONMENT_UNAPPROVED', at, `the recorded class ${shownClassId(env.classId)} (${shownClassName(env.approvedClass)}) is not what its environment record derives (${cls.classId}, ${approvedAs?.name ?? 'unapproved'}): ${environmentSummary(cls)}`);
         return;
       }
-      if (!cls.approvedAs) fail('RENDER_ENVIRONMENT_UNAPPROVED', at, `class ${cls.id} is not an approved render-environment class (config/blender-environments.json)`);
-      else if (ctx.publication && cls.approvedAs.purpose !== 'publication') fail('RENDER_ENVIRONMENT_UNAPPROVED', at, `a publication render must come from a publication class, not ${cls.approvedAs.name} (${cls.approvedAs.purpose})`);
+      if (!approvedAs) fail('RENDER_ENVIRONMENT_UNAPPROVED', at, `class ${cls.classId} is not an approved render-environment class (config/blender-environments.json): ${environmentSummary(cls)}`);
+      else if (ctx.publication && approvedAs.purpose !== 'publication') fail('RENDER_ENVIRONMENT_UNAPPROVED', at, `a publication render must come from a publication class, not ${approvedAs.name} (${approvedAs.purpose})`);
     };
     if (ctx.engine !== 'typescript' && ctx.engine !== 'rust-wasm') return; // checkMotionEngine already failed it
     const lesson = state.lesson(ctx.engine);
@@ -938,7 +943,7 @@ export function compareStillSets(a: string, b: string): StillsComparison {
  * findings, and any file whose bytes changed after it was verified; nothing is written unless every
  * file still matches. The bundle is what CI uploads for review, so this is the last gate before it.
  */
-export function writeReviewBundle(result: PublicOutputResult, bundleDir: string): void {
+export function writeReviewBundle(result: PublicOutputResult, bundleDir: string, names: readonly string[] = thisMachineNames(process.env)): void {
   const { report, sources } = result;
   if (!report.ok || report.findings.length > 0) throw new Error(`refusing to bundle a package with findings (${report.findings.length})`);
   if (existsSync(bundleDir) && readdirSync(bundleDir).length > 0) throw new Error(`refusing to bundle into ${bundleDir}: it is not empty`);
@@ -951,6 +956,8 @@ export function writeReviewBundle(result: PublicOutputResult, bundleDir: string)
   });
   const reportText = prettyJson(report);
   if (localPathIn(reportText, localRoots([VIDEO_ROOT, os.homedir(), os.tmpdir(), process.cwd()]))) throw new Error('refusing to bundle: the report would carry a local path');
+  if (credentialPatternIn(reportText)) throw new Error('refusing to bundle: the report would carry a secret-shaped value');
+  if (machineNameIn(reportText, names)) throw new Error("refusing to bundle: the report would name this machine's host or user");
   for (const s of staged) {
     mkdirSync(path.dirname(s.to), { recursive: true });
     writeFileSync(s.to, s.bytes);
