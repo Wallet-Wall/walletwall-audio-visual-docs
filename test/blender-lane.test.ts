@@ -69,7 +69,8 @@ const doc = (first: number, last: number): BlenderMotionDocument => ({
 
 describe('the Blender bridge carries the decisions, not new ones', () => {
   // The Rive runtime was retired after it proved, frame for frame, that resolvePose is the pose its player would have
-  // drawn (a parity test on the real runtime, until the cutover; commit deee9da pinned these in the same run). These pins freeze what it proved: the resolved pose of every 23rd frame
+  // drawn (a parity test on the real runtime, until the cutover; these pins were captured in the same run, in the commit
+  // before the runtime was removed). These pins freeze what it proved: the resolved pose of every 23rd frame
   // of the lesson, and the rig document Blender builds the character from. A change to either is a declared rig change.
   test('the resolved pose and the rig document are the ones the Rive runtime proved (pinned)', () => {
     const round = (v: unknown): unknown => (typeof v === 'number' ? Math.round(v * 1e9) / 1e9 : Array.isArray(v) ? v.map(round) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, round(x)])) : v);

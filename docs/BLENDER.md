@@ -399,6 +399,3 @@ production render host as an explicit proof and publication step: on software GL
   the chain (the calibrated poles reproduce rest within 0.21 px; the contact error gate measures every frame).
 - **Publication needs the production render host**: hosted CI renders stills and the proof set in software GL, never
   the whole lesson.
-- **The flat DEPTH_ENTER transition (characterless stills only) is not byte-stable under heavy host load**: its CSS
-  perspective text differs by up to 2 levels on a few dozen pixels between runs when the machine is busy (seen locally,
-  not in CI); it predates the cutover and is not Blender's.
