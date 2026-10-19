@@ -192,3 +192,9 @@ jobs:
         with:
           fail-on-severity: moderate
           fail-on-scopes: runtime, development, unknown
+          # tools/chatterbox/requirements.lock.txt records the isolated Python environment the narration
+          # bakeoff evaluated with (docs/NARRATION.md); nothing in this project depends on it. Upstream
+          # Chatterbox pins diffusers 0.29.0, whose two advisories concern remote custom pipelines that
+          # Chatterbox never loads, and synthesis runs offline. Allowed by maintainer decision (2026-10-19)
+          # rather than an upgrade that upstream does not support; see PR #22.
+          allow-ghsas: GHSA-98h9-4798-4q5v, GHSA-7wx4-6vff-v64p
