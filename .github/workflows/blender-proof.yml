@@ -77,6 +77,15 @@ jobs:
           npm run blender:proof -- render --run=ci-a
           npm run blender:proof -- render --run=ci-b
 
+      # The rig invariants Rive used to prove, on a sample of the frames Blender renders (the production host runs the
+      # full stride before every publication render: npm run publication:proof). Coverage minimums scale with the stride.
+      - name: Ported rig invariants (a sample)
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          npm run blender:invariants -- --every=270 --lab-every=6
+          node -e "const r=require('./dist/blender/out/invariants/report.json'); console.log(JSON.stringify({ pass: r.pass, counts: r.counts, palette: r.palette, failuresByCheck: r.failuresByCheck }, null, 2))" | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: A. same class, byte-identical
         run: npm run blender:proof -- compare ci-a ci-b | tee -a "$GITHUB_STEP_SUMMARY"
 

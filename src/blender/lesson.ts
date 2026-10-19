@@ -18,6 +18,7 @@ import { loadCommittedSpec } from '../pipeline/context.ts';
 import { loadSnapshot, synthesize } from '../pipeline/render-input.ts';
 import { buildTimeline, totalFrames, type NarrationTrack, type Timeline } from '../timeline/timeline.ts';
 import { contentAddress } from '../core/hash.ts';
+import type { SceneLayout } from '../layout/scene-layout.ts';
 
 export interface LessonMotion {
   videoId: string;
@@ -26,6 +27,8 @@ export interface LessonMotion {
   engine: BoundMotionEngine;
   engineId: string;
   terrains: Map<string, Terrain>;
+  /** Each segment's scene layout (its text, platforms, and anchors), as the composition lays it out. */
+  layouts: ReadonlyMap<string, SceneLayout>;
   frames: number;
   sample(frame: number): { state: WallabyState; segment: string; onScreen: Terrain[] };
 }
@@ -58,6 +61,7 @@ export function lessonMotionWith(videoId: string, engineName: 'typescript' | 'ru
     engine,
     engineId,
     terrains,
+    layouts,
     frames: totalFrames(timeline),
     sample(frame: number) {
       const ms = (frame * 1000) / timeline.fps;
@@ -73,11 +77,13 @@ export function lessonMotionWith(videoId: string, engineName: 'typescript' | 'ru
 }
 
 /** The bridge document for an inclusive frame range of the lesson, validated before it can reach Blender. */
-export function lessonBridge(lesson: LessonMotion, first: number, last: number): BlenderMotionDocument {
+export function lessonBridge(lesson: LessonMotion, first: number, last: number, only?: ReadonlySet<number>): BlenderMotionDocument {
   if (!Number.isInteger(first) || !Number.isInteger(last) || first < 0 || last >= lesson.frames || last < first) throw new Error(`frames ${first}..${last} are not a range of ${lesson.videoId} (0..${lesson.frames - 1})`);
   const model = compileRig().model;
   const frames = [];
   for (let f = first; f <= last; f++) {
+    // A subset holds only its frames: each bridge frame depends on its own frame alone, so this is the range filtered.
+    if (only && !only.has(f)) continue;
     const { state, segment, onScreen } = lesson.sample(f);
     frames.push(bridgeFrame(model, f, segment, state, onScreen));
   }
@@ -90,8 +96,7 @@ export function lessonBridgeFor(lesson: LessonMotion, frames: readonly number[] 
   if (!frames) return lessonBridge(lesson, 0, lesson.frames - 1);
   if (frames.length === 0) throw new Error('no frames were asked for');
   const want = new Set(frames);
-  const full = lessonBridge(lesson, Math.min(...want), Math.max(...want));
-  return { ...full, frames: full.frames.filter((f) => want.has(f.frame)) };
+  return lessonBridge(lesson, Math.min(...want), Math.max(...want), want);
 }
 
 /** The declared terrain of every segment the bridge touches. */

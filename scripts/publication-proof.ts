@@ -4,8 +4,8 @@
 // The whole-video publication proof, on the production render host (docs/BLENDER.md, Publication). Hosted CI
 // cannot make it: WalletWallaby is drawn by the pinned Blender, and a GPU-less runner renders the whole lesson
 // in software GL in many hours. So this runs where the publication class is (config/blender-environments.json):
-// validate the spec; render the whole video with the fixture voice; run the publish dry run against that exact
-// render; and run the public-output gate with the render required, which refuses a render from any class that is
+// validate the spec; prove the rig invariants on the frames Blender renders (npm run blender:invariants); render the
+// whole video with the fixture voice; run the publish dry run against that exact render; and run the public-output gate with the render required, which refuses a render from any class that is
 // not a publication class. It never uploads anything and holds no publication credential: CI CAN prove
 // publication readiness, CI MUST NOT publish, and neither may this.
 
@@ -27,6 +27,7 @@ if (videoId !== undefined && !/^[a-z0-9][a-z0-9-]*$/.test(videoId)) {
 const bundle = path.join(DIST_ROOT, 'publication-proof');
 const steps: [string, string[]][] = [
   ['validate the spec', ['scripts/validate.ts']],
+  ['the rig invariants on the frames Blender renders (every 9th lesson frame, every lab frame)', ['scripts/blender-invariants.ts']],
   ['render the whole video with the fixture voice', ['scripts/render.ts', ...(videoId ? [videoId] : []), `--motion-engine=${engine}`]],
   ['publish dry run against this exact render', ['scripts/publish-dry-run.ts', ...(videoId ? [videoId] : [])]],
   ['public-output gate, render required (writes the proof package)', ['scripts/public-output-check.ts', ...(videoId ? [videoId] : []), '--require-render', `--bundle=${bundle}`]],

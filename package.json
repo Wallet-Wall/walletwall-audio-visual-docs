@@ -40,6 +40,7 @@
     "blender:contact": "node scripts/blender.ts contact",
     "blender:determinism": "node scripts/blender.ts determinism",
     "blender:proof": "node scripts/blender-proof.ts",
+    "blender:invariants": "node scripts/blender-invariants.ts",
     "pipeline": "node scripts/pipeline.ts",
     "check": "npm run typecheck && npm test && npm run plan:check && npm run validate && npm run rive:check"
   },

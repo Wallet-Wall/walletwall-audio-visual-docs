@@ -52,6 +52,19 @@ def contact_error(binding, frame):
     return errs
 
 
+def measure_bones(arm, names):
+    """Each contract bone's head and tail as the teaching view projects them, in frame pixels (x right, y down): the
+    geometry the ported rig invariants are checked on (scripts/blender-invariants.ts). Depth is not a frame pixel."""
+    mw = arm.matrix_world
+    out = {}
+    for name in names:
+        pb = arm.pose.bones[name]
+        h = mw @ pb.head
+        t = mw @ pb.tail
+        out[name] = [round(h.x / UNITS + 960.0, 3), round(540.0 - h.z / UNITS, 3), round(t.x / UNITS + 960.0, 3), round(540.0 - t.z / UNITS, 3)]
+    return out
+
+
 def render_environment():
     """What actually rendered: OS family, Blender build, engine, and the GPU or software renderer with its driver or
     Mesa identity, as Blender's own GPU module reports them after a render. No host name, user, or path."""
@@ -142,6 +155,9 @@ def main():
     terrain = T.TerrainScene(job.get("terrain"), job.get("terrainStyle"), cfg) if job.get("terrain") and not reveal else None
     cameras = {}
     environment = None
+    # Measurements are asked for by the job (the invariants run), and only views that project like the teaching view.
+    measure = bool(job.get("measure"))
+    bone_names = [b["name"] for b in rig["bones"]]
     report = []
     t_all = time.perf_counter()
     first_ms = None
@@ -185,6 +201,7 @@ def main():
         C.apply_frame(binding, frame, place)
         bpy.context.view_layer.update()
         errs = contact_error(binding, frame)
+        bone_names_px = measure_bones(arm, bone_names) if measure and frame["visible"] and cam_spec["kind"] in ("teaching", "crop") else None
         out = out_path(f"{job['outputs']['dir']}/{shot['name']}.png")
         bpy.context.scene.render.filepath = str(out)
         bpy.ops.render.render(write_still=True)
@@ -199,6 +216,7 @@ def main():
             "name": shot["name"],
             "frame": shot["frame"],
             **({"crop": {k: cam_spec[k] for k in ("x", "y", "width", "height")}} if cam_spec["kind"] == "crop" else {}),
+            **({"bones": bone_names_px} if bone_names_px is not None else {}),
             "ms": round(ms, 1),
             "contactErrorPx": {k: round(v, 4) for k, v in sorted(errs.items())},
             "sha256": hashlib.sha256(out.read_bytes()).hexdigest(),

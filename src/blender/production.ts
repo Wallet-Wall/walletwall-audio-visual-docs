@@ -91,12 +91,14 @@ export interface CharacterSequenceRequest {
   frames?: readonly number[];
   /** Never reuse an earlier render (determinism runs). */
   fresh?: boolean;
+  /** Record each frame's projected bones (the invariants run); always renders anew. */
+  measure?: boolean;
 }
 
 /** Render (or reuse) WalletWallaby's frames for the lesson. Returns whether a verified earlier render was reused. */
 export function renderCharacterSequence(cfg: BlenderConfig, blender: Blender, req: CharacterSequenceRequest): { reused: boolean; frames: number; ms: number } {
   const bridge = lessonBridgeFor(req.lesson, req.frames);
-  if (!req.fresh && sameBridgeOnDisk(req.name, bridge)) {
+  if (!req.fresh && !req.measure && sameBridgeOnDisk(req.name, bridge)) {
     try {
       stageBlenderSequence(req.name, req.lesson, req.layout);
       return { reused: true, frames: bridge.frames.length, ms: 0 };
@@ -123,7 +125,7 @@ export function renderCharacterSequence(cfg: BlenderConfig, blender: Blender, re
   writeFileSync(outFile(`${outDir}/bridge.json`), prettyJson(bridge));
   writeFileSync(outFile(`${outDir}/identity.json`), prettyJson(blenderIdentity(cfg, blender, RIG.version, bridge, BLENDER_MOTION_SCHEMA, terrain)));
   const rig = blenderRigDocument(compileRig().model);
-  const job = writeJob(`render.${req.name}`, { schema: 'walletwall.blender-job/v1', kind: 'render', config: cfg, rig, blend: CHARACTER.blend, bridge, terrain, shots, outputs: { dir: outDir, manifest: `${outDir}/render.json` } });
+  const job = writeJob(`render.${req.name}`, { schema: 'walletwall.blender-job/v1', kind: 'render', config: cfg, rig, blend: CHARACTER.blend, bridge, terrain, shots, ...(req.measure ? { measure: true } : {}), outputs: { dir: outDir, manifest: `${outDir}/render.json` } });
   const { ms } = runBlender(blender, cfg, 'render.py', job);
   const manifest = JSON.parse(readFileSync(outFile(`${outDir}/render.json`), 'utf8')) as { shots: { name: string; frame: number; sha256: string; crop?: { x: number; y: number; width: number; height: number } }[] };
   for (const s of manifest.shots) if (sha256Hex(readFileSync(outFile(`${outDir}/${s.name}.png`))) !== s.sha256) throw new BlenderProductionError(`${outDir}/${s.name}.png does not match the manifest Blender wrote`);

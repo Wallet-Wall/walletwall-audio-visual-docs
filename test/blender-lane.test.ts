@@ -26,6 +26,7 @@ import { BLENDER_LANE_DIR, blenderSourceSha256, loadBlenderConfig, REQUIRED_ARGS
 import { environmentClass, loadEnvironments } from '../src/blender/identity.ts';
 import { characterProofFrames } from '../src/blender/proof-set.ts';
 import { assertPinnedCharacter, BlenderProductionError } from '../src/blender/production.ts';
+import { hexRgb, paletteCheck } from '../src/blender/palette-check.ts';
 import { BLENDER_CHARACTER } from '../src/character/walletwallaby/versions.ts';
 import { characterCrop, interiorEdges } from '../src/character/walletwallaby/blender/crop.ts';
 import { RIG_ENVELOPE } from '../src/character/walletwallaby/rive/rig-source.ts';
@@ -157,6 +158,15 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
     assert.doesNotThrow(() => assertPinnedCharacter(pinned));
     for (const change of [{ modelSha256: 'a'.repeat(64) }, { modelVersion: 2 }, { materialsSha256: 'b'.repeat(64) }, { materialsVersion: 1 }]) {
       assert.throws(() => assertPinnedCharacter({ ...pinned, ...change }), BlenderProductionError, JSON.stringify(change));
+    }
+  });
+
+  test('brand colours: palette colours and their mixes pass; a highlight, a tint, or a foreign hue does not', () => {
+    const p = paletteCheck(['#BA6F38', '#9D6136', '#2B2B2E', '#E9D3AD', '#B99568', '#562E28'].map(hexRgb));
+    assert.ok(p.exact(186, 111, 56) && p.inHull(186, 111, 56), 'the coat itself');
+    assert.ok(!p.exact(106, 69, 49) && p.inHull(106, 69, 49), 'an antialiased edge between the coat shade and the ink (a mix in linear light)');
+    for (const [r, g, b, what] of [[255, 255, 255, 'a white highlight'], [80, 120, 200, 'a blue tint'], [90, 160, 80, 'green'], [200, 60, 60, 'a saturated red'], [250, 240, 200, 'paler than the stone']] as const) {
+      assert.equal(p.inHull(r, g, b), false, what);
     }
   });
 
