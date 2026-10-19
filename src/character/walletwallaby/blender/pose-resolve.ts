@@ -1,11 +1,11 @@
 // The pose one frame asks of WalletWallaby's body, resolved without a renderer.
 //
-// This is the Rive player's own evaluation (../rive/rig-apply.ts RigPlayer.pose)
-// up to, and not including, the IK solve: the `base` reset, the key-pose clips
-// mixed in the contract's order with Rive's normalised sequential mixes (each
-// step lerps from the current value, so the result is the exact weighted
-// average), the continuous controls and IK targets (finalizePose, shared with
-// the Rive path), and the two control clips. Every value is a closed-form
+// This is the evaluation the retired Rive player performed (proven equal on its
+// runtime, and pinned: test/blender-lane.test.ts) up to, and not including, the
+// IK solve: the `base` reset, the key-pose clips mixed in the contract's order
+// with normalised sequential mixes (each step lerps from the current value, so
+// the result is the exact weighted average), the continuous controls and IK
+// targets (finalizePose, ../rig/rig-apply.ts), and the two control clips. Every value is a closed-form
 // function of the frame's RigControls.
 //
 // The Blender presentation layer receives this and only this: it places the
@@ -19,7 +19,7 @@ import type { RigControls } from '../rig/rig-controls.ts';
 import type { Vec } from '../rig/rig-math.ts';
 import { CLIPS, POSE_CLIPS, RIG_BONES, type IkGroup, type PoseClip, type RigBone } from '../rig/rig-source.ts';
 
-/** Frames per second the rig's clips are keyed at (the .riv writer's own rate). */
+/** Frames per second the rig's clips are keyed at (../rig/rig-compile.ts). */
 const CLIP_FPS = 60;
 export const IK_GROUPS: readonly IkGroup[] = ['legs', 'arms', 'tail', 'pointNear'];
 

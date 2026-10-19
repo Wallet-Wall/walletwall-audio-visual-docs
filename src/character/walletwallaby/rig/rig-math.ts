@@ -1,7 +1,7 @@
-// Rig geometry shared by the .riv compiler, the per-frame pose solver, and the
-// tests: 2D affine matrices in Rive's own layout and composition order, forward
-// kinematics for a bone chain, Rive's linear-blend skinning formula, and the
-// contour smoothing used to author the silhouette. Pure and isomorphic.
+// Rig geometry shared by the rig compiler, the per-frame pose solver, and the
+// tests: 2D affine matrices (in the layout and composition order the rig was
+// authored in), forward kinematics for a bone chain, linear-blend skinning, and
+// contour helpers. Pure and isomorphic.
 
 /** Rive Mat2D layout: [xx, xy, yx, yy, tx, ty]; a point maps to (xx·x + yx·y + tx, xy·x + yy·y + ty). */
 export type Mat2D = readonly [number, number, number, number, number, number];

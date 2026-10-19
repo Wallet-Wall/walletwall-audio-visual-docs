@@ -1,6 +1,6 @@
 // WalletWallaby rig parameters: the semantic controls the renderer exposes.
 //
-// Rig v3 performs through a Rive rig (./rive/): a vocabulary pose is a blend of
+// The rig (./rig/, drawn by Blender): a vocabulary pose is a blend of
 // the rig's pose clips plus a few continuous parameters, and expressions drive
 // the ears, lid, and brow. No exaggerated cartoon faces, no squash-and-stretch
 // gags. Every value here is owned by WalletWall; a planner can only pick a

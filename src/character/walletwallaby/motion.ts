@@ -13,8 +13,8 @@
 // third support when standing, loads against the ground before a jump, holds
 // straight as a lever at takeoff, counter-rotates against the body's pitch in
 // flight, braces on hard landings and pushes, and hangs as a counterweight in a
-// mantle. The rig (./rive/) turns these intents into bone angles and resolves
-// the actual contact with the surface.
+// mantle. The rig (./rig/) turns these intents into bone angles and IK targets,
+// and Blender's IK resolves the actual contact with the surface.
 //
 // Everything is closed-form: positions are ballistic arcs and eased paths,
 // secondary motion is a sum of analytic damped-spring responses to the plan's

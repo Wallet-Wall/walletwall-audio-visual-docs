@@ -1,8 +1,9 @@
-// WalletWallaby rig v5, authored as code: skeleton, IK constraints, silhouette,
-// paint slots, draw order, and the pose clips. ./rig-compile.ts turns this into
-// the .riv the Rive runtime loads; ./rig-controls.ts and ./rig-apply.ts pose it
-// per frame. Rive does the body performance (clip blending, IK, skinning,
-// drawing); the code only chooses clip weights and places IK targets.
+// WalletWallaby's rig contract (rig v6), authored as code: skeleton, IK chains,
+// envelope, paint slots, and the pose clips. ./rig-compile.ts turns this into the
+// rest-pose model; ./rig-controls.ts and ../blender/pose-resolve.ts pose it per
+// frame, and Blender performs the body (docs/BLENDER.md). The code only chooses
+// clip weights and places IK targets. Rigs v3 to v5 were drawn by the Rive
+// runtime from 2D silhouette shapes that also lived here; v6 retired them.
 //
 // Coordinates are rig space: the feet at the origin, facing right, y down,
 // 1 unit = 1 px at character scale 1. The rest pose IS the alert idle: a slight
