@@ -463,10 +463,11 @@ async function doctor(): Promise<void> {
   const corpus = loadCorpus();
   log(`corpus ${corpus.id} v${corpus.version} ${corpusSha256(corpus).slice(0, 12)}: ${corpus.passages.map((p) => `${p.id} ~${fmt(estimateSpokenMs(passageRequest(p, pipeline).spokenText, pipeline.voice.pacing) / 1000, 0)} s`).join(', ')}`);
   const el = config.providers.elevenlabs;
-  // Only the presence of the credential is reported, as a boolean; its value never reaches a log line.
+  // Only the presence of the credential is reported, as a boolean. Neither its value nor the binding's
+  // credential field reaches a log line (the variable's name is in config/narration-providers.json).
   const keyPresent = Object.hasOwn(process.env, el.apiKeyEnv) && (process.env[el.apiKeyEnv]?.length ?? 0) > 0;
   const voiceFromEnv = Object.hasOwn(process.env, el.voiceIdEnv) && (process.env[el.voiceIdEnv]?.length ?? 0) > 0;
-  log(`elevenlabs: ${el.apiKeyEnv} ${keyPresent ? 'present' : 'ABSENT (use "place" for reference audio)'}; voice id from ${voiceFromEnv ? el.voiceIdEnv : 'config'}; variants ${variantNames(config, 'elevenlabs').join(', ')}`);
+  log(`elevenlabs: credential ${keyPresent ? 'present' : 'ABSENT (set the variable named by apiKeyEnv in config, or use "place" for reference audio)'}; voice id from ${voiceFromEnv ? 'the environment' : 'config'}; variants ${variantNames(config, 'elevenlabs').join(', ')}`);
   try {
     const rt = await nemoSpeechFor(config);
     log(`nemo-speech ${rt.version}: ok`);
