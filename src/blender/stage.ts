@@ -22,7 +22,7 @@ import { PUBLIC_DIR } from '../pipeline/render-input.ts';
 import type { BlenderCharacterProps, BlenderEnvironmentProps, BlenderTransitionProps } from '../remotion/props.ts';
 import { blenderIdentity, environmentClass, loadEnvironments, type BlenderIdentity, type RenderEnvironment } from './identity.ts';
 import { lessonBridge, lessonTerrain, type LessonMotion } from './lesson.ts';
-import { findBlender, loadBlenderConfig, outFile, type BlenderConfig } from './toolchain.ts';
+import { findBlender, loadBlenderConfig, outFile, readIfPresent, type BlenderConfig } from './toolchain.ts';
 
 export class BlenderStageError extends Error {
   constructor(message: string) {
@@ -138,7 +138,8 @@ export function stageBlenderSequence(name: string, lesson: LessonMotion, layout:
   const frameSize = { width: r.cfg.render.resolution[0], height: r.cfg.render.resolution[1] };
   const padPx = (r.cfg.render as unknown as { crop: { padPx: number } }).crop.padPx;
   const cropFile = outFile(`${r.dir}/crops.json`);
-  const cropDoc = existsSync(cropFile) ? (JSON.parse(readFileSync(cropFile, 'utf8')) as { schema: string; padPx: number; crops: (CharacterCrop & { pngSha256: string })[] }) : null;
+  const cropText = readIfPresent(cropFile);
+  const cropDoc = cropText !== null ? (JSON.parse(cropText) as { schema: string; padPx: number; crops: (CharacterCrop & { pngSha256: string })[] }) : null;
   if ((layout === 'crop') !== (cropDoc !== null)) throw new BlenderStageError(`${name} is not a ${layout} sequence`);
   if (cropDoc && (cropDoc.schema !== 'walletwall.blender-crops/v1' || cropDoc.padPx !== padPx)) throw new BlenderStageError(`${r.dir}/crops.json is not walletwall.blender-crops/v1 at the configured padding`);
   const recordedCrops = new Map((cropDoc?.crops ?? []).map((c) => [c.frame, c]));

@@ -26,7 +26,7 @@ import { blenderIdentity, CHARACTER, readModelManifest, type ModelManifest } fro
 import { lessonBridge, lessonBridgeFor, lessonTerrain, type LessonMotion } from './lesson.ts';
 import { revealJob, type RevealSeam } from './reveal.ts';
 import { stageBlenderSequence, stageBlenderTransition, type BlenderLayout } from './stage.ts';
-import { BLENDER_JOBS, blenderConfigSha256, blenderSourceSha256, findBlender, outFile, runBlender, writeJob, type BlenderConfig } from './toolchain.ts';
+import { BLENDER_JOBS, blenderConfigSha256, blenderSourceSha256, findBlender, outFile, readIfPresent, runBlender, writeJob, type BlenderConfig } from './toolchain.ts';
 
 export class BlenderProductionError extends Error {
   constructor(message: string) {
@@ -65,8 +65,9 @@ export function buildCharacter(cfg: BlenderConfig, blender: Blender): { model: M
 /** The pinned character: the cached build when it was made from today's inputs by this Blender, else a fresh build. */
 export function ensureCharacter(cfg: BlenderConfig, blender: Blender, fresh = false): { model: ModelManifest; rebuilt: boolean } {
   const rig = blenderRigDocument(compileRig().model);
-  if (!fresh && [CHARACTER.blend, CHARACTER.manifest, BUILD_INPUTS].every((f) => existsSync(outFile(f)))) {
-    const recorded = JSON.parse(readFileSync(outFile(BUILD_INPUTS), 'utf8')) as unknown;
+  const inputsText = fresh ? null : readIfPresent(outFile(BUILD_INPUTS));
+  if (inputsText !== null && existsSync(outFile(CHARACTER.blend)) && readIfPresent(outFile(CHARACTER.manifest)) !== null) {
+    const recorded = JSON.parse(inputsText) as unknown;
     const model = readModelManifest();
     const sameBlender = model.blenderVersion.split(' ')[0] === blender.version && model.blenderBuildHash === blender.buildHash;
     if (sameBlender && contentAddress(recorded) === contentAddress(buildInputs(cfg, rig))) {
@@ -80,7 +81,8 @@ export function ensureCharacter(cfg: BlenderConfig, blender: Blender, fresh = fa
 /** True when a rendered output exists for exactly this bridge (the caller still stages it, which verifies everything). */
 function sameBridgeOnDisk(name: string, bridge: BlenderMotionDocument): boolean {
   const file = outFile(`renders/${name}/bridge.json`);
-  return existsSync(file) && existsSync(outFile(`renders/${name}/render.json`)) && contentAddress(JSON.parse(readFileSync(file, 'utf8'))) === contentAddress(bridge);
+  const text = readIfPresent(file);
+  return text !== null && readIfPresent(outFile(`renders/${name}/render.json`)) !== null && contentAddress(JSON.parse(text)) === contentAddress(bridge);
 }
 
 export interface CharacterSequenceRequest {
@@ -166,7 +168,7 @@ export function renderDepthReveal(cfg: BlenderConfig, blender: Blender, req: Rev
   req.layers.forEach((src, i) => copyFileSync(src, path.join(layerDir, `layer-${i}.png`)));
   const layerSha = req.layers.map((src) => sha256Hex(readFileSync(src)));
   const layersFile = outFile(`renders/${req.name}/layers.json`);
-  const sameLayers = existsSync(layersFile) && readFileSync(layersFile, 'utf8') === prettyJson({ layers: layerSha });
+  const sameLayers = readIfPresent(layersFile) === prettyJson({ layers: layerSha });
   if (!req.fresh && sameLayers && sameBridgeOnDisk(req.name, bridge)) {
     try {
       stageBlenderTransition(req.name, req.lesson);
