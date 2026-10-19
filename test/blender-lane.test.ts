@@ -25,6 +25,7 @@ import { RIG_BONES } from '../src/character/walletwallaby/rive/rig-source.ts';
 import { BLENDER_LANE_DIR, blenderSourceSha256, loadBlenderConfig, REQUIRED_ARGS, runBlender, writeJob } from '../src/blender/toolchain.ts';
 import { environmentClass, loadEnvironments } from '../src/blender/identity.ts';
 import { characterProofFrames } from '../src/blender/proof-set.ts';
+import { contentAddress } from '../src/core/hash.ts';
 import { assertPinnedCharacter, BlenderProductionError } from '../src/blender/production.ts';
 import { hexRgb, paletteCheck } from '../src/blender/palette-check.ts';
 import { BLENDER_CHARACTER } from '../src/character/walletwallaby/versions.ts';
@@ -34,6 +35,10 @@ import { terrainsFor } from '../src/layout/terrain.ts';
 import { buildTimeline } from '../src/timeline/timeline.ts';
 import { committedSnapshot, committedSpec, config } from './helpers.ts';
 import { loadRig } from './rive-runtime.ts';
+
+/** Captured 2026-10-18 while the Rive runtime parity test passed in the same run (see below). */
+const RESOLVED_POSES_PIN = 'f8e79d0b1c2cbc3588d6f09a5e0273537624a2a009970ac0730988f783d7467a';
+const RIG_DOCUMENT_PIN = 'cd49bd326c3fe914e57f7f5123ba65489282357fc022d2ea90e411d6d9e4cc38';
 
 const spec = committedSpec();
 const headings = Object.fromEntries(committedSnapshot().sections.map((s) => [s.id, s.heading]));
@@ -92,6 +97,20 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
       checked++;
     }
     assert.ok(checked > 150, `compared ${checked} frames`);
+  });
+
+  // The Rive runtime was retired after it proved, frame for frame, that resolvePose is the pose its player would have
+  // drawn (the test above, until the cutover). These pins freeze what it proved: the resolved pose of every 23rd frame
+  // of the lesson, and the rig document Blender builds the character from. A change to either is a declared rig change.
+  test('the resolved pose and the rig document are the ones the Rive runtime proved (pinned)', () => {
+    const round = (v: unknown): unknown => (typeof v === 'number' ? Math.round(v * 1e9) / 1e9 : Array.isArray(v) ? v.map(round) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, round(x)])) : v);
+    const poses = [];
+    for (let f = 0; f < frames; f += 23) {
+      const { state } = at(f);
+      if (state.visible) poses.push({ frame: f, pose: round(resolvePose(model, rigControls(state))) });
+    }
+    assert.equal(contentAddress(poses), RESOLVED_POSES_PIN, `${poses.length} resolved poses`);
+    assert.equal(contentAddress(blenderRigDocument(model)), RIG_DOCUMENT_PIN);
   });
 
   test('positive control: a 0.01 degree change in one bone is caught', () => {
