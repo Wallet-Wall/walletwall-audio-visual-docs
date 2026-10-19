@@ -31,11 +31,22 @@ export interface VoicePacing {
   commaPauseMs: number;
 }
 
+export interface VoiceDirection {
+  concept: string;
+  summary: string;
+  /** BCP 47 tag of the variety the character speaks (en-AU): what a provider must honour with its own controls. */
+  language: string;
+  accent: { variety: string; rendering: string };
+  register: string;
+  qualities: string[];
+  avoid: string[];
+}
+
 export interface VoiceIdentity {
-  schema: 'walletwall.voice-identity/v1';
+  schema: 'walletwall.voice-identity/v2';
   id: string;
   character: string;
-  direction: { summary: string; register: string; qualities: string[]; avoid: string[] };
+  direction: VoiceDirection;
   pacing: VoicePacing;
   providerBindings: Record<string, unknown>;
 }

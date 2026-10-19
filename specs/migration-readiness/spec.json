@@ -1210,7 +1210,7 @@
     }
   ],
   "audio": {
-    "voiceIdentityId": "walletwallaby-v1",
+    "voiceIdentityId": "walletwallaby-v2",
     "pronunciationDictionaryId": "walletwall-lexicon-v1",
     "sonicIdentityId": "walletwall-ident-v1",
     "musicBedId": null

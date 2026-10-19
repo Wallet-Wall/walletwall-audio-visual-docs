@@ -259,11 +259,19 @@ describe('elevenlabs reference adapter', () => {
   test('sends only contract fields, wraps the PCM in a WAV, and keeps the key out of the result', async () => {
     const pcm = new Uint8Array(44100 * 2);
     const calls: { url: string; headers: Record<string, string>; body: Record<string, unknown> }[] = [];
+    const lookups: { url: string; headers: Record<string, string> }[] = [];
     const fetchStub = (async (url: URL | string, init?: RequestInit) => {
+      if (init?.method === 'GET') {
+        lookups.push({ url: String(url), headers: init.headers as Record<string, string> });
+        return new Response(JSON.stringify({ voice_id: 'DTLT09E2cxHF0DqjKVbc', name: 'Guide', category: 'professional', labels: { accent: 'Australian', gender: 'male' } }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
       calls.push({ url: String(url), headers: init?.headers as Record<string, string>, body: JSON.parse(String(init?.body)) as Record<string, unknown> });
       return new Response(pcm, { status: 200 });
     }) as unknown as typeof fetch;
     const r = await provider.synthesize(request, settings, { workDir: tmpdir(), env: { ELEVENLABS_API_KEY: key }, fetch: fetchStub });
+    assert.equal(lookups.length, 1, 'the voice is looked up once, before synthesis');
+    assert.equal(new URL(lookups[0]!.url).host, ELEVENLABS_HOST);
+    assert.equal(new URL(lookups[0]!.url).pathname, '/v1/voices/DTLT09E2cxHF0DqjKVbc');
     assert.equal(calls.length, 1);
     const seen = calls[0]!;
     assert.equal(new URL(seen.url).host, ELEVENLABS_HOST);
@@ -277,6 +285,20 @@ describe('elevenlabs reference adapter', () => {
     const artifact = buildNarrationArtifact({ request, corpus: { id: 'c', version: 1 }, provider: 'elevenlabs', variant: 'reference', synthesis: 'adapter', result: r, audioPath: `${BAKEOFF_DIST_PREFIX}elevenlabs/reference/short-instruction.wav`, generatedAt: null });
     assert.ok(!JSON.stringify(artifact).includes(key));
     assert.deepEqual(validateNarrationArtifact(artifact, { ELEVENLABS_API_KEY: key }), []);
+  });
+
+  test('a voice of another variety is refused before any speech is requested', async () => {
+    let synthesisRequests = 0;
+    const stubWith = (labels: Record<string, string>) =>
+      (async (url: URL | string, init?: RequestInit) => {
+        if (init?.method === 'GET') return new Response(JSON.stringify({ voice_id: 'DTLT09E2cxHF0DqjKVbc', labels }), { status: 200 });
+        synthesisRequests++;
+        return new Response(new Uint8Array(2), { status: 200 });
+      }) as unknown as typeof fetch;
+    await assert.rejects(provider.synthesize(request, settings, { workDir: tmpdir(), env: { ELEVENLABS_API_KEY: key }, fetch: stubWith({ accent: 'American' }) }), /labelled "American", not en-AU/);
+    const mismatched = new ElevenLabsProvider({ ...provider.binding, accent: 'en-US' });
+    await assert.rejects(mismatched.synthesize(request, settings, { workDir: tmpdir(), env: { ELEVENLABS_API_KEY: key }, fetch: stubWith({ accent: 'Australian' }) }), /declared en-US; the voice identity asks for en-AU/);
+    assert.equal(synthesisRequests, 0, 'no text-to-speech request was made');
   });
 
   test('without a key it refuses and says where the reference audio can be placed; a refusal never echoes the key', async () => {
@@ -299,6 +321,8 @@ describe('magpie adapter', () => {
     writeFileSync(path.join(codecDir, 'codec.gguf'), 'codec-bytes');
     const binding: MagpieBinding = {
       kind: 'local',
+      role: 'test fallback',
+      accent: 'en-US',
       binaryEnv: 'TEST_NEMO',
       modelDirEnv: 'TEST_NEMO_MODELS',
       runtime: { name: 'nemo-speech', version: '0.2.0' },
@@ -369,6 +393,8 @@ describe('chatterbox adapter', () => {
   writeFileSync(python, '');
   const binding: ChatterboxBinding = {
     kind: 'local',
+    role: 'test experimental',
+    accent: 'en-US',
     pythonEnv: 'TEST_CB_PYTHON',
     entry: 'tools/chatterbox/synthesize.py',
     package: { name: 'chatterbox-tts', version: '0.1.7', sourceCommit: '5de7a54aa4e5e2baadb0182dde554908b48b85c2' },

@@ -77,7 +77,7 @@ A rendered video traces back to: the doc blob id, normalized content hash, and n
 ## Open owner decisions
 
 1. Remotion company-license status.
-2. Voice provider and the WalletWallaby voice identity (casting must not imitate a real person).
+2. Voice provider. The WalletWallaby voice identity itself is decided: an Australian English expedition guide, natural and not caricatured (`config/voice-identity.json` v2, [NARRATION.md](NARRATION.md)); casting must not imitate a real person.
 3. Freshness severity order (`MATERIALLY_STALE` is treated as more severe than `REGENERATION_REQUIRED`: wrong beats visually outdated).
 4. Release-plan weights (`config/release-plan.json`) are an initial proposal.
 5. Synthetic-media disclosure default (`containsSyntheticMedia: true`).

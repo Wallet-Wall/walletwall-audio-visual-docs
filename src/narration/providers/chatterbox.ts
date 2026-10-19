@@ -38,6 +38,9 @@ export const CHATTERBOX_SCHEMA: SettingsSchema = {
 
 export interface ChatterboxBinding {
   kind: 'local';
+  role: string;
+  /** The variety the built-in voice speaks (BCP 47). */
+  accent: string;
   pythonEnv: string;
   entry: string;
   /** The PyPI name and version, and the upstream commit the environment installed from (the wheel on PyPI lags the V3 API). */

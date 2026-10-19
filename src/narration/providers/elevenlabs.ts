@@ -32,11 +32,16 @@ export const ELEVENLABS_SCHEMA: SettingsSchema = {
 export interface ElevenLabsBinding {
   kind: 'remote';
   role: string;
+  /** The variety the configured voice speaks (BCP 47); must equal the identity's direction.language. */
+  accent: string;
   apiKeyEnv: string;
   voiceIdEnv: string;
   voiceId: string;
   variants: Record<string, unknown>;
 }
+
+/** How ElevenLabs labels a voice's accent, for the varieties the identity may ask for. */
+export const ELEVENLABS_ACCENT_LABELS: Readonly<Record<string, string>> = { 'en-AU': 'australian', 'en-US': 'american', 'en-GB': 'british' };
 
 export function elevenlabsUrl(voiceId: string, outputFormat: string): URL {
   if (!ELEVENLABS_VOICE_ID.test(voiceId)) throw new NarrationProviderError('voice id is not a plain ElevenLabs voice id');
@@ -44,6 +49,22 @@ export function elevenlabsUrl(voiceId: string, outputFormat: string): URL {
   const url = new URL(`https://${ELEVENLABS_HOST}/v1/text-to-speech/${voiceId}`);
   url.searchParams.set('output_format', outputFormat);
   return url;
+}
+
+export function elevenlabsVoiceUrl(voiceId: string): URL {
+  if (!ELEVENLABS_VOICE_ID.test(voiceId)) throw new NarrationProviderError('voice id is not a plain ElevenLabs voice id');
+  return new URL(`https://${ELEVENLABS_HOST}/v1/voices/${voiceId}`);
+}
+
+/**
+ * The adapter's one control over accent is which voice it uses. The binding declares the variety its voice
+ * speaks and must agree with the identity; when the API reports the voice's own accent label, that must agree too.
+ */
+export function checkVoiceAccent(wanted: string, declared: string, voiceId: string, labels: Record<string, string> | undefined): void {
+  if (declared !== wanted) throw new NarrationProviderError(`the configured ElevenLabs voice is declared ${declared}; the voice identity asks for ${wanted}`);
+  const expected = ELEVENLABS_ACCENT_LABELS[wanted];
+  const label = labels?.accent?.trim().toLowerCase();
+  if (expected && label && !label.includes(expected)) throw new NarrationProviderError(`ElevenLabs voice ${voiceId} is labelled "${labels?.accent}", not ${wanted}`);
 }
 
 export function elevenlabsBody(request: NarrationRequest, s: NarrationSettings): Record<string, unknown> {
@@ -85,6 +106,11 @@ export class ElevenLabsProvider implements NarrationProvider {
     const voiceId = this.voiceId(ctx.env);
     const url = elevenlabsUrl(voiceId, String(s.outputFormat));
     const doFetch = ctx.fetch ?? globalThis.fetch;
+    // The voice must be the variety the identity asks for: declared in the binding, and confirmed by the voice's own labels.
+    const meta = await doFetch(elevenlabsVoiceUrl(voiceId), { method: 'GET', headers: { 'xi-api-key': key, accept: 'application/json' } });
+    if (!meta.ok) throw new NarrationProviderError(`ElevenLabs refused the voice lookup: HTTP ${meta.status}`);
+    const voice = (await meta.json()) as { labels?: Record<string, string> };
+    checkVoiceAccent(request.identity.direction.language, this.binding.accent, voiceId, voice.labels);
     const t0 = performance.now();
     const res = await doFetch(url, { method: 'POST', headers: { 'xi-api-key': key, 'content-type': 'application/json', accept: 'application/octet-stream' }, body: JSON.stringify(elevenlabsBody(request, s)) });
     const bytes = new Uint8Array(await res.arrayBuffer());
