@@ -257,14 +257,15 @@ Two guarantees, over lossless frames only (MP4 bytes are not run-to-run stable a
 A render's environment class is the hash of the environment Blender reported plus the render config hash. Two
 classes are approved today: `production-rtx5080` (Windows, NVIDIA GeForce RTX 5080, driver 616.56; purpose:
 publication) and `proof-linux-software-gl` (Linux, Mesa llvmpipe; purpose: proof). A driver update is a new class
-until it is approved. Every pinned tolerance is the worst measured value times a stated margin, and none lets a drawn
-pixel appear or vanish:
+until it is approved. Each pinned tolerance was set as the worst value measured on 2026-10-18 times a margin and is
+unchanged; none lets a drawn pixel appear or vanish. The worst values on the current baseline (2026-10-19: the material
+pass, rig v6):
 
 | Tolerance (channels beyond ±2 / mean \|Δ\| / coverage) | Measured worst | Pinned |
 |---|---|---|
-| Cross-class, character crops | 1.39e-5 / 4.3e-4 / 0 | 1e-4 / 2e-3 / 0 |
-| Cross-class, full-scene frames (the reveal) | 1.54e-3 / 2.75e-2 / 0 | 5e-3 / 0.08 / 0 |
-| Crop composite vs full-frame composite (whole lesson) | 1.99e-5 / 1.80e-4 / 0 | 1e-4 / 1e-3 / 0 |
+| Cross-class, character crops | 9.95e-6 / 4.9e-4 / 0 | 1e-4 / 2e-3 / 0 |
+| Cross-class, full-scene frames (the reveal) | 4.11e-3 / 4.9e-2 / 0 (narrowed by the material pass's stratified terrain) | 5e-3 / 0.08 / 0 |
+| Crop composite vs full-frame composite (whole lesson) | 2.46e-5 / 2.0e-4 / 0 | 1e-4 / 1e-3 / 0 |
 
 **The proof set** (`src/blender/proof-set.ts`) is ten lesson frames chosen by fixed rules from the lesson's own bridge:
 idle (39), crouch (196), airborne (20), landing (30), perch (2721), inspect (64), tail brace (2341; a hard landing,
@@ -273,21 +274,19 @@ records the environment and class, and compares two runs: same class, every PNG 
 pinned tolerance. The production class's run is kept as the cross-class reference (`blender/proof/reference/`, 10
 lossless PNGs, 900 KB).
 
-Measured 2026-10-18:
+Measured 2026-10-19 on the final code (the material pass, rig v6):
 
 | Test | Result |
 |---|---|
-| A, production class: proof set, two fresh runs (RTX) | 10 / 10 byte-identical |
-| A, proof class: proof set, two fresh runs (WSL Ubuntu 26.04, Mesa 26.0.3 llvmpipe, CPU only) | 10 / 10 byte-identical |
-| B, RTX vs software GL, same canonical model and plan | pass: character crops ≤ 9 levels on ≤ 0.0014% of channels; reveal frames ≤ 10 levels on ≤ 0.15% |
-| Canonical model hash, Windows build vs Linux build | identical (`f8124e59dab3…`) |
-| Two builds on one host, rendered in fresh processes; shuffled render order | 10 / 10 byte-identical each |
-| Crops vs the approved full-frame output, final 1920x1080 composites, all 205 frames of 1806–2010 | pass: ≤ 11 levels on ≤ 0.0013% of channels, 0 pixels appearing or vanishing, 0 of the reference's ink outside a crop |
-| The same, whole lesson: every 10th frame (519) plus the five frames whose character layers differ most | pass: ≤ 14 levels on ≤ 0.0020% of channels, mean \|Δ\| ≤ 1.8e-4, 0 pixels appearing or vanishing, 4 of 519 identical; worst five: 34, 692, 725, 794, 854 all pass (≤ 13 levels on ≤ 0.0016% of channels) |
-| Character layers alone, whole lesson, every visible frame (5,185 crops) | 0 of the reference's ink outside a crop; 21 frames identical; at most 167 channels per frame beyond ±2 (on near-transparent edge pixels, where a straight-alpha colour delta vanishes once composited) |
-| The full-frame reference re-rendered today vs the approved full-frame output | 205 / 205 (section) and 5,201 / 5,201 (whole lesson) byte-identical |
-| MotionPlan and contact, crop vs full-frame layout, whole lesson | bridge byte-identical to the approved one (`042a14d9bf16…`); IK contact error identical on every frame (5,185 / 5,185; worst 0.0217 px, frame 1212, in all three renders) |
-| The default render (no Blender props) on this branch vs main `ddf27b3`, 30 review stills | 30 / 30 byte-identical |
+| A, production class: proof set, two fresh runs (RTX) | 10 / 10 byte-identical (kept as the reference) |
+| A, proof class: proof set, two runs (WSL Ubuntu 26.04, Mesa 26.0.3 llvmpipe, CPU only) | 10 / 10 byte-identical |
+| B, software GL vs the RTX reference, same canonical model and plan | pass: character crops ≤ 17 levels on ≤ 0.0010% of channels; reveal frames ≤ 15 levels on ≤ 0.41% |
+| Canonical model hash, Windows build vs Linux build | identical (`f8124e59dab3…`, the pinned `BLENDER_CHARACTER`); realizations differ (`ac81bb8e…`, `30b5446b…`) |
+| Review stills, two renders with every Blender frame rendered anew | 30 / 30 PNGs and `stills.json` byte-identical |
+| Crops vs the full-frame reference, whole lesson, final 1920x1080 composites | pass: every 10th frame (519) plus the layers' worst five (34, 692, 693, 725, 854): ≤ 25 levels on ≤ 0.0025% of channels, mean \|Δ\| ≤ 2.0e-4, 0 pixels appearing or vanishing, 4 of 519 identical |
+| Character layers alone, whole lesson, every visible frame (5,185 crops) | 0 of the reference's ink outside a crop; 21 frames identical; at most 208 channels per frame beyond ±2 (near-transparent edge pixels, where a straight-alpha colour difference vanishes once composited) |
+| MotionPlan and contact, crop vs full-frame layout, whole lesson | bridges byte-identical (`042a14d9bf16…`); IK contact error identical on every frame (5,185 / 5,185; worst 0.0217 px) |
+| The whole-video publication proof (`npm run publication:proof`) | PASS: invariants, 5,185 crops and the 96-frame reveal in class `production-rtx5080`, dry run, gate with the render required |
 
 Crops are not pixel-identical to full-frame renders (0 of 205 frames): a crop camera's projection is not bit-for-bit
 the full frame's, so a few pixels on silhouette and toon-band edges land in the other tone. Moving the camera,
@@ -295,8 +294,7 @@ snapping crop origins to 64 px, and anchoring crops at the frame origin were eac
 crop layout is held to the pinned crop-equivalence tolerance instead. Every channel is written from the frame alone,
 the legacy IK solver keeps no state, dither is off, and nothing is random. MotionPlan, support decisions, authored
 destinations, and contact timing are unchanged by any of this: the crop and reference sequences were rendered from
-the same plan (`1590e023ee02…` for the section, `042a14d9bf16…` for the whole lesson), and the IK contact error is
-the same on every frame.
+the same plan (`042a14d9bf16…` for the whole lesson), and the IK contact error is the same on every frame.
 
 ## Performance
 

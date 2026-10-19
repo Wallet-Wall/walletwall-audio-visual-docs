@@ -18,5 +18,5 @@
     "character": { "noiseLevel": 2, "maxFractionOverNoise": 0.0001, "maxMeanAbsDelta": 0.002, "maxCoverageDeltaPx": 0, "measured": { "fractionOverNoise": 9.95e-6, "meanAbsDelta": 4.86e-4, "coverageDeltaPx": 0 } },
     "scene": { "noiseLevel": 2, "maxFractionOverNoise": 0.005, "maxMeanAbsDelta": 0.08, "maxCoverageDeltaPx": 0, "measured": { "fractionOverNoise": 4.11e-3, "meanAbsDelta": 4.92e-2, "coverageDeltaPx": 0 } }
   },
-  "cropEquivalenceTolerance": { "noiseLevel": 2, "maxFractionOverNoise": 0.0001, "maxMeanAbsDelta": 0.001, "maxCoverageDeltaPx": 0, "measured": { "fractionOverNoise": 1.99e-5, "meanAbsDelta": 1.80e-4, "coverageDeltaPx": 0 } }
+  "cropEquivalenceTolerance": { "noiseLevel": 2, "maxFractionOverNoise": 0.0001, "maxMeanAbsDelta": 0.001, "maxCoverageDeltaPx": 0, "measured": { "fractionOverNoise": 2.46e-5, "meanAbsDelta": 2.04e-4, "coverageDeltaPx": 0 } }
 }
