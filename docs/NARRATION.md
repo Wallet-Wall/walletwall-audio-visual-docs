@@ -168,6 +168,21 @@ not use.
 - Neither candidate clips. Magpie sits near -24 LUFS, Chatterbox near -17.5 LUFS; the review copies are matched to
   -20 LUFS (Magpie copies gain +3.5 to +4.2 dB, peak-limited on two passages; Chatterbox copies -2.1 to -3 dB).
 
+### Owner listening notes (2026-10-19, first pass)
+
+- On the technical passage, candidate A (Magpie, `jason-cool`) was "more the vibe" than Chatterbox, but it rendered
+  the last syllable of "Wallaby" and "WalletWallaby" as "bye" rather than "bee". The runtime's IPA dictionary has the
+  word right (`WALLABY ˈwɑləbi`), so this is the model's rendering, not a lookup miss. Eight spellings of the word
+  were synthesized with the same settings for listening under `dist/narration-bakeoff/probes/pronunciation/`; the
+  respellings that leave the dictionary (`Wollaby`, `wol a bee`) derail the recognizer, so a lexicon fix must stay
+  with in-dictionary words. A lexicon alias change bumps `config/pronunciation.json`'s id, which the committed spec
+  binds as `pronunciationDictionaryId`, so it is a small separate change with a spec regeneration.
+- The reference voice is an Australian English voice, and that accent is the intended character (the wallaby's
+  geography), natural rather than caricatured. Neither local candidate can offer it: Magpie ships five fixed
+  American English speakers and no `en-AU`, and Chatterbox's built-in voice is American, so an Australian
+  Chatterbox voice would need owned, licensed Australian reference audio. The voice identity's `direction` should
+  say so when it is next bumped (`walletwallaby-v2`), which also regenerates the spec's `voiceIdentityId`.
+
 ### Objective verdict (the listening verdict is the owner's)
 
 - Magpie is deterministic, fast, and paced like the identity, but at default sampling it drops sentences and
