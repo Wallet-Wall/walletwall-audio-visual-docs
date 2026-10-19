@@ -32,7 +32,11 @@ python -m uv pip install --native-tls --python .venv/Scripts/python.exe \
   --override overrides.txt --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match
 ```
 
-`requirements.lock.txt` is the `uv pip freeze` of the environment this lane evaluated with. Then:
+`environment.freeze` is the `uv pip freeze` of the environment this lane evaluated with. It deliberately does
+not carry a `requirements*.txt` name: it records an isolated environment outside this project, not a dependency
+manifest of the repository, so the dependency graph must not read it as one. The environment does carry
+upstream's pins of `diffusers` 0.29.0 and `gradio` 6.8.0, both with published advisories that concern features
+the bakeoff never uses (remote custom pipelines; the Gradio demo UI); it runs offline and is never deployed. Then:
 
 ```bash
 export WALLETWALL_CHATTERBOX_PYTHON=/abs/path/to/.venv/Scripts/python.exe
