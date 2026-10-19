@@ -14,19 +14,19 @@
     },
     "os": "windows"
   },
-  "environmentClass": "238666aed4edb684",
+  "environmentClass": "d9777826203659db",
   "approvedClass": "production-rtx5080",
   "canonicalModelSha256": "f8124e59dab3bcf578f62db4cbe20fec12be7ee78e3a13701df45d6bc0118a1a",
   "realizationSha256": "ac81bb8e27868cb5feb0dee2c9cf7e66b6a4b63d5df77dd242a33bab5273f18c",
-  "blenderConfigSha256": "5e695482df73ebc0a1bcfa8d36e54c79ff90340a1d94422edd3c554afb238a12",
-  "blenderSceneSourceSha256": "acc81bf99b5de3f725a9801be20632346ee50660fbd3ad55bf8444d140d834ec",
+  "blenderConfigSha256": "f89c3a8b238d23ae214a5abab381486cc2e629463bbdfdefea7216e9b310beeb",
+  "blenderSceneSourceSha256": "c7196071b6399ec93f6a48a03d91214d86b0971a65ba493cd028d93274e4985c",
   "motionPlanSha256": "9cbcc317c5cee5908b785699c1bed8f34ab63f133a5589940b1744975df3e50a",
   "roles": [
     {
       "role": "idle",
       "frame": 39,
       "file": "idle.png",
-      "sha256": "2dd7dcb48ecf0f225c85c0236725565ef62e80ab4d7764bec7716ffeea5603fe",
+      "sha256": "3187427f3cce0f934676b67ea9412f5133310534a224970350598acc50b23bc8",
       "crop": {
         "height": 353,
         "width": 356,
@@ -38,7 +38,7 @@
       "role": "crouch",
       "frame": 196,
       "file": "crouch.png",
-      "sha256": "9569c6710b2b10db4df5fb34d2f363ec70e5b1442095c5763f1912b3a7d8c4d7",
+      "sha256": "5ed6f9fc38377c5706882f122f29397e0f6e0d260e4f57934509b7cc8db040d0",
       "crop": {
         "height": 353,
         "width": 356,
@@ -50,7 +50,7 @@
       "role": "airborne",
       "frame": 20,
       "file": "airborne.png",
-      "sha256": "dc41b1e8c27d267f672a9bf14aa26a38ca5980e67141e63ac091e6daa5cd31f7",
+      "sha256": "166f479f2219932541ab477b05bff7870c267204e6d6f3fcd22d08ac7cc8ef93",
       "crop": {
         "height": 354,
         "width": 357,
@@ -62,7 +62,7 @@
       "role": "landing",
       "frame": 30,
       "file": "landing.png",
-      "sha256": "f0f11a09dde461db440a8b748e0649224dbf7241c9fcbaa97bbbccab03e08fe4",
+      "sha256": "1f2a919199561cb7ee0824b2c33ea0ab85b44fb193c9c23074ab7202718fab33",
       "crop": {
         "height": 354,
         "width": 356,
@@ -74,7 +74,7 @@
       "role": "perch",
       "frame": 2721,
       "file": "perch.png",
-      "sha256": "9d393e8f3bec6757948776dacc11da94d9c3ab97a80492464026b223021b6c60",
+      "sha256": "29c50fde342628ced3b66dbf76e523dcc045ade1179d391659cec70cb3b04133",
       "crop": {
         "height": 353,
         "width": 356,
@@ -86,7 +86,7 @@
       "role": "inspect",
       "frame": 64,
       "file": "inspect.png",
-      "sha256": "4487156513f6f9bd678d8f0480838929d5c44392ce2943b6f44e60ec382c019b",
+      "sha256": "e49fa2966aefc28370d3ba0767066b6beb9fc1a2fe98e01a266dd9df9f4c6b53",
       "crop": {
         "height": 353,
         "width": 356,
@@ -98,7 +98,7 @@
       "role": "tail-brace",
       "frame": 2341,
       "file": "tail-brace.png",
-      "sha256": "7ea63b41150f2f6157d08bbb3d926f3e25c70b98099f3e826c229de378fea625",
+      "sha256": "6bb1f38bb14b272c6509778cbbf33995a99cfd3e3bccc503695df1da8afcaf79",
       "crop": {
         "height": 354,
         "width": 356,
@@ -110,26 +110,26 @@
       "role": "transition-entry",
       "frame": 1719,
       "file": "transition-entry.png",
-      "sha256": "cd2e29c560ef625f1f0b8748d08ae5715a6b2cc268eade95d8d48cc1fd531d44",
+      "sha256": "985f7d9266abe9b87fe42321638e8f64797aaa477d00af91789b1a86965ff1d9",
       "crop": null
     },
     {
       "role": "transition-peak",
       "frame": 1760,
       "file": "transition-peak.png",
-      "sha256": "a491ff26d31ab032e201a2602d405586abaffaf5ae18a5bef9adc1125498a795",
+      "sha256": "9041fa22504cedd387115477f486d68668a6b47fa9f4b3b9ff024acc9e27ee99",
       "crop": null
     },
     {
       "role": "transition-exit",
       "frame": 1814,
       "file": "transition-exit.png",
-      "sha256": "7dcba1a29870d389279cfe8f91b8591f429293f0b6c4ea8b58ae3aefa7d1bf1c",
+      "sha256": "c0226a68096b9000a0f772983c04c8c02e74c97b38ab667d18e5c834e92e9f1d",
       "crop": null
     }
   ],
   "layers": [
-    "96d9673bc004825572f40f5da731735709549b27f75e0bd71b9d80823505a489",
-    "a7d7dc038b40d3fa5cd16c4e1e7c97cd27dd29be112455a2c5a00aca90785c81"
+    "8b2bc141a2e47f419f5091712589d1d350207b834be868e9ed3b8f40c2caff5e",
+    "05b073454bef1bbd5f2ac5982782ed25184060903275b3ae1feadb81f4a7b2ce"
   ]
 }
