@@ -23,6 +23,10 @@ import { compileRig } from '../src/character/walletwallaby/rive/rig-compile.ts';
 import { rigControls } from '../src/character/walletwallaby/rive/rig-controls.ts';
 import { RIG_BONES } from '../src/character/walletwallaby/rive/rig-source.ts';
 import { BLENDER_LANE_DIR, blenderSourceSha256, loadBlenderConfig, REQUIRED_ARGS, runBlender, writeJob } from '../src/blender/toolchain.ts';
+import { environmentClass, loadEnvironments } from '../src/blender/identity.ts';
+import { characterProofFrames } from '../src/blender/proof-set.ts';
+import { characterCrop, interiorEdges } from '../src/character/walletwallaby/blender/crop.ts';
+import { RIG_ENVELOPE } from '../src/character/walletwallaby/rive/rig-source.ts';
 import { terrainsFor } from '../src/layout/terrain.ts';
 import { buildTimeline } from '../src/timeline/timeline.ts';
 import { committedSnapshot, committedSpec, config } from './helpers.ts';
@@ -152,6 +156,80 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
     assert.deepEqual(rig.bones.map((b) => b.name), [...RIG_BONES]);
     for (const c of Object.values(rig.palette)) assert.match(c, /^#[0-9A-Fa-f]{6}$/);
     assert.equal(rig.palette.coat.toLowerCase(), '#ba6f38', 'the coat is WalletWallrus\'s own');
+  });
+});
+
+describe('character crops and the proof set', () => {
+  const frameSize = { width: 1920, height: 1080 };
+  const lesson = doc(0, frames - 1);
+
+  test('every crop is integer, inside the frame, decided by the placement alone, and holds the whole envelope', () => {
+    for (const f of lesson.frames) {
+      const c = characterCrop(f, RIG_ENVELOPE, 40, frameSize);
+      if (!f.visible) {
+        assert.equal(c, null);
+        continue;
+      }
+      if (c === null) continue;
+      for (const v of [c.x, c.y, c.width, c.height]) assert.ok(Number.isInteger(v), `frame ${f.frame}`);
+      assert.ok(c.x >= 0 && c.y >= 0 && c.x + c.width <= 1920 && c.y + c.height <= 1080, `frame ${f.frame}`);
+      // Recomputing gives the same bounds (no state, no growth).
+      assert.deepEqual(characterCrop(f, RIG_ENVELOPE, 40, frameSize), c);
+      // Where the crop is not clamped by the frame, it contains the padded envelope at this placement.
+      const { x, y, scale: s, facing } = f.place;
+      const xs = [x + facing * s * (RIG_ENVELOPE.minX - 40), x + facing * s * (RIG_ENVELOPE.maxX + 40)];
+      const e = interiorEdges(c, frameSize);
+      if (e.left) assert.ok(c.x <= Math.min(...xs), `frame ${f.frame} left`);
+      if (e.right) assert.ok(c.x + c.width >= Math.max(...xs), `frame ${f.frame} right`);
+      if (e.top) assert.ok(c.y <= y + s * (RIG_ENVELOPE.minY - 40), `frame ${f.frame} top`);
+      if (e.bottom) assert.ok(c.y + c.height >= y + s * (RIG_ENVELOPE.maxY + 40), `frame ${f.frame} bottom`);
+    }
+  });
+
+  test('a crop needs a visible frame and a non-negative pad; a frame wholly outside the picture has none', () => {
+    const f = lesson.frames[1850]!;
+    assert.throws(() => characterCrop(f, RIG_ENVELOPE, -1, frameSize));
+    assert.equal(characterCrop({ ...f, place: { ...f.place, x: 5000 } }, RIG_ENVELOPE, 40, frameSize), null);
+    assert.equal(characterCrop({ ...f, visible: false }, RIG_ENVELOPE, 40, frameSize), null);
+  });
+
+  test('the proof set is chosen by fixed rules from the lesson, the same every time', () => {
+    const a = characterProofFrames(lesson, 40, { first: 1719, last: 1814 });
+    const b = characterProofFrames(JSON.parse(JSON.stringify(lesson)), 40, { first: 1719, last: 1814 });
+    assert.deepEqual(a, b);
+    const at = (n: number) => lesson.frames[n]!.semantic;
+    assert.equal(at(a.idle).action, 'IDLE');
+    assert.equal(at(a.crouch).phase, 'PRELOAD');
+    assert.equal(at(a.airborne).contact, 'NONE');
+    assert.equal(at(a.landing).phase, 'CONTACT');
+    assert.ok(at(a['tail-brace']).landingImpulse > 0.9);
+    assert.equal(at(a.inspect).action, 'INSPECT');
+    for (const n of Object.values(a)) assert.ok(n < 1719 || n > 1814, 'character roles stay outside the reveal');
+  });
+});
+
+describe('render-environment classes and tolerances', () => {
+  const cfg = loadBlenderConfig();
+  const envs = loadEnvironments();
+  const rtx = { os: 'windows', blenderVersion: '5.2.2 LTS', blenderBuildHash: 'd13f752e3b9c', engine: 'BLENDER_EEVEE', gpu: { backend: 'OPENGL', vendor: 'NVIDIA Corporation', renderer: 'NVIDIA GeForce RTX 5080/PCIe/SSE2', version: '4.6.0 NVIDIA 616.56', deviceType: 'NVIDIA' } };
+  const soft = { ...rtx, os: 'linux', gpu: { backend: 'OPENGL', vendor: 'Mesa', renderer: 'llvmpipe (LLVM 21.1.8, 256 bits)', version: '4.5 (Core Profile) Mesa 26.0.3', deviceType: 'SOFTWARE' } };
+
+  test('a render is matched to the approved class it was made in, and only one with a publication purpose can publish', () => {
+    assert.equal(environmentClass(rtx, cfg, envs).approvedAs?.purpose, 'publication');
+    assert.equal(environmentClass(soft, cfg, envs).approvedAs?.purpose, 'proof');
+    // Positive control: another driver is another class, not approved.
+    assert.equal(environmentClass({ ...rtx, gpu: { ...rtx.gpu, version: '4.6.0 NVIDIA 617.00' } }, cfg, envs).approvedAs, null);
+    assert.notEqual(environmentClass(rtx, cfg, envs).id, environmentClass(soft, cfg, envs).id);
+  });
+
+  test('every pinned tolerance is above what was measured, and none lets a pixel appear or vanish', () => {
+    const all = [envs.crossClassTolerance.character, envs.crossClassTolerance.scene, envs.cropEquivalenceTolerance] as (typeof envs.cropEquivalenceTolerance & { measured: { fractionOverNoise: number; meanAbsDelta: number } })[];
+    for (const t of all) {
+      assert.ok(t.maxFractionOverNoise > t.measured.fractionOverNoise && t.maxMeanAbsDelta > t.measured.meanAbsDelta);
+      assert.equal(t.maxCoverageDeltaPx, 0);
+      assert.equal(t.noiseLevel, 2);
+    }
+    assert.equal(envs.sameClass, 'byte-identical');
   });
 });
 

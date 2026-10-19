@@ -22,6 +22,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import bpy  # noqa: E402
+import numpy as np  # noqa: E402
+from mathutils import Vector  # noqa: E402
 
 import controls as C  # noqa: E402
 import scene as S  # noqa: E402
@@ -50,6 +52,75 @@ def contact_error(binding, frame):
     return errs
 
 
+def render_environment():
+    """What actually rendered: OS family, Blender build, engine, and the GPU or software renderer with its driver or
+    Mesa identity, as Blender's own GPU module reports them after a render. No host name, user, or path."""
+    env = {
+        "os": {"win32": "windows", "linux": "linux", "darwin": "macos"}.get(sys.platform, sys.platform),
+        "blenderVersion": bpy.app.version_string,
+        "blenderBuildHash": bpy.app.build_hash.decode() if isinstance(bpy.app.build_hash, bytes) else str(bpy.app.build_hash),
+        "engine": bpy.context.scene.render.engine,
+    }
+    try:
+        import gpu
+
+        env["gpu"] = {
+            "backend": gpu.platform.backend_type_get(),
+            "vendor": gpu.platform.vendor_get(),
+            "renderer": gpu.platform.renderer_get(),
+            "version": gpu.platform.version_get(),
+            "deviceType": gpu.platform.device_type_get(),
+        }
+    except Exception as e:  # noqa: BLE001 - recorded as unknown, never guessed
+        env["gpu"] = {"unavailable": type(e).__name__}
+    return env
+
+
+def crop_camera(cfg, name):
+    """The teaching view restricted to a crop: orthographic, looking along +Y, one frame pixel per image pixel."""
+    cam = S.teaching_camera(cfg, name)
+    return cam
+
+
+def frame_crop(cam, crop):
+    """Frame an integer frame-px canvas (x, y, width, height) without moving the camera: it stays exactly where the
+    full-frame teaching camera is (so everything view-dependent, such as the sun's shadow clipmap, is anchored as in a
+    full-frame render) and the lens shift moves the view onto the crop. One image pixel is one frame pixel."""
+    x, y, w, h = crop["x"], crop["y"], crop["width"], crop["height"]
+    side = max(w, h)
+    cam.data.sensor_fit = "AUTO"
+    cam.data.ortho_scale = side * UNITS
+    cam.location = (0.0, -60.0, 0.0)
+    # Shift is in units of the larger frame dimension (here `side` px).
+    cam.data.shift_x = (x + w / 2.0 - 960.0) / side
+    cam.data.shift_y = (540.0 - (y + h / 2.0)) / side
+    return (w, h)
+
+
+def ink_on_interior_edge(path, crop, frame_size):
+    """True when any drawn pixel touches a crop edge that lies inside the frame (the envelope did not hold the body).
+    An edge on the frame's own border is exempt: there the character simply leaves the frame."""
+    w, h = crop["width"], crop["height"]
+    img = bpy.data.images.load(str(path), check_existing=False)
+    try:
+        px = np.zeros(w * h * 4, dtype=np.float32)
+        img.pixels.foreach_get(px)
+    finally:
+        bpy.data.images.remove(img)
+    a = px.reshape(h, w, 4)[::-1, :, 3]  # rows top-down, alpha
+    W, H = frame_size
+    edges = []
+    if crop["x"] > 0:
+        edges.append(a[:, 0])
+    if crop["x"] + w < W:
+        edges.append(a[:, w - 1])
+    if crop["y"] > 0:
+        edges.append(a[0, :])
+    if crop["y"] + h < H:
+        edges.append(a[h - 1, :])
+    return any(float(e.max(initial=0.0)) > 0.0 for e in edges)
+
+
 def main():
     job = job_from_argv()
     if job.get("schema") != "walletwall.blender-job/v1" or job.get("kind") != "render":
@@ -70,6 +141,7 @@ def main():
     reveal = TR.DepthReveal(job["transition"], job["terrain"], cfg) if job.get("transition") else None
     terrain = T.TerrainScene(job.get("terrain"), job.get("terrainStyle"), cfg) if job.get("terrain") and not reveal else None
     cameras = {}
+    environment = None
     report = []
     t_all = time.perf_counter()
     first_ms = None
@@ -84,6 +156,11 @@ def main():
             if reveal is None:
                 fail("a transition shot needs the job's transition")
             reveal.at(float(cam_spec["t"]))
+        elif cam_spec["kind"] == "crop":
+            if "crop" not in cameras:
+                cameras["crop"] = crop_camera(cfg, "cam.crop")
+            key = "crop"
+            shot["resolution"] = list(frame_crop(cameras["crop"], cam_spec))
         elif key not in cameras:
             if cam_spec["kind"] == "teaching":
                 cameras[key] = S.teaching_camera(cfg, f"cam.{len(cameras)}")
@@ -111,12 +188,17 @@ def main():
         out = out_path(f"{job['outputs']['dir']}/{shot['name']}.png")
         bpy.context.scene.render.filepath = str(out)
         bpy.ops.render.render(write_still=True)
+        if cam_spec["kind"] == "crop" and ink_on_interior_edge(out, cam_spec, cfg["render"]["resolution"]):
+            fail(f"frame {shot['frame']}: the drawn body reaches an interior edge of its crop {cam_spec}; the envelope does not hold it")
+        if environment is None:
+            environment = render_environment()
         ms = (time.perf_counter() - t0) * 1000
         if first_ms is None:
             first_ms = ms
         report.append({
             "name": shot["name"],
             "frame": shot["frame"],
+            **({"crop": {k: cam_spec[k] for k in ("x", "y", "width", "height")}} if cam_spec["kind"] == "crop" else {}),
             "ms": round(ms, 1),
             "contactErrorPx": {k: round(v, 4) for k, v in sorted(errs.items())},
             "sha256": hashlib.sha256(out.read_bytes()).hexdigest(),
@@ -125,6 +207,7 @@ def main():
     manifest = {
         "schema": "walletwall.blender-render/v1",
         "blenderVersion": bpy.app.version_string,
+        "environment": environment,
         "shots": report,
         "seconds": round(total, 3),
         "firstShotMs": round(first_ms or 0.0, 1),

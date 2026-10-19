@@ -135,12 +135,22 @@ inferred from pixels.
 
 ## Remotion integration
 
-`characterRenderer` (a staged, verified Blender sequence) makes `DocsVideo` draw `WallabyBlender` (one `<Img>` per
-frame, opacity applied by Remotion, fail closed on a missing visible frame) instead of `WallabyRive`;
-`depthReveals` replaces the flat transition for exactly their frames. `src/blender/stage.ts` stages a sequence only
-if every PNG matches Blender's own manifest, the bridge it was rendered from is byte-for-byte the bridge the current
-MotionPlan gives, and its identity matches the current toolchain, config, lane source, built model, and plan.
-Captions, copy, UI, audio, timing, and encoding stay in Remotion.
+For normal teaching scenes Blender draws **the character only**. Each frame, WalletWallaby is rendered into a small
+transparent canvas (`src/character/walletwallaby/blender/crop.ts`) whose bounds are decided before Blender runs, from
+the frame's placement alone: the rig contract's envelope at the feet position, mirrored by facing and scaled, padded
+by a fixed 40 rig px (`config/blender.json` `render.crop`), as integer frame pixels clamped to the frame. Blender's
+camera stays exactly where the full-frame teaching camera is and lens shift frames the crop, so one crop pixel is the
+frame pixel it covers. There is no "grow until it fits": a frame whose ink touches a crop edge that lies inside the
+frame fails the render (an edge on the frame's own border is exempt: there he simply leaves the frame). Each sequence
+records `crops.json`: `{ frame, x, y, width, height, scale, pngSha256 }`.
+
+`characterRenderer` (a staged, verified crop sequence) makes `DocsVideo` draw `WallabyBlender` (one `<Img>` per frame,
+placed at the crop's `x, y`, opacity applied by Remotion, fail closed on a missing visible frame) instead of
+`WallabyRive`; `depthReveals` replaces the flat transition for exactly their frames, and only there does Blender
+render a whole scene. `src/blender/stage.ts` stages a sequence only if every PNG matches Blender's own manifest and has
+exactly its crop's dimensions, every crop equals the one re-derived from the current bridge, the bridge is
+byte-for-byte the one the current MotionPlan gives, and the identity matches the current toolchain, config, lane
+source, and canonical model. Cards, text, diagrams, captions, UI, audio, timing, and encoding stay in Remotion.
 
 ## The 2D → 3D signature transition (depth reveal)
 
@@ -156,42 +166,119 @@ shake. Blender draws no copy of its own. Constants: `config/blender.json` `trans
 
 Every sequence carries `identity.json` (`src/blender/identity.ts`), passed into the composition's props:
 `blenderVersion`, `blenderBuildHash`, `blenderConfigSha256`, `blenderSceneSourceSha256` (the lane's source files),
-`blendArtifactSha256`, `walletwallabyModelVersion` / `walletwallabyModelSha256` (canonical: rest geometry, weights,
-attributes, bones, constraints), `walletwallabyRigVersion`, `materialsVersion` / `materialsSha256` (node graphs and
-the mortar map's pixels), `motionBridgeSchema`, `motionPlanSha256`, `terrainSha256`, `cameraDefinitionSha256`,
-`renderSettingsSha256`. No path, user, or machine detail.
+`blendArtifactSha256`, `walletwallabyModelVersion`, `walletwallabyModelSha256`, `walletwallabyRealizationSha256`,
+`walletwallabyRigVersion`, `materialsVersion` / `materialsSha256`, `motionBridgeSchema`, `motionPlanSha256`,
+`terrainSha256`, `cameraDefinitionSha256`, `renderSettingsSha256`; and Blender's own render manifest records the
+**render environment** it actually ran in (OS family, Blender version and build hash, engine, and the GPU or software
+renderer with its driver or Mesa identity, as Blender's GPU module reports it). No path, user, or host name.
+
+**Canonical model identity vs host realization.** `walletwallabyModelSha256` hashes the model as canonical content:
+vertex positions quantized to 1/256 px and ordered by position (not by generation order), faces rotated to their
+lowest vertex (winding kept) and sorted, weights (1/4096), attributes (1/256) and UVs (1/65536) quantized in that
+order, bones (1e-6 units) and pole angles (0.001°) quantized, and the materials (node graphs, quantized inputs, the
+mortar map's pixels). Every quantum is far coarser than the last-bit float noise that separates hosts (different libm
+and numpy builds) and far finer than anything a render shows. **Measured: Windows and Linux builds of the same source
+give the same canonical model (`f8124e59dab3…`) and materials (`852617c0edcd…`) hashes**, while their exact float
+realizations differ (`ac81bb8e…` vs `30b5446b…`); `walletwallabyRealizationSha256` records the host's realization and
+is compared only within a host. The `.blend` file is a cache: its bytes differ per build (Blender writes memory
+addresses) and are recorded, never compared.
 
 ## Determinism
 
-Measured 2026-10-18 on the pinned build (Windows 11, RTX 5080, driver 616.56) with `npm run blender:determinism`
-over ten lesson frames (1812–1990). Lossless frames only: MP4 bytes are not run-to-run stable and prove nothing.
+Two guarantees, over lossless frames only (MP4 bytes are not run-to-run stable and prove nothing):
+
+- **A. Same approved render-environment class: byte-identical frames.**
+- **B. Different approved classes: bounded pixel equivalence**, at the tolerance pinned in
+  `config/blender-environments.json` (kept apart from `config/blender.json`, so approving a class never changes the
+  render config hash a class is defined by).
+
+A render's environment class is the hash of the environment Blender reported plus the render config hash. Two
+classes are approved today: `production-rtx5080` (Windows, NVIDIA GeForce RTX 5080, driver 616.56; purpose:
+publication) and `proof-linux-software-gl` (Linux, Mesa llvmpipe; purpose: proof). A driver update is a new class
+until it is approved. Every pinned tolerance is the worst measured value times a stated margin, and none lets a drawn
+pixel appear or vanish:
+
+| Tolerance (channels beyond ±2 / mean \|Δ\| / coverage) | Measured worst | Pinned |
+|---|---|---|
+| Cross-class, character crops | 1.39e-5 / 4.3e-4 / 0 | 1e-4 / 2e-3 / 0 |
+| Cross-class, full-scene frames (the reveal) | 1.54e-3 / 2.75e-2 / 0 | 5e-3 / 0.08 / 0 |
+| Crop composite vs full-frame composite (whole lesson) | 1.99e-5 / 1.80e-4 / 0 | 1e-4 / 1e-3 / 0 |
+
+**The proof set** (`src/blender/proof-set.ts`) is ten lesson frames chosen by fixed rules from the lesson's own bridge:
+idle (39), crouch (196), airborne (20), landing (30), perch (2721), inspect (64), tail brace (2341; a hard landing,
+impulse 0.95), and the reveal's entry (1719), peak depth (1760), and exit (1814). `npm run blender:proof` renders it,
+records the environment and class, and compares two runs: same class, every PNG byte-identical; approved classes, the
+pinned tolerance. The production class's run is kept as the cross-class reference (`blender/proof/reference/`, 10
+lossless PNGs, 900 KB).
+
+Measured 2026-10-18:
 
 | Test | Result |
 |---|---|
-| Two builds of the same source: canonical model and materials hashes | identical (`ac81bb8e…`, `21766af8…`) |
-| Two builds: `.blend` bytes | differ: Blender writes memory addresses into the file. The `.blend` is a cache; it is pinned by its canonical model hash, never by its bytes, and staging compares the canonical hashes. |
-| The frames rendered from build 1 and from build 2, each in a fresh process | 10 / 10 byte-identical PNGs |
-| The same frames in a shuffled order | 10 / 10 byte-identical: no frame depends on another |
-| The default render (no Blender props) on this branch vs main `ddf27b3`, 30 review stills | 30 / 30 byte-identical (`npm run stills:compare`) |
+| A, production class: proof set, two fresh runs (RTX) | 10 / 10 byte-identical |
+| A, proof class: proof set, two fresh runs (WSL Ubuntu 26.04, Mesa 26.0.3 llvmpipe, CPU only) | 10 / 10 byte-identical |
+| B, RTX vs software GL, same canonical model and plan | pass: character crops ≤ 9 levels on ≤ 0.0014% of channels; reveal frames ≤ 10 levels on ≤ 0.15% |
+| Canonical model hash, Windows build vs Linux build | identical (`f8124e59dab3…`) |
+| Two builds on one host, rendered in fresh processes; shuffled render order | 10 / 10 byte-identical each |
+| Crops vs the approved full-frame output, final 1920x1080 composites, all 205 frames of 1806–2010 | pass: ≤ 11 levels on ≤ 0.0013% of channels, 0 pixels appearing or vanishing, 0 of the reference's ink outside a crop |
+| The same, whole lesson: every 10th frame (519) plus the five frames whose character layers differ most | pass: ≤ 14 levels on ≤ 0.0020% of channels, mean \|Δ\| ≤ 1.8e-4, 0 pixels appearing or vanishing, 4 of 519 identical; worst five: 34, 692, 725, 794, 854 all pass (≤ 13 levels on ≤ 0.0016% of channels) |
+| Character layers alone, whole lesson, every visible frame (5,185 crops) | 0 of the reference's ink outside a crop; 21 frames identical; at most 167 channels per frame beyond ±2 (on near-transparent edge pixels, where a straight-alpha colour delta vanishes once composited) |
+| The full-frame reference re-rendered today vs the approved full-frame output | 205 / 205 (section) and 5,201 / 5,201 (whole lesson) byte-identical |
+| MotionPlan and contact, crop vs full-frame layout, whole lesson | bridge byte-identical to the approved one (`042a14d9bf16…`); IK contact error identical on every frame (5,185 / 5,185; worst 0.0217 px, frame 1212, in all three renders) |
+| The default render (no Blender props) on this branch vs main `ddf27b3`, 30 review stills | 30 / 30 byte-identical |
 
-Every channel is written from the frame alone, the legacy IK solver keeps no state, dither is off, and nothing is
-random. The scope is one machine and runtime: other GPUs, drivers, and Linux software GL are not proven, and
-`.github/workflows/blender-proof.yml` (written to prove a GPU-less runner) has not run.
+Crops are not pixel-identical to full-frame renders (0 of 205 frames): a crop camera's projection is not bit-for-bit
+the full frame's, so a few pixels on silhouette and toon-band edges land in the other tone. Moving the camera,
+snapping crop origins to 64 px, and anchoring crops at the frame origin were each tried and change nothing, so the
+crop layout is held to the pinned crop-equivalence tolerance instead. Every channel is written from the frame alone,
+the legacy IK solver keeps no state, dither is off, and nothing is random. MotionPlan, support decisions, authored
+destinations, and contact timing are unchanged by any of this: the crop and reference sequences were rendered from
+the same plan (`1590e023ee02…` for the section, `042a14d9bf16…` for the whole lesson), and the IK contact error is
+the same on every frame.
 
-## Performance (RTX 5080, 16 GB; EEVEE, 1920 x 1080, 32 samples)
+## Performance
 
-| Measurement | Result |
-|---|---|
-| Build the character from code (SDF → mesh → rig → materials → .blend) | 31.1 s per build (both builds) (the body mesh itself 4.6 s) |
-| First frame in a fresh process (shader compile) | 1019 ms (then steady) |
-| 30 review frames | 8.3 s in Blender (0.249 s per steady frame); 9.6 s including process start |
-| Representative sequence (1806–2010, 205 frames) | 50.6 s in Blender (0.242 s per steady frame); 51.9 s including process start |
-| Whole lesson, every visible frame | 5201 visible frames in 20.2 min in Blender (0.233 s per steady frame; 20.3 min end to end, including the 5,319-frame bridge); worst IK contact error 0.0217 px |
-| GPU memory while rendering | 1619 MiB above the desktop's own 4242 MiB (peak 5861 of 16,303 MiB) |
-| Remotion composite of the 205-frame section, Rive vs Blender | 7.9 s vs 9.8 s |
+Three costs, measured separately (2026-10-18). Production is the publication class (NVIDIA GeForce RTX 5080, 16 GB,
+Windows 11, EEVEE, 1920 x 1080, 32 samples); CI is the proof class (Mesa llvmpipe, CPU only), which pays only for
+the ten-frame proof set. The two are separate budgets: the crop layout is chosen for the production renderer, and
+nothing is tuned for software GL.
 
-Per-frame time includes posing, the IK contact check, and writing a level-15 PNG. Nothing is optimised yet (no render
-region around the character, which is a small part of most frames). Remotion then composites the whole lesson (5,319 frames) with the staged Blender frames and the reveal in 257 s, staging and bundling included.
+**A. Blender process and build**
+
+| Measurement | Production class | Proof class (WSL, 16 threads) |
+|---|---|---|
+| Build the character from code (SDF → mesh → rig → materials → .blend), once per lane-source change | 31–35 s | 39.4 s |
+| Start a render process (load the .blend, bind the rig) before its first shot | 2.7–3.6 s per invocation (Node plans the lesson, derives the bridge and crops, writes the job; Blender starts and loads the .blend) | |
+| First frame in a fresh process (shader compile) | 976 ms (crop); 1184 ms (full frame) | 7.7–8.0 s |
+
+**B. Per-frame character render** (posing, the IK contact check, and a level-15 PNG included)
+
+| Measurement | Crop (production layout) | Full frame (the approved layout) |
+|---|---|---|
+| Pixels Blender draws per frame | mean 5.8% of the frame, at most 9.9% | 100% |
+| Warm frame, median / p95 (whole lesson) | 195 / 244 ms | 230 / 256 ms (approved run); 263 / 294 ms (today's re-render) |
+| 30 frames (1850–1879), in Blender / end to end | 7.3 / 6.9 s in Blender (warm median 204 / 199 ms); 10.9 / 9.7 s end to end | 9.3 / 9.5 s in Blender (warm median 283 / 283 ms); 12.0 / 12.3 s end to end |
+| Whole lesson (0–5318) | 5,185 frames in 17.2 min | 5,201 frames in 20.2 min (approved run); 23.0 min (today's re-render) |
+| Lossless output for the lesson | 158 MB | 339 MB |
+| Proof class, per frame | 9.9 s median (character crops); 10.9–12.3 s (reveal frames) | |
+
+The whole lesson has 16 more visible frames than crops: there WalletWallaby is entirely outside the frame, so no crop
+exists and Remotion draws nothing (`offFrame`), as the full-frame render's fully transparent PNGs showed. Crops cut
+the pixels by 94% but the frame time by only 15–30%: on the RTX the cost is mostly per-frame work that does not
+scale with pixels (evaluating the posed rig and its IK, EEVEE's shadow and sample passes over the same geometry, the
+PNG write). On software GL a crop saves nothing measurable: there cost scales with geometry times samples.
+GPU memory while rendering: 1619 MiB above the desktop's own 4242 MiB (peak 5861 of 16,303 MiB).
+
+**C. Remotion composite** (whole lesson, 5,319 frames, the reveal in place; staging and bundling included)
+
+| Measurement | Crop layout | Full-frame layout |
+|---|---|---|
+| Final composite, shared host (a game and other sessions running), back to back | 719 s (an earlier run: 699 s) | 932 s |
+| Final composite, quiet host | not yet measured | 257 s |
+
+Remotion's cost is not higher with crops: under the same (heavy, uneven) load the crop layout was faster, and it
+reads half the bytes. The clean quiet-host crop figure is still to be measured. On a quiet host the publication cost
+is roughly 0.5 min to build, 17 min of crop renders, and a few minutes of composite.
 
 ## Security
 
@@ -211,10 +298,17 @@ Blender is a native program with its own Python: a new execution boundary.
 
 ## CI
 
-Every PR: `npm test` includes `test/blender-lane.test.ts` (bridge parity with the Rive runtime, the full-lesson
-support check, the closed v1 schema, the pinned toolchain and its confinement, the Python rules); no Blender needed.
-`.github/workflows/blender-proof.yml` (manual) installs the pinned Linux build (SHA-256 verified), builds the character,
-and proves deterministic frames; read-only and credential-free. Full renders stay manual.
+Every PR: `npm test` includes `test/blender-lane.test.ts`, with no Blender needed: bridge parity with the Rive
+runtime, the full-lesson support check, the closed v1 schema, crop bounds (integer, in frame, holding the envelope,
+recomputed identically), the proof set's selection rules, environment-class matching and tolerance pins, the pinned
+toolchain and its confinement, and the Python rules.
+
+`.github/workflows/blender-proof.yml` (manual) installs the pinned Linux build (SHA-256 verified) on a hosted runner,
+builds the character and checks its canonical model hash against the reference's, renders the proof set twice (A:
+byte-identical) and compares it with the production reference (B: pinned tolerance); read-only and credential-free.
+It has not run on GitHub yet: the same steps ran locally under WSL with CPU-only Mesa llvmpipe. At about 10 s per
+proof frame on 16 cores, a 4-core runner should need roughly 15–25 minutes. The full-lesson render stays on the
+production render host as an explicit proof and publication step: on software GL it would take hours.
 
 ## Known weaknesses and open decisions
 
@@ -232,6 +326,9 @@ and proves deterministic frames; read-only and credential-free. Full renders sta
   pixel through the render's antialiasing filter.
 - **Lane source is hashed, not versioned by review discipline alone**: any change under `blender/walletwallaby/`
   changes `blenderSceneSourceSha256`, and staging refuses older frames.
-- **Not proven**: cross-machine frame identity, EEVEE on a GPU-less runner, and Blender's IK under a pole that crosses
+- **Byte identity is per render-environment class, by design**: Windows NVIDIA EEVEE and Linux software-GL EEVEE agree
+  within the pinned tolerance, never byte for byte. Public renders come from the publication class.
+- **Not proven**: the proof workflow on a GitHub-hosted runner (proven only under WSL), other GPUs and drivers, and
+  Blender's IK under a pole that crosses
   the chain (the calibrated poles reproduce rest within 0.21 px; the contact error gate measures every frame).
 - **The full composition with Blender is review-only**: production `npm run render` still draws the Rive rig.

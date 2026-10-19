@@ -29,8 +29,12 @@ export interface BlenderCharacterProps {
   dir: string;
   /** The bridge range it was rendered from. */
   range: { first: number; last: number };
-  /** The visible frames the sequence holds, one full-frame PNG each. */
-  frames: number[];
+  /** One crop per drawn frame: integer frame-px bounds, decided from the placement before rendering. */
+  crops: { frame: number; x: number; y: number; width: number; height: number }[];
+  /** Visible frames whose whole envelope lies outside the frame: nothing to draw. */
+  offFrame: number[];
+  /** Where the frames were rendered: the environment class id, the approved class it matched (if any), and the record. */
+  environment: { classId: string; approvedClass: string | null; purpose: 'publication' | 'proof' | null; record: Record<string, unknown> };
   /** sha256 of Blender's render manifest (every PNG's hash), and of the bridge the frames were rendered from. */
   renderSha256: string;
   bridgeSha256: string;

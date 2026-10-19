@@ -1,14 +1,14 @@
 name: Blender proof
 
-# The Blender presentation lane (docs/BLENDER.md) on the pinned official build:
-# build WalletWallaby from code, then render a representative frame set twice in
-# fresh processes and once in shuffled order, and compare the lossless frames.
-# Ordinary PRs do not run this (it downloads Blender and renders); the lane's
-# inputs, toolchain pins, bridge, and security rules are checked on every PR by
-# `npm test` (test/blender-lane.test.ts) without Blender.
-#
-# Manual only until EEVEE on a GPU-less hosted runner (Mesa software GL) is
-# proven; read-only and credential-free like every workflow here.
+# The Blender lane's determinism proof (docs/BLENDER.md, Determinism) on a hosted runner: the pinned official
+# Blender build, CPU software GL (Mesa llvmpipe, the approved proof class), and the representative proof set
+# (src/blender/proof-set.ts: idle, crouch, airborne, landing, perch, inspect, tail brace, and the transition's entry,
+# peak, and exit).
+#   A. same class: two fresh runs on this runner must give byte-identical frames;
+#   B. cross class: this runner's frames against the production class's committed reference
+#      (blender/proof/reference/) must hold the pinned tolerance (config/blender-environments.json).
+# The full-lesson render stays on the production render host (it would take hours on software GL).
+# Manual only; read-only and credential-free like every workflow here.
 
 on:
   workflow_dispatch:
@@ -22,9 +22,13 @@ concurrency:
 
 jobs:
   blender-proof:
-    name: Blender proof (build + deterministic frames)
+    name: Blender proof (same-class bytes, cross-class tolerance)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
+    defaults:
+      run:
+        # Explicit bash runs with -o pipefail, so a failed comparison piped through tee still fails the step.
+        shell: bash
 
     steps:
       - name: Checkout
@@ -41,8 +45,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Software OpenGL for headless EEVEE
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri libegl1 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxkbcommon0 libsm6
+      - name: Chrome Headless Shell (the version @remotion/renderer pins; it draws the reveal's teaching surfaces)
+        run: npx remotion browser ensure
+
+      - name: Runtime libraries for headless Blender with software GL
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libsm6 libice6 libgl1-mesa-dri libegl1 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxkbcommon0
 
       - name: Install the pinned Blender build (verified against config/blender.json)
         run: |
@@ -56,10 +63,22 @@ jobs:
           tar -xJf "$RUNNER_TEMP/$file" -C "$RUNNER_TEMP/blender" --strip-components=1
           echo "WALLETWALL_BLENDER=$RUNNER_TEMP/blender/blender" >> "$GITHUB_ENV"
 
-      - name: Build WalletWallaby and prove deterministic frames
+      - name: Build WalletWallaby (the canonical model hash must equal the reference's)
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
-          xvfb-run -a npm run blender:determinism -- --frames=1812,1822,1850,1904,1916,1922,1928,1990
-          node -e "const r=require('./dist/blender/out/determinism/report.json'); console.log(JSON.stringify(r,null,2))" | tee -a "$GITHUB_STEP_SUMMARY"
-          node -e "const r=require('./dist/blender/out/determinism/report.json'); if (!r.buildModelIdentical || r.twoBuildsTwoProcesses.identical !== r.twoBuildsTwoProcesses.of || r.shuffledOrder.identical !== r.shuffledOrder.of) process.exit(1)"
+          npm run blender:build
+          node -e "const m=require('./dist/blender/out/character/model.json'), r=require('./blender/proof/reference/proof.json'); if (m.modelSha256 !== r.canonicalModelSha256) { console.error('canonical model', m.modelSha256, 'is not the reference', r.canonicalModelSha256); process.exit(1) }"
+
+      - name: Proof set, run A and run B (fresh processes)
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          npm run blender:proof -- render --run=ci-a
+          npm run blender:proof -- render --run=ci-b
+
+      - name: A. same class, byte-identical
+        run: npm run blender:proof -- compare ci-a ci-b | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: B. cross class, against the production reference, within the pinned tolerance
+        run: npm run blender:proof -- compare ci-a reference | tee -a "$GITHUB_STEP_SUMMARY"

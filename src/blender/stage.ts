@@ -7,13 +7,15 @@
 // and the composition can only ever show frames of the motion it is sampling.
 // Node-only.
 
-import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { characterCrop, type CharacterCrop } from '../character/walletwallaby/blender/crop.ts';
+import { RIG_ENVELOPE } from '../character/walletwallaby/rive/rig-source.ts';
 import path from 'node:path';
 import { contentAddress, sha256Hex } from '../core/hash.ts';
 import { PUBLIC_DIR } from '../pipeline/render-input.ts';
 import type { BlenderCharacterProps, BlenderTransitionProps } from '../remotion/props.ts';
 import { validateBridge } from '../character/walletwallaby/blender/bridge.ts';
-import { blenderIdentity, type BlenderIdentity } from './identity.ts';
+import { blenderIdentity, environmentClass, loadEnvironments, type BlenderIdentity, type RenderEnvironment } from './identity.ts';
 import { lessonBridge, lessonTerrain, type LessonMotion } from './lesson.ts';
 import { findBlender, loadBlenderConfig, outFile } from './toolchain.ts';
 import { BLENDER_MOTION_SCHEMA } from '../character/walletwallaby/blender/bridge.ts';
@@ -51,8 +53,9 @@ export function stageBlenderSequence(name: string, lesson: LessonMotion): Blende
   if (!/^[a-z0-9][a-z0-9.-]{0,80}$/.test(name)) throw new BlenderStageError('the sequence name must be a plain id');
   const dir = `renders/${name}`;
   const manifestBytes = readFileSync(outFile(`${dir}/render.json`));
-  const manifest = JSON.parse(manifestBytes.toString('utf8')) as { schema: string; shots: { name: string; frame: number; sha256: string }[] };
+  const manifest = JSON.parse(manifestBytes.toString('utf8')) as { schema: string; environment?: RenderEnvironment; shots: { name: string; frame: number; sha256: string }[] };
   if (manifest.schema !== 'walletwall.blender-render/v1') throw new BlenderStageError(`${dir}/render.json is not walletwall.blender-render/v1`);
+  if (!manifest.environment) throw new BlenderStageError(`${dir}/render.json does not record its render environment; re-render it`);
   const bridge = validateBridge(JSON.parse(readFileSync(outFile(`${dir}/bridge.json`), 'utf8')));
   if (bridge.videoId !== lesson.videoId) throw new BlenderStageError(`${name} was rendered for ${bridge.videoId}, not ${lesson.videoId}`);
   const current = lessonBridge(lesson, bridge.range.first, bridge.range.last);
@@ -67,16 +70,38 @@ export function stageBlenderSequence(name: string, lesson: LessonMotion): Blende
     if (k === 'blendArtifactSha256') continue;
     if ((recorded as unknown as Record<string, unknown>)[k] !== v) throw new BlenderStageError(`${name} was rendered with a different ${k} (${String((recorded as unknown as Record<string, unknown>)[k])} vs ${String(v)}); re-render it`);
   }
-  const visible = current.frames.filter((f) => f.visible).map((f) => f.frame);
+  // Crop layout: every crop is re-derived from the current bridge (bounds decided before rendering, never by the
+  // render), and each PNG must have exactly those dimensions. A full-frame sequence (a reference) is a whole-frame crop.
+  const frameSize = { width: cfg.render.resolution[0], height: cfg.render.resolution[1] };
+  const padPx = (cfg.render as unknown as { crop: { padPx: number } }).crop.padPx;
+  const cropFile = outFile(`${dir}/crops.json`);
+  const cropDoc = existsSync(cropFile) ? (JSON.parse(readFileSync(cropFile, 'utf8')) as { schema: string; padPx: number; crops: (CharacterCrop & { pngSha256: string })[] }) : null;
+  if (cropDoc && (cropDoc.schema !== 'walletwall.blender-crops/v1' || cropDoc.padPx !== padPx)) throw new BlenderStageError(`${dir}/crops.json is not walletwall.blender-crops/v1 at the configured padding`);
+  const recordedCrops = new Map((cropDoc?.crops ?? []).map((c) => [c.frame, c]));
   const shots = new Map(manifest.shots.map((s) => [s.frame, s]));
   const publicDir = `renderer/blender/${name}`;
   mkdirSync(path.join(PUBLIC_DIR, ...publicDir.split('/')), { recursive: true });
-  for (const f of visible) {
-    const shot = shots.get(f);
-    if (!shot) throw new BlenderStageError(`${name} has no frame ${f}, which is visible`);
+  const crops: BlenderCharacterProps['crops'] = [];
+  const offFrame: number[] = [];
+  for (const f of current.frames.filter((x) => x.visible)) {
+    const want = cropDoc ? characterCrop(f, RIG_ENVELOPE, padPx, frameSize) : { frame: f.frame, x: 0, y: 0, width: frameSize.width, height: frameSize.height, scale: f.place.scale };
+    const shot = shots.get(f.frame);
+    if (!want) {
+      if (shot) throw new BlenderStageError(`${name} drew frame ${f.frame}, whose envelope lies wholly outside the frame`);
+      offFrame.push(f.frame);
+      continue;
+    }
+    if (!shot) throw new BlenderStageError(`${name} has no frame ${f.frame}, which is visible`);
+    if (cropDoc) {
+      const got = recordedCrops.get(f.frame);
+      if (!got || got.x !== want.x || got.y !== want.y || got.width !== want.width || got.height !== want.height || got.pngSha256 !== shot.sha256) throw new BlenderStageError(`${name} frame ${f.frame}: its crop is not the one its placement decides`);
+    }
     const src = outFile(`${dir}/${shot.name}.png`);
-    if (sha256Hex(readFileSync(src)) !== shot.sha256) throw new BlenderStageError(`${dir}/${shot.name}.png does not match its manifest`);
+    const bytes = readFileSync(src);
+    if (sha256Hex(bytes) !== shot.sha256) throw new BlenderStageError(`${dir}/${shot.name}.png does not match its manifest`);
+    if (bytes.readUInt32BE(16) !== want.width || bytes.readUInt32BE(20) !== want.height) throw new BlenderStageError(`${dir}/${shot.name}.png is not ${want.width}x${want.height}`);
     copyFileSync(src, path.join(PUBLIC_DIR, ...publicDir.split('/'), `${shot.name}.png`));
+    crops.push({ frame: f.frame, x: want.x, y: want.y, width: want.width, height: want.height });
   }
   return {
     schema: 'walletwall.blender-character-props/v1',
@@ -84,7 +109,12 @@ export function stageBlenderSequence(name: string, lesson: LessonMotion): Blende
     name,
     dir: publicDir,
     range: { ...bridge.range },
-    frames: visible,
+    crops,
+    offFrame,
+    environment: (() => {
+      const cls = environmentClass(manifest.environment!, cfg, loadEnvironments());
+      return { classId: cls.id, approvedClass: cls.approvedAs?.name ?? null, purpose: cls.approvedAs?.purpose ?? null, record: { ...manifest.environment! } };
+    })(),
     renderSha256: sha256Hex(manifestBytes),
     bridgeSha256: contentAddress(bridge),
     identity: { ...expected },

@@ -297,7 +297,8 @@ def _q(a, scale):
 def canonical_model(arm, objects):
     """The model as canonical content: geometry quantized and ordered by position (not by generation order), faces
     rotated to their lowest vertex (winding kept) and sorted, weights, attributes and UVs quantized in that order,
-    bones and constraints quantized."""
+    bones and constraints quantized. Two hosts that build the same source agree on this hash; their raw float
+    realizations (realization_hash) may differ in the last bits."""
     h = hashlib.sha256()
     for o in sorted(objects, key=lambda x: x.name):
         me = o.data
@@ -358,6 +359,51 @@ def canonical_model(arm, objects):
             if c.type == "IK":
                 h.update(_q([math.degrees(c.pole_angle)], 1000).tobytes())
     return h.hexdigest()
+
+
+def realization_hash(arm, objects):
+    """This host's exact realization of the model: raw float32 geometry, weights, attributes, bones, constraints.
+    Host-specific (last-bit float noise differs across platforms); recorded beside the canonical hash."""
+    h = hashlib.sha256()
+    summary = []
+    for o in sorted(objects, key=lambda x: x.name):
+        me = o.data
+        co = np.zeros(len(me.vertices) * 3, dtype=np.float32)
+        me.vertices.foreach_get("co", co)
+        lv = np.zeros(len(me.loops), dtype=np.int32)
+        me.loops.foreach_get("vertex_index", lv)
+        h.update(o.name.encode())
+        h.update(co.tobytes())
+        h.update(lv.tobytes())
+        for g in sorted(o.vertex_groups, key=lambda g: g.name):
+            h.update(g.name.encode())
+        for a in sorted(me.attributes, key=lambda a: a.name):
+            if a.name.startswith(".") or a.domain not in ("POINT", "CORNER"):
+                continue
+            if a.data_type == "FLOAT":
+                buf = np.zeros(len(a.data), dtype=np.float32)
+                a.data.foreach_get("value", buf)
+                h.update(a.name.encode())
+                h.update(buf.tobytes())
+        for uvl in me.uv_layers:
+            buf = np.zeros(len(uvl.data) * 2, dtype=np.float32)
+            uvl.data.foreach_get("uv", buf)
+            h.update(uvl.name.encode())
+            h.update(buf.tobytes())
+        # Weights, vertex by vertex.
+        for v in me.vertices:
+            for ge in v.groups:
+                h.update(np.array([v.index, ge.group, ge.weight], dtype=np.float32).tobytes())
+        summary.append({"object": o.name, "vertices": len(me.vertices), "polygons": len(me.polygons), "materials": [m.name for m in me.materials]})
+    for b in arm.data.bones:
+        h.update(b.name.encode())
+        h.update(np.array(list(b.matrix_local.col[0]) + list(b.matrix_local.col[1]) + list(b.matrix_local.col[2]) + list(b.matrix_local.col[3]), dtype=np.float32).tobytes())
+    for pb in arm.pose.bones:
+        for c in pb.constraints:
+            h.update(f"{pb.name}:{c.name}:{c.type}".encode())
+            if c.type == "IK":
+                h.update(np.array([c.pole_angle, c.chain_count], dtype=np.float64).tobytes())
+    return h.hexdigest(), summary
 
 
 def material_hash(mats):
@@ -437,7 +483,7 @@ def main():
     disc.visible_shadow = False
     targets = R.build_ik(arm, rig)
     model_sha = canonical_model(arm, [body] + small)
-    summary = [{"object": o.name, "vertices": len(o.data.vertices), "polygons": len(o.data.polygons), "materials": [m.name for m in o.data.materials]} for o in sorted([body] + small, key=lambda x: x.name)]
+    realization_sha, summary = realization_hash(arm, [body] + small)
     mats_all = dict(mats)
     mats_all["outline"] = outline
     mats_all["shadow"] = shadow
@@ -449,6 +495,7 @@ def main():
         "modelVersion": LANE_VERSION["model"],
         "materialsVersion": LANE_VERSION["materials"],
         "modelSha256": model_sha,
+        "modelRealizationSha256": realization_sha,
         "canonicalQuanta": {"positionPerPx": Q_POSITION, "weight": Q_WEIGHT, "attribute": Q_ATTRIBUTE, "uv": Q_UV, "bonePerUnit": Q_BONE, "material": Q_MATERIAL},
         "materialsSha256": mats_sha,
         "blenderVersion": bpy.app.version_string,

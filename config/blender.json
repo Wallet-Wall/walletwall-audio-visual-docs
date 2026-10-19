@@ -53,6 +53,10 @@
       "colorMode": "RGBA",
       "colorDepth": 8,
       "compression": 15
+    },
+    "crop": {
+      "note": "Teaching frames render WalletWallaby alone into a small transparent canvas: the rig envelope at the placement, padded by padPx (rig px at scale 1), integer frame px, clamped to the frame; ink on an interior crop edge fails the render.",
+      "padPx": 40
     }
   },
   "lighting": {

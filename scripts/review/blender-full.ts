@@ -1,7 +1,7 @@
 // Review-only: the whole lesson composited by Remotion with the Blender character and the depth reveal.
 //
-// node scripts/review/blender-full.ts <sequence covering every visible frame> <reveal name>
-//   -> dist/blender-review/full/migration-readiness.blender.mp4 (+ render-info.json)
+// node scripts/review/blender-full.ts <sequence covering every visible frame> <reveal name> [--out=<name>]
+//   -> dist/blender-review/<name, default full>/migration-readiness.blender.mp4 (+ render-info.json)
 //
 // Both Blender inputs are staged through the verified path (src/blender/stage.ts) BEFORE bundling: the bundle copies
 // the public dir when it is made.
@@ -21,6 +21,8 @@ import { loadCommittedSpec } from '../../src/pipeline/context.ts';
 import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, stageRendererAssets, synthesize } from '../../src/pipeline/render-input.ts';
 
 const [sequence, revealName] = process.argv.slice(2);
+const outName = process.argv.find((a) => a.startsWith('--out='))?.slice(6) ?? 'full';
+if (!/^[a-z0-9-]+$/.test(outName)) throw new Error('--out must be a plain lowercase name');
 if (!sequence || !revealName) throw new Error('usage: blender-full.ts <sequence> <reveal>');
 const videoId = 'migration-readiness';
 const config = loadPipelineConfig();
@@ -38,7 +40,7 @@ const t0 = performance.now();
 const serveUrl = await bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'index.ts'), publicDir: PUBLIC_DIR });
 const props = { ...buildProps(spec, source, track, config, { captions: true, characterless: false, guides: false }), characterRenderer: character, depthReveals: [reveal] };
 const composition = await selectComposition({ serveUrl, id: 'WalletWallDocsVideo', inputProps: props });
-const out = path.join(DIST_ROOT, 'blender-review', 'full');
+const out = path.join(DIST_ROOT, 'blender-review', outName);
 mkdirSync(out, { recursive: true });
 const output = path.join(out, `${videoId}.blender.mp4`);
 await renderMedia({ composition, serveUrl, codec: 'h264', outputLocation: output, inputProps: props, concurrency: 2 });
