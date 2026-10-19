@@ -463,7 +463,10 @@ async function doctor(): Promise<void> {
   const corpus = loadCorpus();
   log(`corpus ${corpus.id} v${corpus.version} ${corpusSha256(corpus).slice(0, 12)}: ${corpus.passages.map((p) => `${p.id} ~${fmt(estimateSpokenMs(passageRequest(p, pipeline).spokenText, pipeline.voice.pacing) / 1000, 0)} s`).join(', ')}`);
   const el = config.providers.elevenlabs;
-  log(`elevenlabs: ${el.apiKeyEnv} ${process.env[el.apiKeyEnv] ? 'present' : 'ABSENT (use "place" for reference audio)'}; voice id from ${process.env[el.voiceIdEnv] ? el.voiceIdEnv : 'config'}; variants ${variantNames(config, 'elevenlabs').join(', ')}`);
+  // Only the presence of the credential is reported, as a boolean; its value never reaches a log line.
+  const keyPresent = Object.hasOwn(process.env, el.apiKeyEnv) && (process.env[el.apiKeyEnv]?.length ?? 0) > 0;
+  const voiceFromEnv = Object.hasOwn(process.env, el.voiceIdEnv) && (process.env[el.voiceIdEnv]?.length ?? 0) > 0;
+  log(`elevenlabs: ${el.apiKeyEnv} ${keyPresent ? 'present' : 'ABSENT (use "place" for reference audio)'}; voice id from ${voiceFromEnv ? el.voiceIdEnv : 'config'}; variants ${variantNames(config, 'elevenlabs').join(', ')}`);
   try {
     const rt = await nemoSpeechFor(config);
     log(`nemo-speech ${rt.version}: ok`);

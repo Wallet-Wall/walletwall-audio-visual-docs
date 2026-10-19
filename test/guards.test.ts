@@ -135,7 +135,15 @@ describe('repository rules', () => {
       return seen;
     };
     const providers = path.join(VIDEO_ROOT, 'src', 'narration', 'providers') + path.sep;
-    for (const entry of ['src/remotion/index.ts', 'scripts/render.ts', 'scripts/render-review.ts', 'scripts/publish-dry-run.ts', 'scripts/pipeline.ts', 'scripts/public-output-check.ts', 'scripts/plan.ts', 'scripts/validate.ts']) {
+    // The render bundle plus every script package.json names (render, publish, planning, proof, Blender, ...), except the bakeoff itself.
+    const pkg = JSON.parse(readFileSync(path.join(VIDEO_ROOT, 'package.json'), 'utf8')) as { scripts: Record<string, string> };
+    const entries = new Set<string>(['src/remotion/index.ts']);
+    for (const [name, command] of Object.entries(pkg.scripts)) {
+      if (name.startsWith('narration')) continue;
+      for (const m of command.matchAll(/scripts\/[\w./-]+\.ts/g)) entries.add(m[0]);
+    }
+    assert.ok(entries.size >= 10, `the scan covers ${entries.size} entries`);
+    for (const entry of [...entries].sort()) {
       const reached = [...closure(path.join(VIDEO_ROOT, ...entry.split('/')))].filter((f) => f.startsWith(providers));
       assert.deepEqual(reached, [], `${entry} reaches ${reached.map((f) => path.relative(VIDEO_ROOT, f)).join(', ')}`);
     }
