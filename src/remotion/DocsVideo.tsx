@@ -11,7 +11,7 @@
 // (a staged depth reveal, review captions, debug guides, the
 // end screen's reserved zones) is never framed.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { AbsoluteFill, cancelRender, continueRender, delayRender, Img, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import { cameraAt, directionAt, framingCss, planAttention, type AttentionPlan } from '../attention/direction.ts';
 import { buildCaptions } from '../audio/captions.ts';
@@ -93,12 +93,23 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
   const { fps } = useVideoConfig();
   const ms = (frame * 1000) / fps;
   const [fontHandle] = useState(() => delayRender('Loading WalletWall fonts'));
+  // Nothing is painted until the brand fonts are loaded, so every frame is painted once. Painting first with
+  // the fonts still loading and repainting the text when they arrive made Chromium re-rasterize only the
+  // invalidated parts of tiles it had already rasterized, and inside such a clipped replay Skia's anti-aliased
+  // edge coverage can round one level differently: the same frame came out as two bitmaps in repeat renders
+  // (docs/CI.md, Render determinism).
+  const [fontsReady, setFontsReady] = useState(false);
   useEffect(() => {
     loadBrandFonts()
-      .then(() => continueRender(fontHandle))
+      .then(() => setFontsReady(true))
       .catch((err: unknown) => cancelRender(err instanceof Error ? err : new Error(String(err))));
-  }, [fontHandle]);
+  }, []);
+  // The handle is released only after the frame drawn with the fonts has been committed.
+  useLayoutEffect(() => {
+    if (fontsReady) continueRender(fontHandle);
+  }, [fontsReady, fontHandle]);
   const model = useMemo(() => buildModel(props), [props]);
+  if (!fontsReady) return null;
   const { timeline } = model;
 
   const index = Math.max(0, timeline.segments.findIndex((s) => ms >= s.startMs && ms < s.endMs));
