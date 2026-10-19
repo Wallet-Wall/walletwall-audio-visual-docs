@@ -102,8 +102,8 @@ export function renderCharacterSequence(cfg: BlenderConfig, blender: Blender, re
   const bridge = lessonBridgeFor(req.lesson, req.frames);
   if (!req.fresh && !req.measure && sameBridgeOnDisk(req.name, bridge)) {
     try {
-      stageBlenderSequence(req.name, req.lesson, req.layout);
-      return { reused: true, frames: bridge.frames.length, ms: 0 };
+      const staged = stageBlenderSequence(req.name, req.lesson, req.layout);
+      return { reused: true, frames: staged.crops.length, ms: 0 };
     } catch {
       // Stale (another identity, layout, or tampered output): render it again below.
     }
