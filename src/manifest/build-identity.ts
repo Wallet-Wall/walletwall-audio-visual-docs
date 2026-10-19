@@ -32,6 +32,7 @@ const IDENTITY_CONFIGS = [
   'config/copy-templates.json',
   'config/copy-policy.json',
   'config/youtube.json',
+  'config/blender-visual.json',
   'contracts/walletwall-brand.json',
   'fixtures/canonical/MANIFEST.json',
 ] as const;

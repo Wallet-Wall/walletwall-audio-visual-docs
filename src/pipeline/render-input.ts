@@ -3,6 +3,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { voiceRequestFor, type VoiceProvider } from '../audio/voice-provider.ts';
+import { loadVisualConfig } from '../blender/visual.ts';
 import { RIVE_ASSET, RIVE_RUNTIME } from '../character/walletwallaby/versions.ts';
 import { DIST_ROOT, readJson, VIDEO_ROOT } from '../config/load.ts';
 import { readWorkspaceFile, resolveWorkspacePath } from './context.ts';
@@ -84,5 +85,6 @@ export function buildProps(spec: VideoSpec, source: NormalizedSource, track: Nar
     templates: config.templates,
     overlays,
     provenance: { blob: spec.source.blob, contentHash: spec.source.contentHash },
+    material: loadVisualConfig(),
   };
 }

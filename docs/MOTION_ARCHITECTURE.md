@@ -89,6 +89,7 @@ No general-purpose physics or game engine (Matter.js, Rapier, Phaser), no Three.
 | Drawing in Remotion | `src/remotion/wallaby/WallabyRive.tsx`, `rive-loader.ts` |
 | Declared versions and pinned hashes | `src/character/walletwallaby/versions.ts` |
 | Rust/WASM Motion Intelligence (engine v3, opt-in: every hop from a stance that ends in a perch, its stand selection and support verdicts, its arc search, the contacts the scene reacts to, and an audit of every lesson contact) | `motion-intelligence/`, `src/motion/`; see [MOTION_INTELLIGENCE.md](MOTION_INTELLIGENCE.md) |
+| The Blender presentation lane (review only): the same MotionPlan as `walletwall.blender-motion/v1`, a code-built 3D body, Blender's IK on the plan's targets, declared terrain as geometry, the depth reveal | `src/character/walletwallaby/blender/`, `src/blender/`, `blender/walletwallaby/`; see [BLENDER.md](BLENDER.md) |
 
 `planMotion(clips, layouts)` runs once per video; `sampleWallaby(plan, ms)` is a pure function of the plan and the absolute time. Neither can return a destination that the clip did not give it.
 

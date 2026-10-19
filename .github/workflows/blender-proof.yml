@@ -1,0 +1,65 @@
+name: Blender proof
+
+# The Blender presentation lane (docs/BLENDER.md) on the pinned official build:
+# build WalletWallaby from code, then render a representative frame set twice in
+# fresh processes and once in shuffled order, and compare the lossless frames.
+# Ordinary PRs do not run this (it downloads Blender and renders); the lane's
+# inputs, toolchain pins, bridge, and security rules are checked on every PR by
+# `npm test` (test/blender-lane.test.ts) without Blender.
+#
+# Manual only until EEVEE on a GPU-less hosted runner (Mesa software GL) is
+# proven; read-only and credential-free like every workflow here.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  blender-proof:
+    name: Blender proof (build + deterministic frames)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Software OpenGL for headless EEVEE
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri libegl1 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxkbcommon0 libsm6
+
+      - name: Install the pinned Blender build (verified against config/blender.json)
+        run: |
+          version=$(node -p "require('./config/blender.json').blender.version")
+          series=$(echo "$version" | cut -d. -f1,2)
+          file="blender-${version}-linux-x64.tar.xz"
+          want=$(node -p "require('./config/blender.json').blender.artifacts['${file}']")
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$file" "https://mirrors.ocf.berkeley.edu/blender/release/Blender${series}/${file}"
+          echo "${want}  $RUNNER_TEMP/$file" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/blender"
+          tar -xJf "$RUNNER_TEMP/$file" -C "$RUNNER_TEMP/blender" --strip-components=1
+          echo "WALLETWALL_BLENDER=$RUNNER_TEMP/blender/blender" >> "$GITHUB_ENV"
+
+      - name: Build WalletWallaby and prove deterministic frames
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          xvfb-run -a npm run blender:determinism -- --frames=1812,1822,1850,1904,1916,1922,1928,1990
+          node -e "const r=require('./dist/blender/out/determinism/report.json'); console.log(JSON.stringify(r,null,2))" | tee -a "$GITHUB_STEP_SUMMARY"
+          node -e "const r=require('./dist/blender/out/determinism/report.json'); if (!r.buildModelIdentical || r.twoBuildsTwoProcesses.identical !== r.twoBuildsTwoProcesses.of || r.shuffledOrder.identical !== r.shuffledOrder.of) process.exit(1)"

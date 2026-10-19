@@ -1,0 +1,65 @@
+{
+  "schema": "walletwall.blender-visual/v1",
+  "note": "The Blender lane's visual constants: a warm palette with no white, stratified rock under the supports, and the contact shadow. A colour is a brand-token NAME, or a derived mix of two ({ mix: [a, b], t }): never a typed hex. src/blender/visual.ts resolves them, refuses any white-ish result, and merges them into the pinned config as `visual`, so they are hashed into every frame's identity. Kept apart from config/blender.json, which holds the toolchain and render pins.",
+  "whiteGuard": {
+    "note": "A colour is white-ish when its sRGB luma is at least minLuma and its chroma (max - min channel, 0..1) is at most maxChroma. Nothing the lane draws may be white-ish.",
+    "minLuma": 0.8,
+    "maxChroma": 0.14
+  },
+  "palette": {
+    "note": "The coat is WalletWallrus's own and comes from the rig contract. The rig's cream accents (muzzle, chin, chest, inner ears, tail underside, eye glint) become the wall's warm stone, shaded by the brand's darker stone.",
+    "accent": "stone",
+    "accentShade": "stoneLow",
+    "glint": "stone"
+  },
+  "terrain": {
+    "note": "Solid blocks seen in depth: the contact views and the signature transition. Every block is stratified rock (flat colour, two-tone light, a charcoal edge like the character's); a supporting top is a worn cap stone. Front faces on the teaching plane stay Remotion's own pixels.",
+    "depthPx": 60,
+    "edgePx": 2,
+    "edge": "charcoal",
+    "line": "terracotta",
+    "top": "stone",
+    "topShade": "stoneLow",
+    "strata": {
+      "layers": [
+        "stone",
+        "tan",
+        { "mix": ["stone", "terracotta"], "t": 0.16 },
+        "stoneLow",
+        { "mix": ["tan", "terracottaDark"], "t": 0.22 }
+      ],
+      "shadeToward": "terracottaDark",
+      "shadeAmount": 0.24,
+      "bandPx": [14, 46],
+      "insetPx": [0, 8],
+      "setbackPx": [0, 12],
+      "capPx": 9,
+      "seed": "walletwall.strata/v1"
+    }
+  },
+  "contactShadow": {
+    "note": "A warm umber shadow under the feet: a tight core and a soft penumbra, clipped to the support it lies on (it never hangs over an edge), darker for a hard landing.",
+    "color": { "mix": ["charcoal", "terracottaDark"], "t": 0.45 },
+    "widthPx": 132,
+    "heightPx": 18,
+    "centerPx": [8, 4],
+    "depthPx": 30,
+    "coreAlpha": 0.4,
+    "penumbraAlpha": 0.19,
+    "spanFadePx": 12,
+    "landingGain": 0.6
+  },
+  "flat": {
+    "note": "The flat teaching scenes' share of the same material rule. Authored cards and panels are warm parchment (paper pulled halfway toward stone), never white; text keeps more contrast than it had on the old near-white card. Only the dedicated physical supports are cut as terrain (the ground, the summit ledge, the pillars under tier nodes, the layered slabs): their visible sides may taper, stratify and fracture, but the authored top surface and the contact faces stay on the declared coordinates (src/layout/rock.ts). Semantic cards stay cards.",
+    "surface": { "mix": ["paper", "stone"], "t": 0.5 },
+    "text": {
+      "ink": { "token": "ink", "alpha": 0.96 },
+      "muted": { "token": "inkMuted", "alpha": 0.76 },
+      "link": { "mix": ["terracottaDark", "charcoal"], "t": 0.3 }
+    },
+    "ground": { "depthPx": 30, "capPx": 8, "bandPx": [7, 12], "sideJitterPx": 0, "taperPx": 22, "contactZonePx": 0, "fractureMaxPx": 5 },
+    "pillar": { "capPx": 0, "bandPx": [16, 44], "sideJitterPx": 3, "taperPx": 0, "contactZonePx": 400, "fractureMaxPx": 0 },
+    "ledge": { "capPx": 9, "bandPx": [14, 34], "sideJitterPx": 3, "taperPx": 16, "contactZonePx": 40, "fractureMaxPx": 0 },
+    "slab": { "fractions": [0.34, 0.67], "opacity": { "upper": 0.5, "lower": 0.58 } }
+  }
+}

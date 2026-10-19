@@ -5,7 +5,7 @@ import { FONTS, TOKENS } from '../brand/tokens.ts';
 import { clamp01, easeOut, type Rect } from '../layout/geometry.ts';
 import { TEXT_STYLES, type TextStyleKey } from '../layout/scene-layout.ts';
 
-export function textStyle(key: TextStyleKey, mono = false): CSSProperties {
+export function textStyle(key: TextStyleKey, mono = false, ink: string = TOKENS.ink): CSSProperties {
   const s = TEXT_STYLES[key];
   return {
     fontFamily: mono ? FONTS.mono : FONTS[s.font],
@@ -14,7 +14,7 @@ export function textStyle(key: TextStyleKey, mono = false): CSSProperties {
     lineHeight: s.lineHeight,
     letterSpacing: 'tracking' in s ? s.tracking : mono ? 0 : -0.2,
     textTransform: 'uppercase' in s && s.uppercase ? 'uppercase' : 'none',
-    color: TOKENS.ink,
+    color: ink,
     fontVariantNumeric: 'tabular-nums',
   };
 }

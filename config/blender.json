@@ -1,0 +1,129 @@
+{
+  "schema": "walletwall.blender-config/v1",
+  "note": "The pinned Blender toolchain and every setting that changes a WalletWallaby frame. A render made with any other Blender build is refused. docs/BLENDER.md explains each choice.",
+  "blender": {
+    "version": "5.2.2",
+    "buildHash": "d13f752e3b9c",
+    "series": "5.2 LTS",
+    "source": "official Blender Foundation build from download.blender.org (or an official mirror), verified against the release's published SHA-256 list",
+    "artifacts": {
+      "blender-5.2.2-windows-x64.zip": "3849d17a682cba006075aaa3f3597ecb5c9c30ec31035b2e092c53e40679b535",
+      "blender-5.2.2-linux-x64.tar.xz": "84098912789dc450e95697c4184fb8a90acbe5111c2ba4aede3fecb57806a168"
+    },
+    "args": [
+      "--background",
+      "--factory-startup",
+      "--disable-autoexec",
+      "--offline-mode",
+      "--python-exit-code",
+      "1"
+    ]
+  },
+  "render": {
+    "engine": "BLENDER_EEVEE",
+    "resolution": [
+      1920,
+      1080
+    ],
+    "fps": 30,
+    "samples": 32,
+    "threads": 8,
+    "raytracing": false,
+    "film": {
+      "transparent": true,
+      "filterSizePx": 1.5
+    },
+    "ditherIntensity": 0,
+    "colorManagement": {
+      "display": "sRGB",
+      "view": "Standard",
+      "look": "None",
+      "exposure": 0,
+      "gamma": 1,
+      "sequencer": "sRGB"
+    },
+    "shadows": {
+      "enabled": true,
+      "rayCount": 1,
+      "stepCount": 6,
+      "resolutionScale": 1
+    },
+    "output": {
+      "format": "PNG",
+      "colorMode": "RGBA",
+      "colorDepth": 8,
+      "compression": 15
+    }
+  },
+  "lighting": {
+    "ambient": 0.35,
+    "sunStrength": 3,
+    "sunAngleDeg": 1.5,
+    "sunDirection": [
+      0.3,
+      0.75,
+      -0.6
+    ]
+  },
+  "materials": {
+    "lightBand": 0.81
+  },
+  "outline": {
+    "strategy": "inverted-hull",
+    "widthPx": 3.6
+  },
+  "model": {
+    "gridPx": 1.25,
+    "relaxRounds": 3
+  },
+  "presentation": {
+    "camera": "orthographic-teaching-plane",
+    "yawTeachDeg": 38,
+    "yawTravelDeg": 18,
+    "travelWeights": {
+      "takeoff": 1,
+      "airborne": 1,
+      "trace": 1,
+      "mantle": 1,
+      "crouch_preload": 0.5,
+      "land_soft": 0.35,
+      "land_hard": 0.35,
+      "push": 0.5
+    }
+  },
+  "contactShadow": {
+    "alpha": 0.12,
+    "widthPx": 112,
+    "heightPx": 11,
+    "centerPx": [
+      8,
+      1
+    ],
+    "depthPx": 30
+  },
+  "determinism": {
+    "factoryStartup": true,
+    "autoexec": false,
+    "online": false,
+    "ikSolver": "LEGACY",
+    "keyInterpolation": "CONSTANT",
+    "seed": 0
+  },
+  "transitions": {
+    "depthReveal": {
+      "note": "The 2D -> 3D signature move (blender/walletwallaby/transition.py): flat at both ends, a dolly-zoom reveal, a dissolve, a settle.",
+      "flatDistance": 80,
+      "nearDistance": 1.25,
+      "elevationDeg": 11,
+      "azimuthDeg": -9,
+      "revealBy": 0.42,
+      "dissolveFrom": 0.44,
+      "dissolveTo": 0.62,
+      "travelFrom": 0.5,
+      "travelTo": 0.86,
+      "settleFrom": 0.7,
+      "layerGapPx": 700,
+      "blockDepthPx": 60
+    }
+  }
+}
