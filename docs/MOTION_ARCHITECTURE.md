@@ -21,10 +21,10 @@ motion state (position, velocity, action, phase,     ← Motion Intelligence dec
         │ rig controls: a pure mapping
         ▼
 clip weights + IK targets + small continuous offsets
-        │ a fresh Rive artboard instance per frame
+        │ the resolved pose and its IK targets (walletwall.blender-motion/v1)
         ▼
-Rive: clip blending, IK, skinning, drawing           ← Rive performs the BODY
-        │
+Blender: IK, the 3D body, lossless frames            ← Blender performs the BODY
+        │ crops placed by Remotion
         ▼
 Remotion captures frame N                             ← Remotion owns TIME
 ```
@@ -70,7 +70,7 @@ Cards, graph nodes, and ledges may acknowledge contact with a tiny, bounded sett
 
 No general-purpose physics or game engine (Matter.js, Rapier, Phaser), no Three.js conversion of the character, no collision world, pathfinding, procedural levels, particles, camera shake, character variants, or new mascots. If a concrete need ever proves one of these unavoidable, it is proposed and reviewed on its own.
 
-## Implementation (rig v5, motion v4)
+## Implementation (rig v6, motion v4)
 
 | Layer | Code |
 |---|---|
@@ -82,37 +82,26 @@ No general-purpose physics or game engine (Matter.js, Rapier, Phaser), no Three.
 | Traces as bounds between supported footholds | `src/character/walletwallaby/trace.ts` |
 | Physics and behaviour constants (versioned) | `config/motion.json` |
 | Vocabulary poses as clip blends, expressions, palette slots | `src/character/walletwallaby/rig.ts` |
-| The rig as code: skeleton, IK, silhouette, draw order, clips | `src/character/walletwallaby/rive/rig-source.ts` |
-| Rig source to `.riv` (deterministic bytes) | `rive/rig-compile.ts`, `rive/riv-format.ts`, `npm run rive:build` |
-| Motion state to rig controls | `rive/rig-controls.ts` |
-| Frame-pure posing on the Rive runtime | `rive/rig-apply.ts` |
-| Drawing in Remotion | `src/remotion/wallaby/WallabyRive.tsx`, `rive-loader.ts` |
+| The rig contract as code: skeleton, controls, IK, clips, envelope, paint slots | `src/character/walletwallaby/rig/rig-source.ts` |
+| Rig contract to the rest-pose model (deterministic) | `rig/rig-compile.ts` |
+| Motion state to rig controls | `rig/rig-controls.ts` |
+| Frame-pure posing: the pose before IK and every IK target | `rig/rig-apply.ts`, `blender/pose-resolve.ts` |
+| Drawing: the Blender character (crops composited by Remotion) and the depth reveal | `src/character/walletwallaby/blender/`, `src/blender/`, `blender/walletwallaby/`, `src/remotion/wallaby/WallabyBlender.tsx`; see [BLENDER.md](BLENDER.md) |
 | Declared versions and pinned hashes | `src/character/walletwallaby/versions.ts` |
 | Rust/WASM Motion Intelligence (engine v3, opt-in: every hop from a stance that ends in a perch, its stand selection and support verdicts, its arc search, the contacts the scene reacts to, and an audit of every lesson contact) | `motion-intelligence/`, `src/motion/`; see [MOTION_INTELLIGENCE.md](MOTION_INTELLIGENCE.md) |
-| The Blender presentation lane (review only): the same MotionPlan as `walletwall.blender-motion/v1`, a code-built 3D body, Blender's IK on the plan's targets, declared terrain as geometry, the depth reveal | `src/character/walletwallaby/blender/`, `src/blender/`, `blender/walletwallaby/`; see [BLENDER.md](BLENDER.md) |
 
 `planMotion(clips, layouts)` runs once per video; `sampleWallaby(plan, ms)` is a pure function of the plan and the absolute time. Neither can return a destination that the clip did not give it.
 
-### Rive
+### The rig contract and its renderer
 
-WalletWallaby is a Rive rig, drawn as WalletWallrus's sibling: one silhouette in WalletWallrus's coat colour with charcoal linework, cream accents, an integrated brick belly, and a long tail as the signature feature (the walrus's tusks are its own). The `.riv` (`assets/character/walletwallaby.riv`, about 42 KB) is compiled from `rig-source.ts` by a small writer for the Rive runtime format (major version 7), committed, and pinned by the sha256 of its bytes. `npm run rive:check` (also in CI) proves that the committed file, a fresh compile, and the pin agree. Authoring the rig as code keeps every bone, weight, and key reviewable in a diff. The asset contract (artboard, bone, control, clip, and IK names) is what any future editor-authored replacement must satisfy.
+WalletWallaby is drawn by Blender ([BLENDER.md](BLENDER.md)): a code-built body in WalletWallrus's shape language (one rounded mass in the walrus's coat, charcoal outline, warm stone accents, the wall built into the belly, and the long tail as the signature feature), posed by the rig contract below and pinned by its canonical model hash (`BLENDER_CHARACTER`). The contract is renderer-neutral: names, rest pose, IK chains, and clips, authored as code so every bone and key is reviewable in a diff. Rig v6 is that contract alone. Rigs v3 to v5 were drawn by the Rive runtime from 2D silhouette shapes compiled into a `.riv`; the runtime, the asset, and the shapes were retired once the invariants it proved were proven on the frames Blender renders (`npm run blender:invariants`), and the pose it evaluated is pinned (`test/blender-lane.test.ts`).
 
-- **Skeleton:** 22 bones. Hip, chest, neck, head, jaw, two ears, a five-bone tail, two three-bone hind legs, and two two-bone forelimbs.
-- **Silhouette:** every body part also draws a 6 px charcoal underlay behind all the fills, so only the outer contour of their union shows: one silhouette, however the parts overlap. The masses are rounded, as on WalletWallrus: a convex back sweeping into the tail through a full rump, a rounded haunch and calves, a belly that rounds down over the thigh. Thinner interior lines (2 px) mark only what lies in front of the body (the near ear, the near forelimb, the haunch). Like the haunch's line over the thigh, the near forelimb's line wraps the back of the shoulder and leaves its front open, so the limb grows out of the chest.
-- **Brick belly:** the stomach is the wall, as on WalletWallrus: four courses of running-bond brick (27 px bricks, 13.5 px courses) in charcoal mortar on the coat, filling the front of the stomach (about three quarters of the torso's depth, with a band of coat along the flank), with the chest above it in plain coat. Each course's back end is racked a quarter or half brick forward of the one below (closing with a bat where the bond needs one), so the field's edge is the bricks' own toothed end; there is no border line around it. The mortar is skinned to the torso, so the bricks deform with the body (it compresses on landing, stretches in flight); there is no plate, no fill, and no brick anywhere else.
-- **Tail:** about 182 px from root to tip at rest, longer than the body is tall, tapering from 21 px, with extra mass on the upper edge of its root where it grows out of the rump; a cream underside band runs along it. It stays visible behind the body in every pose (`test/brand-identity.test.ts`).
-- **Skinning:** the torso, the brick belly's mortar, the cream throat, the tail and its underside, and each forelimb (one shape over its two bones, so the elbow bends without a seam) are skinned to their bone chains (linear-blend weights, 50/50 at each joint). The body bends and compresses as one surface, and the tail curves rather than hinging. Rigid parts (head, ears, hind limbs, feet) ride their bones.
-- **Clips:** a reset (`base`), a looping `idle_alert` (a 3.4 s breath), eleven key poses (`crouch_preload`, `takeoff`, `airborne`, `land_soft`, `land_hard`, `perch`, `inspect`, `trace`, `mantle`, `push`, `resolve`), and two control clips (`tail_free`, `point_near`). Every pose clip keys the full pose property set, so blending is order-stable.
-- **IK (Rive constraints):** two-bone legs plant each foot, with the heel set by the clip-keyed foot angle and the toes on the rig's ground point. Single-bone foot constraints aim each foot. Two-bone forelimbs grip a ledge lip in the mantle and point at what the lesson reveals. A two-bone tail tip rests on the surface. Strengths are keyed by the clips, so the clips decide when the feet plant (never in flight), and a blend of two clips blends their IK. A five-bone tail chain was tried first and rejected: the runtime's iterative solve missed its target by up to 16 px and folded the tail into a hook.
-- **Palette:** coat, tail, outer ears, and lids are WalletWallrus's own coat colour (`#BA6F38`, the colour of the largest area of the walrus's coat in its avatar, reused exactly; `FAMILY_COLORS` in `rig.ts`). It is not a docs-theme token: the theme's terracotta, `#BF4E32`, is redder. The throat, muzzle, tail underside, and inner ears are cream. Outline, mortar, eyes, nose, and claws are charcoal. The shade (far limbs) is the coat mixed 20% toward charcoal, computed, never typed. There are no highlights and no tag: emblematic flat colour, as on WalletWallrus. The cream and charcoal are resolved from the brand contract at compile time.
+- **Skeleton:** 22 bones. Hip, chest, neck, head, jaw, two ears, a five-bone tail, two three-bone hind legs, and two two-bone forelimbs. Blender's armature is built on exactly these bones (`rig-export.ts`), with its own face bones for the eyes, lids, and brows.
+- **Clips:** a reset (`base`), a looping `idle_alert` (a 3.4 s breath), eleven key poses (`crouch_preload`, `takeoff`, `airborne`, `land_soft`, `land_hard`, `perch`, `inspect`, `trace`, `mantle`, `push`, `resolve`), and two control clips (`tail_free`, `point_near`). Every pose clip sets the full pose property set, so blending is order-stable.
+- **IK:** two-bone legs plant each foot, with the heel set by the clip-keyed foot angle and the toes on the rig's ground point; two-bone forelimbs grip a ledge lip in the mantle and point at what the lesson reveals; a two-bone tail tip rests on the surface. Strengths are keyed by the clips, so the clips decide when the feet plant (never in flight), and a blend of two clips blends their IK. The pose resolver decides every target; Blender's IK only reaches for them.
+- **Palette:** the coat is WalletWallrus's own (`#BA6F38`, `FAMILY_COLORS` in `rig.ts`), not the docs theme's redder terracotta; the shade is the coat mixed 20% toward charcoal, computed, never typed; outline, mortar, eyes, nose, and claws are charcoal; the accents are the material pass's warm stone ([BLENDER_VISUAL.md](BLENDER_VISUAL.md)). Two flat tones per surface, no highlights: brand colours are checked on the rendered pixels.
 
-**Frame-authoritative integration.** `@remotion/rive`'s `<RemotionRiveCanvas>` is not used. It fetches the runtime WASM from unpkg at render time (the render path may not touch the network), and it advances its animation by frame deltas (a frame would depend on the previous one). WalletWallaby drives the same runtime that component pins, `@rive-app/canvas-advanced@2.31.5`, directly:
-
-1. The loader fetches the staged `.riv` and `rive.wasm` from the bundle's own public dir and re-hashes both against their pins. It hands the WASM to the runtime as bytes (so the runtime fetches nothing) and loads the rig with Rive's asset CDN disabled. `stageRendererAssets()` refuses to stage bytes that do not match the pins.
-2. For every frame, every character is posed on a **fresh artboard instance**: `base` at mix 1, then the pose clips with normalised sequential mixes (Rive lerps from the current value, so this is the exact weighted average), then the control clips. The continuous controls and IK targets are written, and the artboard is advanced by zero seconds, twice: the pinned runtime does not order an IK constraint after its target node, so the first pass settles the targets and the second solves against them. The instance is drawn, the queued canvas commands are flushed, and the instance is freed.
-3. Nothing calls `play()`, uses a state machine, or reads elapsed time.
-
-A fresh instance per frame is the guarantee, not an optimisation. Rive's IK writes the constrained bones' transforms, and a property re-set to an unchanged value does not invalidate them, so a reused instance let one frame's solve leak into the next: 527 of 591 shuffled frames differed before the fix, and 0 after. The re-dirty pass also makes a reused instance clean, and the tests check both. The cost is about 1.7 ms per character per frame.
+**Frame-authoritative posing.** Every frame is a pure function of the frame: `rigControls(state)` and `resolvePose` (`blender/pose-resolve.ts`) blend the frame's clips from rest, add the continuous controls, and place every IK target, and the bridge (`walletwall.blender-motion/v1`) carries exactly that to Blender, which poses a fresh armature state from it. Nothing reads elapsed time; frames rendered in a shuffled order are byte-identical.
 
 ### Motion intelligence (v4)
 
@@ -123,15 +112,15 @@ The motion layer now returns behaviour, not drawing parameters:
 - **Velocity.** Closed form: the derivative of the feet's path, tested against finite differences.
 - **Jumps.** Orient; preload, where the tail loads down against the ground and stiffens; takeoff extension, where the tail locks straight as a lever; flight, where the tail counter-rotates against the body's pitch and streams against the vertical velocity; reach, where the legs swing forward feet-first and the tail sweeps down to meet the ground; then contact, compression, and settle.
 - **Landings** are soft or hard by impact (a smoothstep from 0.55 to 0.95). A hard landing blends in `land_hard` (deeper compression, a wider stance, forelimbs out), recovers 2.5 times more slowly, and braces the tail. The brace carries into the following hold and relaxes there.
-- **Mantles.** A move becomes a climb when its destination is a platform top at least 0.55 body heights above a start beside that platform, the whole sequence fits the window under the speed and gravity limits, and it crosses no more protected text than the hop would. The climb: jump to a hang point below the lip; catch it (Rive's arm IK grips the lip, the body hangs outside the face with the legs against it, and the tail swings as a counterweight); pull the hindquarters up and over; settle exactly on the anchor. The committed lesson has no ledge that can be climbed without crossing text, so it keeps its hops; the motion lab shows the climb.
-- **The tail.** It rests on the surface behind as a third support whenever there is surface under it, and Rive's tail IK makes the contact exact. Past a platform's edge, `tail_free` releases it and it hangs. Where a pose holds it well clear (inspect, trace, flight), the release is smooth. On narrow perches it corrects the balance with a slow ±2° sway. It never sinks through a surface: if a pose would drive the tip below the surface line, the tail first swings up about its root, so the IK only has to close a few pixels instead of folding the tip.
-- **Pointing.** The near forelimb reaches for the subject with Rive's arm IK, weighted by the pose's reach, never past the rig's reach (a far subject is pointed at, not lunged for). Presenting gestures stay as small rotation offsets.
+- **Mantles.** A move becomes a climb when its destination is a platform top at least 0.55 body heights above a start beside that platform, the whole sequence fits the window under the speed and gravity limits, and it crosses no more protected text than the hop would. The climb: jump to a hang point below the lip; catch it (the arm IK grips the lip, the body hangs outside the face with the legs against it, and the tail swings as a counterweight); pull the hindquarters up and over; settle exactly on the anchor. The committed lesson has no ledge that can be climbed without crossing text, so it keeps its hops; the motion lab shows the climb.
+- **The tail.** It rests on the surface behind as a third support whenever there is surface under it, and the tail IK makes the contact exact. Past a platform's edge, `tail_free` releases it and it hangs. Where a pose holds it well clear (inspect, trace, flight), the release is smooth. On narrow perches it corrects the balance with a slow ±2° sway. It never sinks through a surface: if a pose would drive the tip below the surface line, the tail first swings up about its root, so the IK only has to close a few pixels instead of folding the tip.
+- **Pointing.** The near forelimb reaches for the subject with the arm IK, weighted by the pose's reach, never past the rig's reach (a far subject is pointed at, not lunged for). Presenting gestures stay as small rotation offsets.
 - **Support (v4).** Every stand, takeoff, landing, trace foothold, grip, and brace is judged against the declared terrain (see "Terrain and support" above); a plan with one unsupported contact is refused.
 - **Exit leaps (v4)** leave the plane above the frame (the apex is out of view), and the next scene's arrival continues that flight: the body falls in from above and lands on its stand only once the new scene's content is on screen, never on the outgoing scene's geometry.
 
 ### Bounds
 
-`RIG_ENVELOPE` (rig space at scale 1: x −224..152, y −280..92) bounds the drawn ink of every pose the motion system can produce, measured on the runtime's own transforms (over every frame of the lesson and the lab: x −215.8..143.9, y −270.7..82.4). While holding, the drawn ink never overlaps protected text and stays inside title-safe (checked on the committed lesson's hold frames). The layout box `WALLABY_EXTENT` (x −150..100) is unchanged so that no scene's layout moves; the rest pose's ink now reaches x −197 behind the feet (the longer tail), so the guarantees above are checked on real geometry instead, as they were for leans.
+`RIG_ENVELOPE` (rig space at scale 1: x −224..152, y −280..92) bounds the drawn ink of every pose the motion system can produce, measured on the pixels Blender actually draws (`npm run blender:invariants`: every 9th lesson frame and every lab frame; the closest the ink comes to the box is 1.8 px at the top). While holding, the drawn pixels never overlap protected text and stay inside title-safe (checked on the committed lesson's hold frames). The production crop is this box padded by 40 rig px, and a frame whose ink reaches a crop edge fails the render. The layout box `WALLABY_EXTENT` (x −150..100) is unchanged so that no scene's layout moves; the rest pose's ink now reaches x −197 behind the feet (the longer tail), so the guarantees above are checked on real geometry instead, as they were for leans.
 
 ### Model
 
@@ -154,25 +143,25 @@ The motion layer now returns behaviour, not drawing parameters:
 
 ### Guarantees
 
-Tests live in `test/motion.test.ts`, `test/motion-intelligence.test.ts`, `test/rive-rig.test.ts`, `test/rive-format.test.ts`, and `test/versions.test.ts`.
+Tests live in `test/motion.test.ts`, `test/motion-intelligence.test.ts`, `test/rig.test.ts`, `test/blender-lane.test.ts`, and `test/versions.test.ts`; what needs the rendered frames runs as `npm run blender:invariants` (before every publication render, and on a sample in the Blender proof workflow).
 
-- The same spec, config, rig, and runtime give the same plan, the same rig controls, and the same bone transforms. Shuffled evaluation of about 590 frames is bit-identical to timeline order, and a positive control proves the comparison catches a 0.01° change.
+- The same spec, config, and rig give the same plan, the same rig controls, and the same resolved pose. Shuffled evaluation of about 590 frames is bit-identical to timeline order, and a positive control proves the comparison catches a 0.01° change; frames Blender renders in a shuffled order are byte-identical too.
 - Every hop lands exactly on its target. Every clip that moves ends on its authored anchor, every perch holds it, and the mantle ends on the authored ledge. A very different physics config gives the same landings in the same order.
-- On every grounded frame the near toe is exactly on the ground point (within 0.01 px) and the knees point forward. The tail rests on supported surfaces and is released past edges, and no tail joint bends more than 70°.
+- On every grounded frame Blender's IK reaches every toe and heel target (within 0.05 px; worst over the whole lesson 0.0217 px) and the knees point forward. The tail rests on supported surfaces and is released past edges, the paws hold the ledge lip in a climb, and no tail joint bends more than 70°.
 - Every control is finite and inside its hard limit on every frame. Clip weights are in [0, 1] and sum to 1, and clip times are in range.
-- Adversarial controls are refused, each with a positive control: non-finite or out-of-range values, unknown or duplicated clips, control clips used as poses, unreachable grips, and inverted support spans. So are malformed `.riv` values (NaN, overflow, duplicate or unknown properties) and a tampered asset.
-- The committed `.riv` regenerates byte-for-byte and matches its pin, and the coat written into the asset is the canonical terracotta. The build identity and the provenance manifest record the asset hash, rig version, runtime version, and WASM hash.
+- Adversarial controls are refused, each with a positive control: non-finite or out-of-range values, unknown or duplicated clips, control clips used as poses, unreachable grips, and inverted support spans. So is anything that is not exactly a v1 bridge, and a Blender frame that is not the bytes its manifest names.
+- The Blender character built from the rig is the pinned one (its canonical model and materials hashes), and every opaque pixel it draws is a mix of the palette's colours. The build identity and the provenance manifest record the Blender build, its config, lane source, and the pinned character.
 - Invalid motion configs are refused, as before, with positive controls.
 
 ### Review renders
 
-`npm run render:review` renders the pose sheet, a close-up, and the motion lab from `src/remotion/review/`, a separate entry point the video pipeline never bundles. Lab frames are chosen from the lab's own motion plan.
+`npm run blender:review` renders the pose sheet and close-ups (with `--turnaround`, a turn study), and `npm run blender:contact` the lesson's contacts in perspective on their declared terrain. The motion lab (`src/remotion/review/motion-lab-scene.ts`) is bridged like a lesson (`src/blender/lab.ts`) for the invariants and the narrow-perch review.
 
 ### Known weaknesses
 
 - **Text crossings in flight are reduced, not eliminated:** 105 frames against the v1 ceiling of 109, for the reasons given for v2. Flight poses extend past the layout box, so that count, which uses the box, is an estimate.
 - **The layout box under-reserves the tail.** `WALLABY_EXTENT` still reserves 150 px behind the feet at scale 1; the rest pose's tail reaches 197. Growing it would move every scene's layout; the real-ink checks keep holds off text and inside title-safe meanwhile.
-- **Support is a flat-footed model.** A stance is the feet's span on a level top: no slopes, no partial footing, no per-paw placement. Rive's IK plants the drawn feet on the stand point.
-- **The rig is code-authored.** Its silhouette and clips were tuned by hand with probes, not by an animator in the Rive editor. The contract is stable, so an editor-authored `.riv` can replace it, but such a file must pass the same tests.
-- **Code changes in `motion.ts` are not covered by the definition hash.** Only the config and the timing table are hashed, so a behavioural code change must bump `MOTION.version` by review discipline. The rig is fully covered: its source is in the definition, and the asset is pinned by its bytes.
-- **The pinned runtime's IK quirks are handled, not removed.** The second zero-time pass and the reach clamp on the tail contact are needed on 2.31.5 and are checked by the tests. A runtime upgrade must re-run them.
+- **Support is a flat-footed model.** A stance is the feet's span on a level top: no slopes, no partial footing, no per-paw placement. Blender's IK plants the drawn feet on the stand point.
+- **The rig and the body are code-authored.** The clips were tuned by hand with probes and the body is built from code (BLENDER.md), not by an animator in an editor. The contract is stable, so an editor-authored body can replace the code-built one, but it must pass the same invariants and be pinned the same way.
+- **Code changes in `motion.ts` are not covered by the definition hash.** Only the config and the timing table are hashed, so a behavioural code change must bump `MOTION.version` by review discipline. The rig is fully covered: its source is in the definition; the resolved pose is pinned (`test/blender-lane.test.ts`), and Blender's body by its canonical model hash.
+- **Blender's IK is the legacy solver with calibrated poles.** The poles reproduce the rest pose within 0.21 px; a pole that crosses its chain is not proven. In the motion lab's climb the arm reaches near full length and lands within 2.5 px of the lip (Rive's tolerance was 3). A Blender upgrade must re-run the invariants.

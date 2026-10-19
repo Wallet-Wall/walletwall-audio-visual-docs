@@ -13,11 +13,11 @@
 // given here, and draws. Nothing it receives lets it move a foot target, a
 // support span, or a destination. Isomorphic.
 
-import { finalizePose, TARGETS, type TargetControl } from '../rive/rig-apply.ts';
-import { poseValues, type PoseValues, type RigModel } from '../rive/rig-compile.ts';
-import type { RigControls } from '../rive/rig-controls.ts';
-import type { Vec } from '../rive/rig-math.ts';
-import { CLIPS, POSE_CLIPS, RIG_BONES, type IkGroup, type PoseClip, type RigBone } from '../rive/rig-source.ts';
+import { finalizePose, TARGETS, type TargetControl } from '../rig/rig-apply.ts';
+import { poseValues, type PoseValues, type RigModel } from '../rig/rig-compile.ts';
+import type { RigControls } from '../rig/rig-controls.ts';
+import type { Vec } from '../rig/rig-math.ts';
+import { CLIPS, POSE_CLIPS, RIG_BONES, type IkGroup, type PoseClip, type RigBone } from '../rig/rig-source.ts';
 
 /** Frames per second the rig's clips are keyed at (the .riv writer's own rate). */
 const CLIP_FPS = 60;

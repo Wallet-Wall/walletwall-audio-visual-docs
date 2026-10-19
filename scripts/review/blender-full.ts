@@ -18,7 +18,7 @@ import { DIST_ROOT, loadPipelineConfig, VIDEO_ROOT } from '../../src/config/load
 import { prettyJson } from '../../src/core/canonical-json.ts';
 import { sha256Hex } from '../../src/core/hash.ts';
 import { loadCommittedSpec } from '../../src/pipeline/context.ts';
-import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, stageRendererAssets, synthesize } from '../../src/pipeline/render-input.ts';
+import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, synthesize } from '../../src/pipeline/render-input.ts';
 
 const [sequence, revealName] = process.argv.slice(2);
 const outName = process.argv.find((a) => a.startsWith('--out='))?.slice(6) ?? 'full';
@@ -36,7 +36,6 @@ const revealManifest = JSON.parse(readFileSync(outFile(`renders/${revealName}/re
 const frames = revealManifest.shots.map((s) => s.frame);
 const reveal = stageBlenderTransition(revealName, lesson);
 stageDeclaredAssets(spec);
-stageRendererAssets();
 const t0 = performance.now();
 const serveUrl = await bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'index.ts'), publicDir: PUBLIC_DIR });
 const props = { ...buildProps(spec, source, track, config, { captions: true, characterless: false, guides: false }), characterRenderer: character, depthReveals: [reveal] };

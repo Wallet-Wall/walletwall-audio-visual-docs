@@ -18,10 +18,9 @@ import { blenderRigDocument } from '../src/character/walletwallaby/blender/rig-e
 import { terrainSegment } from '../src/character/walletwallaby/blender/terrain-export.ts';
 import { choreograph, layoutsFor, mouthAt } from '../src/character/walletwallaby/choreography.ts';
 import { planMotion, sampleWallaby } from '../src/character/walletwallaby/motion.ts';
-import { RigPlayer, TARGETS, type RiveArtboard } from '../src/character/walletwallaby/rive/rig-apply.ts';
-import { compileRig } from '../src/character/walletwallaby/rive/rig-compile.ts';
-import { rigControls } from '../src/character/walletwallaby/rive/rig-controls.ts';
-import { RIG_BONES } from '../src/character/walletwallaby/rive/rig-source.ts';
+import { compileRig } from '../src/character/walletwallaby/rig/rig-compile.ts';
+import { rigControls } from '../src/character/walletwallaby/rig/rig-controls.ts';
+import { RIG_BONES } from '../src/character/walletwallaby/rig/rig-source.ts';
 import { BLENDER_LANE_DIR, blenderSourceSha256, loadBlenderConfig, REQUIRED_ARGS, runBlender, writeJob } from '../src/blender/toolchain.ts';
 import { environmentClass, loadEnvironments } from '../src/blender/identity.ts';
 import { characterProofFrames } from '../src/blender/proof-set.ts';
@@ -30,11 +29,10 @@ import { assertPinnedCharacter, BlenderProductionError } from '../src/blender/pr
 import { hexRgb, paletteCheck } from '../src/blender/palette-check.ts';
 import { BLENDER_CHARACTER } from '../src/character/walletwallaby/versions.ts';
 import { characterCrop, interiorEdges } from '../src/character/walletwallaby/blender/crop.ts';
-import { RIG_ENVELOPE } from '../src/character/walletwallaby/rive/rig-source.ts';
+import { RIG_ENVELOPE } from '../src/character/walletwallaby/rig/rig-source.ts';
 import { terrainsFor } from '../src/layout/terrain.ts';
 import { buildTimeline } from '../src/timeline/timeline.ts';
 import { committedSnapshot, committedSpec, config } from './helpers.ts';
-import { loadRig } from './rive-runtime.ts';
 
 /** Captured 2026-10-18 while the Rive runtime parity test passed in the same run (see below). */
 const RESOLVED_POSES_PIN = 'f8e79d0b1c2cbc3588d6f09a5e0273537624a2a009970ac0730988f783d7467a';
@@ -70,37 +68,8 @@ const doc = (first: number, last: number): BlenderMotionDocument => ({
 });
 
 describe('the Blender bridge carries the decisions, not new ones', () => {
-  test('the resolved pose is exactly the Rive player\'s own pose before IK, on the real runtime', async () => {
-    const { rive, file } = await loadRig();
-    let checked = 0;
-    for (let f = 0; f < frames; f += 23) {
-      const { state } = at(f);
-      if (!state.visible) continue;
-      const controls = rigControls(state);
-      const mine = resolvePose(model, controls);
-      const artboard = file.artboardByName(model.artboard.name) as RiveArtboard & { delete?(): void };
-      const player = new RigPlayer(rive, artboard, model);
-      try {
-        player.pose(controls);
-        const theirs = player.read();
-        // Rive stores properties as 32-bit floats: compare at that precision.
-        for (const b of RIG_BONES) assert.ok(Math.abs(theirs.rot[b] - mine.rot[b]) < 2e-5, `frame ${f} ${b}: rive ${theirs.rot[b]} vs bridge ${mine.rot[b]}`);
-        assert.ok(Math.abs(theirs.hipX - mine.hip[0]) < 1e-3 && Math.abs(theirs.hipY - mine.hip[1]) < 1e-3, `frame ${f} hip`);
-        for (const t of TARGETS) {
-          const n = artboard.node(t);
-          assert.ok(Math.abs(n.x - mine.targets[t][0]) < 1e-3 && Math.abs(n.y - mine.targets[t][1]) < 1e-3, `frame ${f} ${t}: rive (${n.x}, ${n.y}) vs bridge (${mine.targets[t][0]}, ${mine.targets[t][1]})`);
-        }
-      } finally {
-        player.dispose();
-        artboard.delete?.();
-      }
-      checked++;
-    }
-    assert.ok(checked > 150, `compared ${checked} frames`);
-  });
-
   // The Rive runtime was retired after it proved, frame for frame, that resolvePose is the pose its player would have
-  // drawn (the test above, until the cutover). These pins freeze what it proved: the resolved pose of every 23rd frame
+  // drawn (a parity test on the real runtime, until the cutover; commit deee9da pinned these in the same run). These pins freeze what it proved: the resolved pose of every 23rd frame
   // of the lesson, and the rig document Blender builds the character from. A change to either is a declared rig change.
   test('the resolved pose and the rig document are the ones the Rive runtime proved (pinned)', () => {
     const round = (v: unknown): unknown => (typeof v === 'number' ? Math.round(v * 1e9) / 1e9 : Array.isArray(v) ? v.map(round) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, round(x)])) : v);

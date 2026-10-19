@@ -21,15 +21,12 @@
     "studio": "node scripts/prepare-assets.ts && remotion studio src/remotion/index.ts --public-dir=dist/public",
     "render": "node scripts/render.ts",
     "render:stills": "node scripts/render.ts --stills",
-    "render:review": "node scripts/render-review.ts",
     "publish:dry-run": "node scripts/publish-dry-run.ts",
     "public:check": "node scripts/public-output-check.ts",
     "publication:proof": "node scripts/publication-proof.ts",
     "stills:compare": "node scripts/stills-compare.ts",
     "freshness": "node scripts/freshness.ts",
     "contracts:check": "node scripts/contracts-check.ts",
-    "rive:build": "node scripts/build-rive.ts",
-    "rive:check": "node scripts/build-rive.ts --check",
     "motion:build": "bash motion-intelligence/build-wasm.sh dist/motion-intelligence/motion_intelligence.wasm && node scripts/motion-wasm.ts --write dist/motion-intelligence/motion_intelligence.wasm",
     "motion:check": "bash motion-intelligence/build-wasm.sh dist/motion-intelligence/motion_intelligence.wasm && node scripts/motion-wasm.ts --check dist/motion-intelligence/motion_intelligence.wasm",
     "motion:fixtures": "node scripts/motion-fixtures.ts",
@@ -42,7 +39,7 @@
     "blender:proof": "node scripts/blender-proof.ts",
     "blender:invariants": "node scripts/blender-invariants.ts",
     "pipeline": "node scripts/pipeline.ts",
-    "check": "npm run typecheck && npm test && npm run plan:check && npm run validate && npm run rive:check"
+    "check": "npm run typecheck && npm test && npm run plan:check && npm run validate"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "5.2.8",
@@ -51,7 +48,6 @@
     "@remotion/bundler": "4.0.532",
     "@remotion/cli": "4.0.532",
     "@remotion/renderer": "4.0.532",
-    "@rive-app/canvas-advanced": "2.31.5",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "remotion": "4.0.532"

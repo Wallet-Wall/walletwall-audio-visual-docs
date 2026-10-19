@@ -65,7 +65,6 @@ export interface Occurrence {
 export const EXCEPTIONS: { file: RegExp; what: string; line: RegExp; why: string }[] = [
   { file: /src\/remotion\/DocsVideo\.tsx$/, what: 'TOKENS.paper', line: /backgroundColor: TOKENS\.paper/, why: 'the canvas: the brand page colour (--ww-bg), not a card or panel; flagged to the owner' },
   { file: /src\/remotion\/DocsVideo\.tsx$/, what: 'TOKENS.cream', line: /color: TOKENS\.cream/, why: 'caption text on the dark caption pill (review renders only): light text, not a surface' },
-  { file: /src\/remotion\/review\//, what: 'TOKENS.paper', line: /backgroundColor: TOKENS\.paper/, why: 'the canvas of a review-only composition' },
 ];
 
 const WHITE_READING: { what: string; re: RegExp }[] = [

@@ -4,7 +4,7 @@
 
 import type { BlenderMotionDocument, BlenderMotionFrame } from '../character/walletwallaby/blender/bridge.ts';
 import { characterCrop } from '../character/walletwallaby/blender/crop.ts';
-import { RIG_ENVELOPE } from '../character/walletwallaby/rive/rig-source.ts';
+import { RIG_ENVELOPE } from '../character/walletwallaby/rig/rig-source.ts';
 
 export const PROOF_ROLES = ['idle', 'crouch', 'airborne', 'landing', 'perch', 'inspect', 'tail-brace', 'transition-entry', 'transition-peak', 'transition-exit'] as const;
 export type ProofRole = (typeof PROOF_ROLES)[number];

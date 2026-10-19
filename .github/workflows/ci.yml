@@ -53,9 +53,6 @@ jobs:
       - name: Committed specs regenerate byte-for-byte
         run: npm run plan:check
 
-      - name: Committed Rive rig regenerates byte-for-byte
-        run: npm run rive:check
-
       - name: Validate specs
         run: npm run validate
 

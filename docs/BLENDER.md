@@ -2,10 +2,10 @@
 
 > Rust decides. Blender performs. Remotion tells the story.
 
-This lane renders WalletWallaby's body with Blender instead of Rive, from the same decisions. It is the
-**review lane** for replacing Rive as the long-term character presentation engine: until the owner's visual
-review passes, the production renderer is still the Rive rig ([MOTION_ARCHITECTURE.md](MOTION_ARCHITECTURE.md)),
-and every render without `characterRenderer` is byte-for-byte what it was.
+WalletWallaby is drawn by Blender, from Motion Intelligence's decisions: production renders draw him as small lossless
+crops that Remotion places in the frame, and the depth reveal is Blender's one full-scene shot (Production, below). The
+Rive rig that drew rigs v3 to v5 was retired in rig v6, after every invariant it proved was proven on the frames Blender
+renders (Ported invariants, below; [MOTION_ARCHITECTURE.md](MOTION_ARCHITECTURE.md) has the rig contract).
 
 ## Ownership
 
@@ -40,11 +40,13 @@ Every run uses the fixed arguments `--background --factory-startup --disable-aut
 | Command | What it does |
 |---|---|
 | `npm run blender:build` | Builds the character from code: `dist/blender/out/character/walletwallaby.blend` + `model.json` |
-| `npm run blender:render -- --frames=a..b [--name=id]` | Renders lesson frames from the bridge (teaching camera) |
+| `npm run blender:render -- --frames=a..b [--name=id] [--full-frame]` | Renders lesson frames from the bridge (crops; whole frames with `--full-frame`) |
 | `npm run blender:review` | The seven-pose sheet and close-ups, from the motion system's own review states |
 | `npm run blender:contact -- --frames=a,b` | Perspective contact views on the declared terrain |
 | `npm run blender:determinism -- --frames=a,b,c` | Two builds, two fresh render processes, one shuffled order; compared |
-| `node scripts/review/blender-parity.ts <seq> --frames=… --clip=a..b` | Same composition, Rive vs Blender stills and clips |
+| `npm run blender:invariants` | The ported rig invariants on the frames Blender renders (Ported invariants) |
+| `npm run blender:proof -- render\|compare …` | The ten-frame proof set: same-class bytes, cross-class tolerance (Determinism) |
+| `npm run publication:proof` | The whole-video publication proof, on the production render host (Production) |
 | `node scripts/review/blender-transition.ts --context=<seq>` | The 2D → 3D signature transition at the tiers → signals seam |
 
 ## The coordinate contract (2.5D)
@@ -77,18 +79,20 @@ are its frames) and, per frame, records:
 - **semantic** (audit only; the pose already performs it): action, phase, contact, `offStage`, the declared support
   **surface id** under the feet, the support span, platform dip, landing impulse, velocity, pitch, stretch, tail
   intent (swing, curl, tension, lag), and the focus point.
-- **pose** (`pose-resolve.ts`): the clip blend weights; every bone's local rotation before IK (the Rive player's
-  own clip blend and continuous controls, `finalizePose` shared with the Rive path); the hip; the IK targets (heels,
+- **pose** (`pose-resolve.ts`): the clip blend weights; every bone's local rotation before IK (the rig contract's
+  clip blend and continuous controls, `finalizePose`); the hip; the IK targets (heels,
   toes, paws, tail tip) and each IK group's strength; the face controls.
 
-`validateBridge()` refuses anything that is not exactly v1: unknown fields at any level, gaps in the range,
-non-finite or out-of-range values, unknown clips, weights that do not sum to 1, a target across the frame, a path-like
+`validateBridge()` refuses anything that is not exactly v1: unknown fields at any level,
+frames that are not strictly ascending frames of the range (a subset is allowed: stills, the proof set, some frames of a
+reveal), non-finite or out-of-range values, unknown clips, weights that do not sum to 1, a target across the frame, a path-like
 segment id, and **a grounded on-stage frame with no declared supporting top under it**. A test bridges all 5,319
 frames of the committed lesson: every grounded frame stands on a declared `SUPPORTED_SURFACE`/`LEDGE`/`NARROW_LEDGE`
 top, except the few whose feet are outside the frame, which the contact audit also treats as off stage.
 
-Another test runs the pinned Rive runtime on ~230 lesson frames and proves the bridge's resolved pose is the Rive
-player's own pose before IK (every bone, the hip, every IK target), with a positive control.
+Until the cutover, a test ran the pinned Rive runtime on ~230 lesson frames and proved the bridge's resolved pose was
+the Rive player's own pose before IK (every bone, the hip, every IK target); the content hash of those resolved poses,
+captured in the same run, is now pinned, with a positive control that a 0.01° change is caught.
 
 ## The character (blender/walletwallaby/)
 
@@ -145,12 +149,70 @@ frame fails the render (an edge on the frame's own border is exempt: there he si
 records `crops.json`: `{ frame, x, y, width, height, scale, pngSha256 }`.
 
 `characterRenderer` (a staged, verified crop sequence) makes `DocsVideo` draw `WallabyBlender` (one `<Img>` per frame,
-placed at the crop's `x, y`, opacity applied by Remotion, fail closed on a missing visible frame) instead of
-`WallabyRive`; `depthReveals` replaces the flat transition for exactly their frames, and only there does Blender
+placed at the crop's `x, y`, opacity applied by Remotion, fail closed on a missing visible frame; a frame that shows
+him with no staged frames at all also fails closed); `depthReveals` replaces the flat transition for exactly their frames, and only there does Blender
 render a whole scene. `src/blender/stage.ts` stages a sequence only if every PNG matches Blender's own manifest and has
 exactly its crop's dimensions, every crop equals the one re-derived from the current bridge, the bridge is
 byte-for-byte the one the current MotionPlan gives, and the identity matches the current toolchain, config, lane
 source, and canonical model. Cards, text, diagrams, captions, UI, audio, timing, and encoding stay in Remotion.
+
+## Production
+
+`npm run render` and `npm run render:stills` draw WalletWallaby with the pinned Blender (`WALLETWALL_BLENDER` names the
+executable; `src/blender/production.ts`):
+
+1. **The character**: built from code (`build.py`) and refused unless its canonical model and materials are exactly
+   the ones `src/character/walletwallaby/versions.ts` pins (`BLENDER_CHARACTER`). A cached build is reused only while
+   the config, lane source, and rig it was built from are today's.
+2. **The frames**: the crop layout by default; `--character-layout=full-frame` renders whole frames instead (the
+   approved reference and the fallback). A full render covers every frame of the lesson; stills cover exactly their
+   frames (the bridge then holds that subset, compared frame by frame with the current plan). A sequence on disk is
+   reused only if its bridge is today's and staging verifies all of it; `--fresh-blender` never reuses (determinism
+   runs).
+3. **The depth reveal** at the lesson's PUSH_THROUGH → DEPTH_ENTER seam, from Remotion's two characterless surfaces,
+   verified like a character sequence (identity, plan, environment). Its subset for stills uses the whole reveal's
+   terrain and depth, so its frames are exactly the full reveal's.
+
+Every render clears the bundle's Blender staging area first (the bundle copies the whole public dir, so frames left
+from other renders would ride along), stages its own frames, and bundles again. `render.json` (`walletwall.render-info/v5`)
+and `stills.json` (`walletwall.stills-info/v3`) record the character: the layout, the sequence and reveal (frame
+counts, content hashes of what Blender recorded, never its timings), their bridge hashes, the Blender identity (without
+the `.blend` cache's bytes), and the render environment and its class. `npm run public:check` re-derives all of it from
+the repository alone and refuses a render to publish from any class that is not a publication class.
+
+**Publication** runs on the production render host: `npm run publication:proof` validates the spec, proves the ported
+invariants, renders the whole video, runs the publish dry run against that exact render, and runs the gate with the
+render required, writing the proof package to `dist/publication-proof/` for human review. Nothing uploads it.
+
+In Remotion Studio, a frame that shows WalletWallaby without staged Blender frames stops with an error rather than
+rendering without him; preview such frames with `npm run render:stills -- --frames=…`.
+
+## Ported invariants
+
+What the Rive runtime proved on its own transforms before the cutover is proved on the frames Blender renders:
+`npm run blender:invariants` (`scripts/blender-invariants.ts`) renders every 9th lesson frame and every frame of the
+motion lab (the ledge it climbs and the narrow perch whose edge the tail passes) in the crop layout, with each bone's
+projected position recorded by `render.py` on request, and checks:
+
+| Invariant | Rule | Measured 2026-10-18 (RTX) |
+|---|---|---|
+| Finite poses | every bone finite | 786 / 786 frames |
+| Planted feet, knees forward | IK within 0.05 px of every toe and heel target on grounded frames | 691 grounded frames; worst 0.0046 px |
+| The tail rests where there is a surface | full strength within 0.05 px, a blend within 2 px of the surface; released on fewer than 10% of supported holds | 312 supported holds: 310 resting, 2 released |
+| The tail hangs past an edge | released, never solved onto a target past the edge | 48 lab perch frames |
+| The paws hold the lip | the paw target is the lip; the paw within 3 rig px of it | 3 hang frames, within 2.5 px |
+| The tail never folds | no joint bends 70° or more | all frames |
+| Inside the envelope | the drawn pixels inside `RIG_ENVELOPE` at the placement, unpadded | all frames (closest: 1.8 rig px) |
+| Holds off protected text, inside title-safe | the drawn pixels vs the layout's text, the eyebrow, and title-safe | 405 scene holds |
+| Brand colours on pixels | every opaque pixel a mix of palette colours in linear light (at most 0.01% not); at least 30% exactly one | 0 of 11,084,922 off; 72.2% exact (worst frame 44.6%) |
+| Shuffled-frame purity | frames rendered in a shuffled order equal the in-order frames, byte for byte | 12 / 12 |
+
+Coverage minimums are Rive's (400 grounded frames, 300 supported holds, 300 scene holds at every 9th frame), scaled to
+the stride. The motion lab's two MANTLE/PULL frames the support judge refuses to bridge are excluded and listed. Not
+ported, because they describe the 2D shapes Rive drew: the belly polygon inside the torso polygon, the underlay draw
+order, and per-shape area retention; the Blender body is pinned instead and passed the owner's visual gate. The pose
+the Rive runtime evaluated is pinned too: `test/blender-lane.test.ts` holds the content hash of the resolved pose on
+every 23rd lesson frame and of the rig document, captured while the runtime parity test still passed.
 
 ## The 2D → 3D signature transition (depth reveal)
 
@@ -298,24 +360,28 @@ Blender is a native program with its own Python: a new execution boundary.
 
 ## CI
 
-Every PR: `npm test` includes `test/blender-lane.test.ts`, with no Blender needed: bridge parity with the Rive
-runtime, the full-lesson support check, the closed v1 schema, crop bounds (integer, in frame, holding the envelope,
+Every PR: `npm test` includes `test/blender-lane.test.ts`, with no Blender needed: the resolved pose and rig document
+pinned as the Rive runtime proved them, the full-lesson support check, the closed v1 schema, crop bounds (integer, in frame, holding the envelope,
 recomputed identically), the proof set's selection rules, environment-class matching and tolerance pins, the pinned
-toolchain and its confinement, and the Python rules.
+toolchain and its confinement, the pinned character, the palette check's controls, and the Python rules.
+
+Every PR: the required `Render determinism` check installs the pinned Blender and renders the review stills twice on
+one runner (proof class, CPU software GL): render A builds the character, render B renders every Blender frame again,
+and every PNG and `stills.json` must be byte-identical; the public-output gate then checks the stills' character
+identity, plan, and environment class ([CI.md](CI.md)).
 
 `.github/workflows/blender-proof.yml` (manual) installs the pinned Linux build (SHA-256 verified) on a hosted runner,
 builds the character and checks its canonical model hash against the reference's, renders the proof set twice (A:
-byte-identical) and compares it with the production reference (B: pinned tolerance); read-only and credential-free.
+byte-identical) and compares it with the production reference (B: pinned tolerance), and proves the ported invariants
+on a sample (every 270th lesson frame, every 6th lab frame); read-only and credential-free.
 It has not run on GitHub yet: the same steps ran locally under WSL with CPU-only Mesa llvmpipe. At about 10 s per
 proof frame on 16 cores, a 4-core runner should need roughly 15–25 minutes. The full-lesson render stays on the
 production render host as an explicit proof and publication step: on software GL it would take hours.
 
 ## Known weaknesses and open decisions
 
-- **The visual gate is the owner's.** In close-up and in depth the Blender body is the stronger one (volume, the wall
-  in the belly, the face, and the depth reveal Rive cannot do). At lesson scale (0.5–0.78) the 2D rig still reads as
-  the crisper emblem: its tail runs longer in silhouette and its limbs read bolder. Nothing is cut over until the
-  owner says so.
+- **The visual gate was passed by the owner (2026-10-18).** At lesson scale (0.5–0.78) the retired 2D rig read as the
+  crisper emblem (a longer tail in silhouette, bolder limbs); the presentation turn below is the lever for that.
 - **The presentation turn** (38° teaching, 18° travelling) trades the profile's long tail for a readable belly and
   face; it is one config block.
 - **The contact shadow** is a soft camera-facing ellipse at the feet while grounded, as on the 2D rig: in the flat
@@ -331,4 +397,8 @@ production render host as an explicit proof and publication step: on software GL
 - **Not proven**: the proof workflow on a GitHub-hosted runner (proven only under WSL), other GPUs and drivers, and
   Blender's IK under a pole that crosses
   the chain (the calibrated poles reproduce rest within 0.21 px; the contact error gate measures every frame).
-- **The full composition with Blender is review-only**: production `npm run render` still draws the Rive rig.
+- **Publication needs the production render host**: hosted CI renders stills and the proof set in software GL, never
+  the whole lesson.
+- **The flat DEPTH_ENTER transition (characterless stills only) is not byte-stable under heavy host load**: its CSS
+  perspective text differs by up to 2 levels on a few dozen pixels between runs when the machine is busy (seen locally,
+  not in CI); it predates the cutover and is not Blender's.

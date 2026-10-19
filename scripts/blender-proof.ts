@@ -27,13 +27,13 @@ import { BLENDER_JOBS, blenderConfigSha256, blenderSourceSha256, findBlender, lo
 import { characterCrop } from '../src/character/walletwallaby/blender/crop.ts';
 import { blenderRigDocument } from '../src/character/walletwallaby/blender/rig-export.ts';
 import { blenderTerrainDocument } from '../src/character/walletwallaby/blender/terrain-export.ts';
-import { compileRig } from '../src/character/walletwallaby/rive/rig-compile.ts';
-import { RIG_ENVELOPE } from '../src/character/walletwallaby/rive/rig-source.ts';
+import { compileRig } from '../src/character/walletwallaby/rig/rig-compile.ts';
+import { RIG_ENVELOPE } from '../src/character/walletwallaby/rig/rig-source.ts';
 import { loadPipelineConfig, VIDEO_ROOT } from '../src/config/load.ts';
 import { prettyJson } from '../src/core/canonical-json.ts';
 import { contentAddress, sha256Hex } from '../src/core/hash.ts';
 import { loadCommittedSpec } from '../src/pipeline/context.ts';
-import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, stageRendererAssets, synthesize } from '../src/pipeline/render-input.ts';
+import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, synthesize } from '../src/pipeline/render-input.ts';
 import { readPng, type Image } from './review/png.ts';
 
 const args = process.argv.slice(2);
@@ -86,7 +86,6 @@ async function prepare(run: string, blend: string): Promise<void> {
   const source = loadSnapshot(spec);
   const track = await synthesize(spec, new FixtureVoiceProvider(), config);
   stageDeclaredAssets(spec);
-  stageRendererAssets();
   const serveUrl = await bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'index.ts'), publicDir: PUBLIC_DIR });
   const bare = buildProps(spec, source, track, config, { captions: false, characterless: true, guides: false });
   const comp = await selectComposition({ serveUrl, id: 'WalletWallDocsVideo', inputProps: bare });

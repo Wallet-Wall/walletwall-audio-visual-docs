@@ -8,7 +8,7 @@
 
 import type { TOKENS } from '../../brand/tokens.ts';
 import type { WallabyExpression, WallabyPose } from '../../spec/vocabulary.ts';
-import type { PoseClip } from './rive/rig-source.ts';
+import type { PoseClip } from './rig/rig-source.ts';
 
 /**
  * WalletWallrus's coat, reused as WalletWallaby's so the two read as one family: the colour of the largest

@@ -20,12 +20,12 @@ import { clearStagedBlender, recordedLayout, stageBlenderSequence, stageBlenderT
 import { BLENDER_JOBS, findBlender, loadBlenderConfig, outFile, runBlender, writeJob } from '../../src/blender/toolchain.ts';
 import { BLENDER_MOTION_SCHEMA } from '../../src/character/walletwallaby/blender/bridge.ts';
 import { blenderRigDocument } from '../../src/character/walletwallaby/blender/rig-export.ts';
-import { compileRig } from '../../src/character/walletwallaby/rive/rig-compile.ts';
+import { compileRig } from '../../src/character/walletwallaby/rig/rig-compile.ts';
 import { RIG } from '../../src/character/walletwallaby/versions.ts';
 import { DIST_ROOT, loadPipelineConfig, VIDEO_ROOT } from '../../src/config/load.ts';
 import { prettyJson } from '../../src/core/canonical-json.ts';
 import { loadCommittedSpec } from '../../src/pipeline/context.ts';
-import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, stageRendererAssets, synthesize } from '../../src/pipeline/render-input.ts';
+import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, synthesize } from '../../src/pipeline/render-input.ts';
 
 const args = process.argv.slice(2);
 const opt = (n: string): string | undefined => args.find((a) => a.startsWith(`--${n}=`))?.slice(n.length + 3);
@@ -57,7 +57,6 @@ const layerDir = path.join(BLENDER_JOBS, NAME);
 mkdirSync(layerDir, { recursive: true });
 if (!(reuseLayers && existsSync(path.join(layerDir, 'layer-0.png')) && existsSync(path.join(layerDir, 'layer-1.png')))) {
   stageDeclaredAssets(spec);
-  stageRendererAssets();
   const serveUrl = await bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'index.ts'), publicDir: PUBLIC_DIR });
   const bare = buildProps(spec, source, track, config, { captions: false, characterless: true, guides: false });
   const bareComp = await selectComposition({ serveUrl, id: 'WalletWallDocsVideo', inputProps: bare });

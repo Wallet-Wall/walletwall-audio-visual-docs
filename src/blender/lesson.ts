@@ -6,7 +6,7 @@
 import { FixtureVoiceProvider } from '../audio/voice-provider.ts';
 import { choreograph, layoutsFor, mouthAt } from '../character/walletwallaby/choreography.ts';
 import { planMotion, type MotionPlan, type WallabyState } from '../character/walletwallaby/motion.ts';
-import { compileRig } from '../character/walletwallaby/rive/rig-compile.ts';
+import { compileRig } from '../character/walletwallaby/rig/rig-compile.ts';
 import { BLENDER_MOTION_SCHEMA, bridgeFrame, PLANE_ORIGIN, UNITS_PER_PX, validateBridge, type BlenderMotionDocument } from '../character/walletwallaby/blender/bridge.ts';
 import { blenderTerrainDocument, type BlenderTerrainDocument } from '../character/walletwallaby/blender/terrain-export.ts';
 import { loadPipelineConfig } from '../config/load.ts';

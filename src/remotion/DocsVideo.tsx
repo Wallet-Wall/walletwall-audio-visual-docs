@@ -31,7 +31,6 @@ import type { SceneState } from './scenes/common.tsx';
 import { rectStyle, textStyle } from './style.ts';
 import { MaterialContext } from './material.tsx';
 import { WallabyBlender } from './wallaby/WallabyBlender.tsx';
-import { WallabyRive } from './wallaby/WallabyRive.tsx';
 
 interface Model {
   timeline: Timeline;
@@ -133,6 +132,9 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
   const reveal = props.overlays.characterless ? undefined : props.depthReveals?.find((r) => frame >= r.range.first && frame <= r.range.last);
   // Fail closed: a frame of the reveal's range that the staged reveal does not hold stops the render.
   if (reveal && !reveal.frames.includes(frame)) cancelRender(new Error(`the staged depth reveal ${reveal.name} has no frame ${frame}`));
+  // Fail closed: WalletWallaby is drawn only from staged Blender frames (scripts/render.ts stages them); a frame that
+  // shows him without them is never rendered without him.
+  if (!reveal && !props.overlays.characterless && !props.characterRenderer && wallaby.visible && wallaby.opacity > 0) cancelRender(new Error(`frame ${frame} shows WalletWallaby, but no Blender frames were staged: render with npm run render or render:stills`));
   const cue = props.overlays.captions ? model.captions.find((c) => ms >= c.startMs && ms < c.endMs) : undefined;
   const section = seg.scene ? props.headings[seg.scene.eyebrowSectionId] : undefined;
   // The content world's framing: identity (`none`) wherever attention direction frames nothing, so those frames are untouched.
@@ -151,10 +153,8 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
             {`${props.spec.source.docPath.replace(/^docs\//, '')}${section ? ` § ${section}` : ''}`}
           </div>
         ) : null}
-        {reveal || props.overlays.characterless ? null : props.characterRenderer ? (
+        {reveal || props.overlays.characterless || !props.characterRenderer ? null : (
           <WallabyBlender frame={frame} visible={wallaby.visible} opacity={wallaby.opacity} source={props.characterRenderer} />
-        ) : (
-          <WallabyRive states={[wallaby]} opacity={wallaby.opacity} />
         )}
       </AbsoluteFill>
 

@@ -21,7 +21,7 @@ How to fill this in:
 - [ ] VideoSpec / planning
 - [ ] Motion Intelligence
 - [ ] Rust / WASM
-- [ ] Rive rig / animation
+- [ ] Rig contract / Blender character
 - [ ] Remotion rendering
 - [ ] Audio / narration / captions
 - [ ] Visual design / layout
@@ -47,7 +47,7 @@ How to fill this in:
 - [ ] Docs stay authoritative over the generated video: no fact, number, or claim the bound docs page does not state
 - [ ] No generative channel: no styling, code, camera, or prompt fields in the spec, and no new generative asset kinds
 - [ ] Motion simulation never changes a semantic destination. Motion Intelligence decides how, not where.
-- [ ] Rive owns body articulation; Remotion owns frame and time composition
+- [ ] Blender performs the body; Remotion owns frame and time composition
 - [ ] Invalid or unverifiable input fails closed: no error downgraded to a warning, no gate skipped
 - [ ] The render path reads no wall clock, randomness, network, or ambient environment
 - [ ] Provenance identifies the exact artifacts used, and anything that changes a frame bumps its declared version
@@ -64,27 +64,27 @@ How to fill this in:
 |---|---|---|
 | Semantic intent: where WalletWallaby goes, what the video says | Docs page → `VideoSpec` | |
 | Movement planning: how and when | Motion Intelligence (TypeScript, plus the Rust/WASM engine on bound paths) | |
-| Character articulation | Rive rig | |
+| Character articulation | Blender (pinned build, crop layout) | |
 | Frame and time composition | Remotion | |
 | Provenance | Pinned versions and hashes, `render.json`, `provenance.json` | |
 
 Before (optional):
 
 ```text
-docs page → VideoSpec → timeline → motion plan → Rive controls and IK → Remotion frame
+docs page → VideoSpec → timeline → motion plan → resolved pose and IK targets → Blender crop → Remotion frame
 ```
 
 After (optional):
 
 ```text
-docs page → VideoSpec → timeline → motion plan → Rive controls and IK → Remotion frame
+docs page → VideoSpec → timeline → motion plan → resolved pose and IK targets → Blender crop → Remotion frame
 ```
 
 </details>
 
 ## Evidence
 
-<!-- Results from the final commit, for example "263 tests: 261 pass, 0 fail, 2 skipped (need a WalletWall checkout)". Write n/a when the change cannot affect a check. `npm run check` runs typecheck, tests, plan:check, validate, and rive:check in one go. -->
+<!-- Results from the final commit, for example "263 tests: 261 pass, 0 fail, 2 skipped (need a WalletWall checkout)". Write n/a when the change cannot affect a check. `npm run check` runs typecheck, tests, plan:check, and validate in one go. -->
 
 | Check | Command | Result |
 |---|---|---|
@@ -94,7 +94,7 @@ docs page → VideoSpec → timeline → motion plan → Rive controls and IK �
 | Rust tests | `cargo test` (in `motion-intelligence/`) | |
 | Clippy | `cargo clippy --all-targets -- -D warnings`; `cargo clippy --target wasm32-unknown-unknown --lib -- -D warnings` | |
 | Rustfmt | `cargo fmt --check` | |
-| Build / artifact regeneration | `npm run plan:check`; `npm run rive:check`; `npm run motion:check` (Linux or WSL) | |
+| Build / artifact regeneration | `npm run plan:check`; `npm run motion:check` (Linux or WSL) | |
 | Validation | `npm run validate`; `npm run contracts:check` | |
 | Public output | `npm run publish:dry-run`; `npm run public:check` (add `--stills=<dir>` after `npm run render:stills`) | |
 | Security audit | `npm audit --audit-level=moderate`; `cargo audit` when crate dependencies change | |
@@ -124,7 +124,7 @@ docs page → VideoSpec → timeline → motion plan → Rive controls and IK �
 <details>
 <summary>Visual / audiovisual review</summary>
 
-<!-- Required for anything visual: render with npm run render:stills migration-readiness, and also npm run render:review for the rig. -->
+<!-- Required for anything visual: render with npm run render:stills migration-readiness, and also npm run blender:review for the character. -->
 
 - [ ] Before/after stills attached
 - [ ] Contact sheet
@@ -163,7 +163,7 @@ Invariants:
 - [ ] No phantom contact: nothing touches a surface that is not there
 - [ ] Tail output stays bounded: swing, curl, and tension within their limits
 - [ ] No motion math duplicated across Rust and TypeScript, except the explicit TypeScript oracle
-- [ ] The hand-off to Rive stays renderer-neutral: controls and IK targets, never pixels
+- [ ] The hand-off to Blender stays renderer-neutral: the resolved pose and IK targets (walletwall.blender-motion/v1), never a decision
 
 </details>
 
@@ -213,7 +213,7 @@ config sha256: …
 | Motion engine version | |
 | Motion artifact hash | |
 | Rig version | |
-| Rive asset hash | |
+| Blender character (model / materials hash) | |
 | Renderer version | |
 | Theme / motion version | |
 | Audio identity / version | |
@@ -276,7 +276,7 @@ config sha256: …
 ## Rollback
 
 - **Smallest rollback:** <!-- for example git revert of one commit; name any later PR that must be reverted first -->
-- **Pins and generated artifacts that revert with it:** <!-- versions, config pins, .riv, .wasm, fixtures, or "none" -->
+- **Pins and generated artifacts that revert with it:** <!-- versions, config pins, the Blender character pin, .wasm, fixtures, or "none" -->
 - **External or public artifacts that need separate action:** <!-- or "none" -->
 
 > [!WARNING]
@@ -291,7 +291,7 @@ config sha256: …
 <!-- Claims a reviewer should try to falsify, and how to try. Keep the ones that apply, and add your own. -->
 
 - Can a semantic destination drift?
-- Can stale WASM, `.riv`, or config bytes still render or publish?
+- Can stale WASM, Blender frames, or config bytes still render or publish?
 - Can frame order change the output?
 - Can invalid numeric input (NaN, ±Infinity, out-of-range values) cross the boundary?
 

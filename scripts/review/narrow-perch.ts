@@ -17,11 +17,11 @@ import { BLENDER_MOTION_SCHEMA, bridgeFrame, PLANE_ORIGIN, UNITS_PER_PX, validat
 import { blenderRigDocument } from '../../src/character/walletwallaby/blender/rig-export.ts';
 import { blenderTerrainDocument } from '../../src/character/walletwallaby/blender/terrain-export.ts';
 import { sampleWallaby } from '../../src/character/walletwallaby/motion.ts';
-import { compileRig } from '../../src/character/walletwallaby/rive/rig-compile.ts';
+import { compileRig } from '../../src/character/walletwallaby/rig/rig-compile.ts';
 import { DIST_ROOT, VIDEO_ROOT } from '../../src/config/load.ts';
 import { prettyJson } from '../../src/core/canonical-json.ts';
 import { sceneTerrain } from '../../src/layout/terrain.ts';
-import { PUBLIC_DIR, stageRendererAssets } from '../../src/pipeline/render-input.ts';
+import { PUBLIC_DIR } from '../../src/pipeline/render-input.ts';
 import { LAB_DURATION_MS, LAB_FPS, LAB_LAYOUT, LAB_SEGMENT, labPlan } from '../../src/remotion/review/motion-lab-scene.ts';
 import { RIG } from '../../src/character/walletwallaby/versions.ts';
 import { over, readPng, writePng } from './png.ts';
@@ -45,7 +45,6 @@ const out = path.join(DIST_ROOT, 'blender-review', 'visual');
 mkdirSync(out, { recursive: true });
 
 // 1. The lab's terrain alone, as Remotion draws it.
-stageRendererAssets();
 const serveUrl = await bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'review', 'index.ts'), publicDir: PUBLIC_DIR });
 const composition = await selectComposition({ serveUrl, id: 'WalletWallabyMotionLab', inputProps: { characterless: true } });
 const bgFile = path.join(out, 'narrow-perch.terrain.png');

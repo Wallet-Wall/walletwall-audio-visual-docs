@@ -20,7 +20,7 @@ MotionPlan: the chosen stand and how the terrain carries the hop, phase windows,
    │ the composition binds the plan to its clips (fails closed), performs each state,
    │ and lets the scene react to the plan's contacts
    ▼
-WallabyState → rig controls → Rive (body performance) → Remotion (time and composition)
+WallabyState → rig controls → resolved pose and IK targets → Blender (body performance) → Remotion (time and composition)
 ```
 
 | Owner | Decides |
@@ -30,7 +30,7 @@ WallabyState → rig controls → Rive (body performance) → Remotion (time and
 | The scene grammar | What each drawn element offers a body (`src/layout/terrain.ts`): a top to stand on, a ledge, a face a hand may brace or grip, or drawn information that is never terrain |
 | The scene | On owned paths, reacts to the engine's contacts: each platform's dip (and the feet riding it), the contact cues |
 | TypeScript (transitional) | Every other clip; on owned paths the expressive layer (key-pose blend, expression, gaze, focus, support), timed by its own hop |
-| Rive | The body itself: clip blending, IK, skinning, drawing |
+| Blender | The body itself: IK on the decided targets, the 3D body, lossless frames (docs/BLENDER.md) |
 | Remotion | Time and composition: which frame, and everything else in it |
 
 ## What the engine performs
@@ -79,7 +79,7 @@ The engine still flies exactly the oracle's hop, so today the dips and cues are 
 body motion → desired counterbalance → bounded damped response → swing, curl, tension
 ```
 
-The desired swing (`desired_counterbalance` in `motion-intelligence/src/tail.rs`) is the authored stance plus four physical terms: leg load presses the tail down against the surface (only while grounded); it counter-rotates against the body's pitch; it streams with the vertical speed (rising lifts the tip, falling sweeps it down to meet the ground); touchdown whips it down before the brace. A damped second-order follower turns that target into the tail's actual swing (it lags, overshoots a little, settles). Curl and tension follow their own targets with a first-order lag: the stance's own curl, looser in the air and flattened under load, and the stance's own tension while standing, rising with the phase's work (a lever at takeoff, a brace at landing) and with tracking effort. Stances carry the tail's curl and tension, so a perch that leans in to inspect settles into the lifted, curled counterweight that pose holds. A soft range of motion bounds every angle, and the settle tapers everything to the exact stance before the perch. Angles use the Rive rig's conventions (positive swing raises the tip).
+The desired swing (`desired_counterbalance` in `motion-intelligence/src/tail.rs`) is the authored stance plus four physical terms: leg load presses the tail down against the surface (only while grounded); it counter-rotates against the body's pitch; it streams with the vertical speed (rising lifts the tip, falling sweeps it down to meet the ground); touchdown whips it down before the brace. A damped second-order follower turns that target into the tail's actual swing (it lags, overshoots a little, settles). Curl and tension follow their own targets with a first-order lag: the stance's own curl, looser in the air and flattened under load, and the stance's own tension while standing, rising with the phase's work (a lever at takeoff, a brace at landing) and with tracking effort. Stances carry the tail's curl and tension, so a perch that leans in to inspect settles into the lifted, curled counterweight that pose holds. A soft range of motion bounds every angle, and the settle tapers everything to the exact stance before the perch. Angles use the rig contract's conventions (positive swing raises the tip).
 
 ## The boundary
 
@@ -143,7 +143,7 @@ The support tests (`motion-intelligence/tests/support.rs`, `test/support.test.ts
 - The oracle's hop touches down at least 0.45 × 40 ms = 18 ms before its clip ends, not the full 40 ms reserve that MOTION_ARCHITECTURE.md states: the orient and the extra preload take part of the reserve. The engine reproduces this exactly, and its tests assert the real margin.
 - The arc search, like the oracle's, tests the standing figure's layout box, not the drawn pose: flight poses extend past it, so text crossings are an estimate.
 - The engine is stricter than the oracle in one way: it refuses an arc that rises past `limits.maxApexBodyHeights` (2 body heights), which the transitional solver would fly (for example a screen-wide hop at half scale, where the speed limit buys flight time with a higher arc). Such a path fails closed; no hop of the committed lesson comes near it, and a test pins the divergence.
-- The support judge models a stance as the feet's span on a level top: no slopes, no partial footing, no per-paw placement; the drawn feet come from Rive's IK, which plants them on the stand point.
+- The support judge models a stance as the feet's span on a level top: no slopes, no partial footing, no per-paw placement; the drawn feet come from Blender's IK, which plants them on the stand point.
 - What the feet touch (`PLATFORM` or `GROUND`) comes from the declared tops that carry feet; the transitional planner also counts a pillar's top (the underside of its node), which no stand uses. A difference would fail the bind closed.
 - The engine judges the trace footholds, mantle grips, and push braces only in the audit; it does not plan those moves.
 - Support grew the artifact from 237 KB to 314 KB (the judge, the query document, and their refusals).

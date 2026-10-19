@@ -19,11 +19,11 @@
 // Isomorphic.
 
 import type { WallabyState } from '../motion.ts';
-import type { RigModel } from '../rive/rig-compile.ts';
-import { rigControls } from '../rive/rig-controls.ts';
-import type { Vec } from '../rive/rig-math.ts';
-import { POSE_CLIPS, RIG_BONES, type PoseClip, type RigBone } from '../rive/rig-source.ts';
-import { TARGETS, type TargetControl } from '../rive/rig-apply.ts';
+import type { RigModel } from '../rig/rig-compile.ts';
+import { rigControls } from '../rig/rig-controls.ts';
+import type { Vec } from '../rig/rig-math.ts';
+import { POSE_CLIPS, RIG_BONES, type PoseClip, type RigBone } from '../rig/rig-source.ts';
+import { TARGETS, type TargetControl } from '../rig/rig-apply.ts';
 import { FRAME } from '../../../layout/geometry.ts';
 import type { Terrain, TerrainSurface } from '../../../layout/terrain.ts';
 import { IK_GROUPS, resolvePose } from './pose-resolve.ts';

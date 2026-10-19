@@ -33,7 +33,7 @@ import { typescriptEngineIdentity, type MotionEngineIdentity } from '../src/moti
 import { planRustMotion } from '../src/motion/rust-adapter.ts';
 import { distDir, loadCommittedSpec, loadRegistry, validationContextFor } from '../src/pipeline/context.ts';
 import { validateSpec } from '../src/validation/validate-spec.ts';
-import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, stageRendererAssets, synthesize } from '../src/pipeline/render-input.ts';
+import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, synthesize } from '../src/pipeline/render-input.ts';
 import { buildTimeline, msToFrame, totalFrames } from '../src/timeline/timeline.ts';
 import { lessonMotion } from '../src/blender/lesson.ts';
 import { ensureCharacter, renderCharacterSequence, renderDepthReveal } from '../src/blender/production.ts';
@@ -119,7 +119,6 @@ if (stills) {
 const overlays = { captions: !flag('--no-captions'), characterless: flag('--characterless'), guides: flag('--guides') };
 const bundleNow = () => bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'index.ts'), publicDir: PUBLIC_DIR });
 stageDeclaredAssets(spec);
-stageRendererAssets();
 console.log(`[render] bundling ${COMPOSITION_ID} (${(timeline.totalMs / 1000).toFixed(1)} s, ${totalFrames(timeline)} frames)…`);
 let serveUrl = await bundleNow();
 

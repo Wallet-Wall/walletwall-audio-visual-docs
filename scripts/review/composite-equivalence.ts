@@ -16,7 +16,7 @@ import { lessonMotion } from '../../src/blender/lesson.ts';
 import { clearStagedBlender, stageBlenderSequence } from '../../src/blender/stage.ts';
 import { DIST_ROOT, loadPipelineConfig, VIDEO_ROOT } from '../../src/config/load.ts';
 import { loadCommittedSpec } from '../../src/pipeline/context.ts';
-import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, stageRendererAssets, synthesize } from '../../src/pipeline/render-input.ts';
+import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, synthesize } from '../../src/pipeline/render-input.ts';
 import { readPng, type Image } from './png.ts';
 
 const [cropName, refName] = process.argv.slice(2);
@@ -33,7 +33,6 @@ const crop = stageBlenderSequence(cropName!, lesson, 'crop');
 const ref = stageBlenderSequence(refName!, lesson, 'full-frame');
 if (crop.bridgeSha256 !== ref.bridgeSha256) throw new Error('the two sequences were rendered from different MotionPlans');
 stageDeclaredAssets(spec);
-stageRendererAssets();
 const serveUrl = await bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'index.ts'), publicDir: PUBLIC_DIR });
 const overlays = { captions: true, characterless: false, guides: false };
 const out = path.join(DIST_ROOT, 'blender-review', `composite-${cropName}${picked ? '-frames' : ''}`);

@@ -1,12 +1,11 @@
 // Node-side preparation of everything the Remotion composition needs.
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadAttentionConfig } from '../attention/config.ts';
 import { voiceRequestFor, type VoiceProvider } from '../audio/voice-provider.ts';
 import { loadVisualConfig } from '../blender/visual.ts';
-import { RIVE_ASSET, RIVE_RUNTIME } from '../character/walletwallaby/versions.ts';
-import { DIST_ROOT, readJson, VIDEO_ROOT } from '../config/load.ts';
+import { DIST_ROOT, readJson } from '../config/load.ts';
 import { readWorkspaceFile, resolveWorkspacePath } from './context.ts';
 import type { PipelineConfig } from '../config/types.ts';
 import { sha256Hex } from '../core/hash.ts';
@@ -35,36 +34,6 @@ export function stageDeclaredAssets(spec: VideoSpec): string[] {
     staged.push(dest);
   }
   return staged;
-}
-
-/**
- * Stage the renderer's own pinned dependencies (the compiled WalletWallaby rig
- * and the Rive runtime's WASM) under renderer/ in the bundle's public dir.
- * They are code, not spec content: each is re-hashed against its pin and the
- * render fails closed on any mismatch, so the bytes Remotion draws with are
- * exactly the bytes provenance records.
- */
-export function stageRendererAssets(): string[] {
-  const pkg = readJson<{ version: string }>(path.join(VIDEO_ROOT, 'node_modules', ...RIVE_RUNTIME.package.split('/'), 'package.json'));
-  if (pkg.version !== RIVE_RUNTIME.version) throw new Error(`${RIVE_RUNTIME.package} ${pkg.version} is installed; the renderer is pinned to ${RIVE_RUNTIME.version}`);
-  const items = [
-    { from: path.join(VIDEO_ROOT, ...RIVE_ASSET.path.split('/')), to: RIVE_ASSET.public, sha256: RIVE_ASSET.sha256 },
-    { from: path.join(VIDEO_ROOT, 'node_modules', ...RIVE_RUNTIME.package.split('/'), RIVE_RUNTIME.wasm), to: RIVE_RUNTIME.public, sha256: RIVE_RUNTIME.wasmSha256 },
-  ];
-  return items.map((item) => {
-    const bytes = verifyPinned(readFileSync(item.from), item.sha256, path.relative(VIDEO_ROOT, item.from));
-    const dest = path.join(PUBLIC_DIR, ...item.to.split('/'));
-    mkdirSync(path.dirname(dest), { recursive: true });
-    writeFileSync(dest, bytes);
-    return dest;
-  });
-}
-
-/** The bytes, if they are exactly the pinned ones; otherwise a refusal naming both hashes. */
-export function verifyPinned(bytes: Uint8Array, pinned: string, what: string): Uint8Array {
-  const actual = sha256Hex(bytes);
-  if (actual !== pinned) throw new Error(`renderer asset ${what} hash ${actual} != pinned ${pinned}`);
-  return bytes;
 }
 
 export function loadSnapshot(spec: VideoSpec): NormalizedSource {

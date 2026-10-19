@@ -14,7 +14,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { characterCrop, type CharacterCrop } from '../character/walletwallaby/blender/crop.ts';
-import { RIG_ENVELOPE } from '../character/walletwallaby/rive/rig-source.ts';
+import { RIG_ENVELOPE } from '../character/walletwallaby/rig/rig-source.ts';
 import { BLENDER_MOTION_SCHEMA, validateBridge, type BlenderMotionDocument } from '../character/walletwallaby/blender/bridge.ts';
 import { RIG } from '../character/walletwallaby/versions.ts';
 import { contentAddress, sha256Hex } from '../core/hash.ts';
