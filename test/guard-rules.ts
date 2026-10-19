@@ -27,4 +27,7 @@ export const CONTENT_RULES: readonly GuardRule[] = Object.freeze([
     re: /\b(?:OPENAI|OPENROUTER|ANTHROPIC|ETHERSCAN|ALCHEMY|COINGECKO|DUNE|UPSTASH)_[A-Z0-9_]*(?:KEY|TOKEN)[ \t]*=[ \t]*[A-Za-z0-9_-]{20,}/,
     msg: 'looks like a real API key assignment',
   },
+  // This repository's addition: the voice reference adapter's credential (ElevenLabs keys start with sk_).
+  { re: /\bELEVENLABS_API_KEY[ \t]*[=:][ \t]*['"]?sk_[A-Za-z0-9]{20,}/, msg: 'looks like a real ElevenLabs key assignment' },
+  { re: /\bsk_[0-9a-f]{40,}\b/, msg: 'looks like a real ElevenLabs key' },
 ]);

@@ -19,7 +19,7 @@ VoiceProvider ──▶ NarrationTrack ──▶ Timeline (integer ms) ──▶
                      UploadProvider (dry run in v1) ──▶ publish manifest · provenance · lineage
 ```
 
-The `VideoSpec` names no renderer, voice provider, upload target, or model. Each of those sits behind an interface: `StoryboardProvider`, `VoiceProvider`, the Remotion adapter, and `UploadProvider`.
+The `VideoSpec` names no renderer, voice provider, upload target, or model. Each of those sits behind an interface: `StoryboardProvider`, `VoiceProvider`, the Remotion adapter, and `UploadProvider`. The narration adapters and the voice bakeoff that evaluates them live behind the same boundary and off the render path; see [NARRATION.md](NARRATION.md).
 
 ## Two trees, one namespace
 

@@ -1,0 +1,4 @@
+# Overrides for chatterbox-tts 0.1.7 (pyproject pins torch==2.6.0, which has no
+# Blackwell / sm_120 kernels). The RTX 5080 needs a CUDA 12.8 build of torch.
+torch==2.11.0+cu128
+torchaudio==2.11.0+cu128
