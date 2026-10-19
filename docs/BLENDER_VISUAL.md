@@ -2,8 +2,7 @@
 
 This is the visual and material refinement of the Blender presentation lane ([BLENDER.md](BLENDER.md)) and of the flat
 teaching scenes Remotion draws. It changes what is drawn, never what is decided: the MotionPlan, the bridge, the rig, the
-IK targets, the body's geometry, the declared terrain, every contact, and every authored destination are untouched, and the
-production character renderer is still the Rive rig.
+IK targets, the body's geometry, the declared terrain, every contact, and every authored destination are untouched.
 
 One config drives all of it, `config/blender-visual.json`, kept apart from `config/blender.json` (the toolchain and render
 pins). Its Blender part is merged into the pinned config as `visual`, so it is hashed into every Blender frame's identity.
@@ -30,9 +29,8 @@ the brand's darker stone:
 | lit | `cream` `#F5F1E8` | `stone` `#E9D3AD` |
 | shade | `cream` 20% toward charcoal | `stoneLow` `#B99568` |
 
-The coat is still WalletWallrus's own `#BA6F38`, the outline charcoal, the brick belly unchanged. The Rive rig's palette is
-pinned by its rig version and is unchanged: until the character is cut over, the default render's character keeps the
-rig's cream.
+The coat is still WalletWallrus's own `#BA6F38`, the outline charcoal, the brick belly unchanged. The rig contract's palette
+slots are pinned by its rig version and are unchanged; the Blender body draws its accents in this stone.
 
 ## 2. Authored cards and panels: parchment
 

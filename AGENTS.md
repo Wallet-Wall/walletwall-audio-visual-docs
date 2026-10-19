@@ -49,9 +49,10 @@ Report exact results in the PR:
 - `npm run validate`
 - `npm audit --audit-level=moderate`
 - `git diff --check`
-- for anything visual: `npm run render:stills migration-readiness`, with before/after stills attached
+- for anything visual: `npm run render:stills migration-readiness` (WalletWallaby is drawn by the pinned Blender: set `WALLETWALL_BLENDER`), with before/after stills attached
 - for anything that changes an authored colour or a formation under `src/remotion/` or `src/layout/rock.ts`: `node scripts/review/white-audit.ts --before=<main's stills> --after=dist/migration-readiness/stills` (settled characterless stills; must PASS)
-- for anything under `blender/` or `src/blender/` (with the pinned Blender, `WALLETWALL_BLENDER`): `npm run blender:determinism -- --frames=1812,1822,1850,1904,1916,1922,1928,1990` and `npm run blender:review`, with before/after stills attached
+- for anything under `blender/`, `src/blender/`, or the rig (`src/character/walletwallaby/`) (with the pinned Blender, `WALLETWALL_BLENDER`): `npm run blender:invariants`, `npm run blender:determinism -- --frames=1812,1822,1850,1904,1916,1922,1928,1990`, and `npm run blender:review`, with before/after stills attached; a change to the body or its materials updates `BLENDER_CHARACTER` deliberately
+- before any publication: `npm run publication:proof` on the production render host (a publication class in `config/blender-environments.json`); CI never renders the whole video
 - for anything under `motion-intelligence/` (in that directory): `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo clippy --target wasm32-unknown-unknown --lib -- -D warnings`, `cargo test`; then `npm run motion:build` and `npm run motion:check` on Linux or WSL (the committed WASM is a canonical Linux build), and `npm run motion:fixtures` after a deliberate behaviour change ([docs/MOTION_INTELLIGENCE.md](docs/MOTION_INTELLIGENCE.md))
 
 ## Copy

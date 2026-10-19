@@ -2,27 +2,27 @@
 // render and provenance metadata. Each version pins the content hash of its
 // definition (test/versions.test.ts), so changing a pose, palette slot, rig
 // part, clip, or motion constant without declaring a new version fails the
-// build. The compiled Rive asset and the Rive runtime are pinned by the sha256
-// of their bytes. Isomorphic.
+// build. The Blender character the renderer builds from the rig is pinned by
+// its canonical model and materials hashes (BLENDER_CHARACTER). Isomorphic.
 
 import { AIRBORNE, EXPRESSIONS, LAND_HARD, MANTLE, POSES, PUSH, RIG_PALETTE, TAKEOFF, TRACE, WALLABY_HEIGHT } from './rig.ts';
 import { ACTION_MS } from './choreography.ts';
 import { MOTION_CONFIG } from './motion.ts';
-import { ARTBOARD, BONES, CLIPS, CONTROLS, IKS, REST_IK, RIG_ENVELOPE, RIG_ORIGIN, SHAPES } from './rive/rig-source.ts';
+import { BONES, CLIPS, CONTROLS, IKS, REST_IK, RIG_ENVELOPE } from './rig/rig-source.ts';
 
-/** v5: the belly IS the wall (a racked brick stomach, no border), a soft-massed body (convex back into a full rump, rounded haunch and calves), one-piece forelimbs that grow out of the chest, a convex muzzle over a rounded chin. v4 was the WalletWallrus sibling; v3 the athletic Rive rig; v2 the SVG terracotta figure. */
-export const RIG = { id: 'walletwallaby-rig', version: 5 } as const;
+/** v6: the rig contract alone (skeleton, controls, IK, clips, envelope), drawn by Blender (docs/BLENDER.md); Rive's artboard and 2D silhouette shapes are retired. v5: the belly IS the wall (a racked brick stomach, no border), a soft-massed body (convex back into a full rump, rounded haunch and calves), one-piece forelimbs that grow out of the chest, a convex muzzle over a rounded chin. v4 was the WalletWallrus sibling; v3 the athletic Rive rig; v2 the SVG terracotta figure. */
+export const RIG = { id: 'walletwallaby-rig', version: 6 } as const;
 /** v4: support plausibility (semantic terrain, the support judge, foothold traces, exit leaps that land out of view; config v4 adds `support`). v3 was motion intelligence; v2 ballistic motion alone. */
 export const MOTION = { id: 'walletwallaby-motion', version: 4 } as const;
 
-/** Everything that defines the figure's look and posable range, including the whole rig source. */
+/** Everything that defines the figure's posable range and palette, including the whole rig contract. */
 export const rigDefinition = () => ({
   poses: POSES,
   transient: { airborne: AIRBORNE, takeoff: TAKEOFF, landHard: LAND_HARD, mantle: MANTLE, push: PUSH, trace: TRACE },
   expressions: EXPRESSIONS,
   heightPx: WALLABY_HEIGHT,
   palette: RIG_PALETTE,
-  rive: { artboard: ARTBOARD, origin: RIG_ORIGIN, envelope: RIG_ENVELOPE, bones: BONES, controls: CONTROLS, iks: IKS, restIk: REST_IK, shapes: SHAPES, clips: CLIPS },
+  rig: { envelope: RIG_ENVELOPE, bones: BONES, controls: CONTROLS, iks: IKS, restIk: REST_IK, clips: CLIPS },
 });
 
 /** Motion: the choreography timing table plus the versioned physics config. */
@@ -35,6 +35,7 @@ export const RIG_PINS: Readonly<Record<number, string>> = {
   3: '81c92cf6983422b18bf646f3f5e5afde0dc07dcc1659d34a72f7ce679bb2e5c6',
   4: 'a67b355fabf7de82b3696ac4d6c515c72b7da65a4f5e78272895f85ed3cf97db',
   5: '43452464145eaf642eff376dcc0e028bf670d819b48ffc49233f27256f068ac2',
+  6: '765d69dfc23f9d007305266772a64c0be2dcabbfdf8425beb947edefb9affb56',
 };
 export const MOTION_PINS: Readonly<Record<number, string>> = {
   1: '4139d50ad1bc441c8f34b70fe2f1a129e013a3df76e4d3cc4c73c04a0ad56df2',
@@ -44,11 +45,14 @@ export const MOTION_PINS: Readonly<Record<number, string>> = {
 };
 
 /**
- * The compiled rig: where it lives in this repository, where the render bundle
- * serves it from, and the sha256 of its bytes (`npm run rive:build` prints it).
- * The renderer refuses any other bytes.
+ * The Blender character the production renderer draws (docs/BLENDER.md): the canonical model (quantized, ordered by
+ * position, the same on every host that builds this source) and its materials, as built from blender/walletwallaby/
+ * by the pinned Blender. A render refuses a built character whose hashes differ, so a change to the body or its
+ * materials is declared here, deliberately, together with its model or materials version.
  */
-export const RIVE_ASSET = { path: 'assets/character/walletwallaby.riv', public: 'renderer/walletwallaby.riv', rigVersion: RIG.version, sha256: '80be6d494b571ad1863759019389ab10ab5e0da60774fd763e4f22655cc9328e' } as const;
-
-/** The Rive runtime the renderer drives (the version @remotion/rive pins) and the sha256 of the WASM it loads. */
-export const RIVE_RUNTIME = { package: '@rive-app/canvas-advanced', version: '2.31.5', wasm: 'rive.wasm', public: 'renderer/rive.wasm', wasmSha256: '0586b74359591e953df23b27e5d084540aa618dfcc08662beed9196109f0aa87' } as const;
+export const BLENDER_CHARACTER = {
+  modelVersion: 1,
+  modelSha256: 'f8124e59dab3bcf578f62db4cbe20fec12be7ee78e3a13701df45d6bc0118a1a',
+  materialsVersion: 2,
+  materialsSha256: 'de8c55f5725372035b3358311fe07d9096d60e8ca6cefbc9281e51222f421db3',
+} as const;

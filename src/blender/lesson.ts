@@ -6,7 +6,7 @@
 import { FixtureVoiceProvider } from '../audio/voice-provider.ts';
 import { choreograph, layoutsFor, mouthAt } from '../character/walletwallaby/choreography.ts';
 import { planMotion, type MotionPlan, type WallabyState } from '../character/walletwallaby/motion.ts';
-import { compileRig } from '../character/walletwallaby/rive/rig-compile.ts';
+import { compileRig } from '../character/walletwallaby/rig/rig-compile.ts';
 import { BLENDER_MOTION_SCHEMA, bridgeFrame, PLANE_ORIGIN, UNITS_PER_PX, validateBridge, type BlenderMotionDocument } from '../character/walletwallaby/blender/bridge.ts';
 import { blenderTerrainDocument, type BlenderTerrainDocument } from '../character/walletwallaby/blender/terrain-export.ts';
 import { loadPipelineConfig } from '../config/load.ts';
@@ -16,8 +16,9 @@ import { bindMotionEngine, sampleWithEngine, type BoundMotionEngine } from '../m
 import { planRustMotion } from '../motion/rust-adapter.ts';
 import { loadCommittedSpec } from '../pipeline/context.ts';
 import { loadSnapshot, synthesize } from '../pipeline/render-input.ts';
-import { buildTimeline, totalFrames, type Timeline } from '../timeline/timeline.ts';
+import { buildTimeline, totalFrames, type NarrationTrack, type Timeline } from '../timeline/timeline.ts';
 import { contentAddress } from '../core/hash.ts';
+import type { SceneLayout } from '../layout/scene-layout.ts';
 
 export interface LessonMotion {
   videoId: string;
@@ -26,6 +27,8 @@ export interface LessonMotion {
   engine: BoundMotionEngine;
   engineId: string;
   terrains: Map<string, Terrain>;
+  /** Each segment's scene layout (its text, platforms, and anchors), as the composition lays it out. */
+  layouts: ReadonlyMap<string, SceneLayout>;
   frames: number;
   sample(frame: number): { state: WallabyState; segment: string; onScreen: Terrain[] };
 }
@@ -33,8 +36,14 @@ export interface LessonMotion {
 export async function lessonMotion(videoId: string, engineName: 'typescript' | 'rust-wasm' = 'typescript'): Promise<LessonMotion> {
   const config = loadPipelineConfig();
   const spec = loadCommittedSpec(videoId);
+  return lessonMotionWith(videoId, engineName, await synthesize(spec, new FixtureVoiceProvider(), config));
+}
+
+/** The lesson's motion for an already-synthesized narration track (the same as lessonMotion with the fixture voice). */
+export function lessonMotionWith(videoId: string, engineName: 'typescript' | 'rust-wasm', track: NarrationTrack): LessonMotion {
+  const config = loadPipelineConfig();
+  const spec = loadCommittedSpec(videoId);
   const source = loadSnapshot(spec);
-  const track = await synthesize(spec, new FixtureVoiceProvider(), config);
   const timeline = buildTimeline(spec, track, config.templates);
   const headings: Record<string, string> = Object.fromEntries(source.sections.map((s) => [s.id, s.heading]));
   const layouts = layoutsFor(timeline, (id) => headings[id] ?? '');
@@ -52,6 +61,7 @@ export async function lessonMotion(videoId: string, engineName: 'typescript' | '
     engine,
     engineId,
     terrains,
+    layouts,
     frames: totalFrames(timeline),
     sample(frame: number) {
       const ms = (frame * 1000) / timeline.fps;
@@ -67,16 +77,26 @@ export async function lessonMotion(videoId: string, engineName: 'typescript' | '
 }
 
 /** The bridge document for an inclusive frame range of the lesson, validated before it can reach Blender. */
-export function lessonBridge(lesson: LessonMotion, first: number, last: number): BlenderMotionDocument {
+export function lessonBridge(lesson: LessonMotion, first: number, last: number, only?: ReadonlySet<number>): BlenderMotionDocument {
   if (!Number.isInteger(first) || !Number.isInteger(last) || first < 0 || last >= lesson.frames || last < first) throw new Error(`frames ${first}..${last} are not a range of ${lesson.videoId} (0..${lesson.frames - 1})`);
   const model = compileRig().model;
   const frames = [];
   for (let f = first; f <= last; f++) {
+    // A subset holds only its frames: each bridge frame depends on its own frame alone, so this is the range filtered.
+    if (only && !only.has(f)) continue;
     const { state, segment, onScreen } = lesson.sample(f);
     frames.push(bridgeFrame(model, f, segment, state, onScreen));
   }
   const doc: BlenderMotionDocument = { schema: BLENDER_MOTION_SCHEMA, videoId: lesson.videoId, fps: lesson.timeline.fps, range: { first, last }, motionEngine: lesson.engineId, coordinates: { unitsPerPx: UNITS_PER_PX, planeOrigin: { ...PLANE_ORIGIN } }, frames };
   return validateBridge(JSON.parse(JSON.stringify(doc)));
+}
+
+/** The bridge for the whole lesson, or exactly the given frames (a subset of the range they span). */
+export function lessonBridgeFor(lesson: LessonMotion, frames: readonly number[] | undefined): BlenderMotionDocument {
+  if (!frames) return lessonBridge(lesson, 0, lesson.frames - 1);
+  if (frames.length === 0) throw new Error('no frames were asked for');
+  const want = new Set(frames);
+  return lessonBridge(lesson, Math.min(...want), Math.max(...want), want);
 }
 
 /** The declared terrain of every segment the bridge touches. */

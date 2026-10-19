@@ -3,7 +3,8 @@ name: Public Output
 # The public-output assurance layer. CI (ci.yml) proves the source is correct; this workflow proves the
 # PUBLIC surface: the publication package that publish:dry-run writes (captions, cue sheet, media QA,
 # provenance, YouTube publish manifest, dry-run receipt), the lossless review stills including the
-# characterless design test, and that a repeat render reproduces every frame. It also reviews new
+# characterless design test, and that a repeat render reproduces every frame (WalletWallaby drawn by the
+# pinned Blender in the proof class). It also reviews new
 # dependencies before they reach the rendering and publishing supply chain.
 #
 # Publication safety invariant:
@@ -64,13 +65,25 @@ jobs:
       - name: Public-output gate
         run: npm run public:check -- --summary="$GITHUB_STEP_SUMMARY"
 
+  # WalletWallaby is drawn by the pinned Blender (docs/BLENDER.md). On a hosted runner it renders in the
+  # proof class (CPU software GL, Mesa llvmpipe), so A and B run on this one machine, in sequence: Chrome's
+  # software rasterizer and llvmpipe both choose code paths by the host CPU, so byte identity is a promise
+  # about one machine, never across runners. A builds the character from code; B renders every Blender
+  # frame again from that build (two builds of the same source are proven identical by blender-proof.yml).
+  # The full lesson is never rendered here: the publication render runs on the production render host
+  # (npm run publication:proof, docs/BLENDER.md).
   render-determinism:
     name: Render determinism
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
+    defaults:
+      run:
+        # Explicit bash runs with -o pipefail.
+        shell: bash
     env:
       # Where render:stills writes the review stills of the registered video (config/videos.json).
       STILLS: dist/migration-readiness/stills
+      LIBGL_ALWAYS_SOFTWARE: '1'
 
     steps:
       - name: Checkout
@@ -90,17 +103,33 @@ jobs:
       - name: Chrome Headless Shell (the version @remotion/renderer pins)
         run: npx remotion browser ensure
 
+      - name: Runtime libraries for headless Blender with software GL
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libsm6 libice6 libgl1-mesa-dri libegl1 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxkbcommon0
+
+      - name: Install the pinned Blender build (verified against config/blender.json)
+        run: |
+          version=$(node -p "require('./config/blender.json').blender.version")
+          series=$(echo "$version" | cut -d. -f1,2)
+          file="blender-${version}-linux-x64.tar.xz"
+          want=$(node -p "require('./config/blender.json').blender.artifacts['${file}']")
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$file" "https://mirrors.ocf.berkeley.edu/blender/release/Blender${series}/${file}"
+          echo "${want}  $RUNNER_TEMP/$file" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/blender"
+          tar -xJf "$RUNNER_TEMP/$file" -C "$RUNNER_TEMP/blender" --strip-components=1
+          echo "WALLETWALL_BLENDER=$RUNNER_TEMP/blender/blender" >> "$GITHUB_ENV"
+
       # Lossless PNG stills are the determinism evidence; MP4 bytes are not run-to-run stable, so an MP4
       # hash is never used here. Each render runs in a fresh Node process, and only the generated stills
       # directory is moved between renders.
       - name: Default engine, render A (standard review stills, with and without WalletWallaby)
         run: |
-          npm run render:stills
+          npm run render:stills -- --fresh-blender
           mkdir -p "$RUNNER_TEMP/stills"
           mv "$STILLS" "$RUNNER_TEMP/stills/typescript-a"
 
-      - name: Default engine, render B
+      - name: Default engine, render B (every Blender frame rendered again)
         run: |
+          rm -rf dist/blender/out/renders
           npm run render:stills
           mv "$STILLS" "$RUNNER_TEMP/stills/typescript-b"
 
@@ -119,6 +148,7 @@ jobs:
 
       - name: Rust/WASM engine, render B
         run: |
+          rm -rf dist/blender/out/renders
           frames="$(node scripts/engine-path-frames.ts)"
           npm run render:stills -- --motion-engine=rust-wasm --frames="$frames"
           mv "$STILLS" "$RUNNER_TEMP/stills/rust-wasm-b"
@@ -132,8 +162,9 @@ jobs:
       - name: Publish dry run
         run: npm run publish:dry-run
 
-      # The gate checks both engines' stills (identity, motion engine, hashes, characterless twins, no
-      # metadata or local paths) and, only on PASS, copies exactly the files it verified into the bundle.
+      # The gate checks both engines' stills (identity, motion engine, the Blender character's identity, plan
+      # and approved render-environment class, hashes, characterless twins, no metadata or local paths) and,
+      # only on PASS, copies exactly the files it verified into the bundle.
       - name: Public-output gate over the review stills (writes the review bundle)
         run: npm run public:check -- --stills="$RUNNER_TEMP/stills/typescript-b" --stills="$RUNNER_TEMP/stills/rust-wasm-b" --bundle="$RUNNER_TEMP/public-output-review" --summary="$GITHUB_STEP_SUMMARY"
 

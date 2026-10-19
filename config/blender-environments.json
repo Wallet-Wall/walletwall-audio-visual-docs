@@ -1,0 +1,22 @@
+{
+  "schema": "walletwall.blender-environments/v1",
+  "note": "Approved render-environment classes for the Blender lane, and the pinned tolerances (docs/BLENDER.md, Determinism). Kept apart from config/blender.json so that approving a class never changes the render config hash a class is defined by. Same class: lossless frames byte-identical. Different approved classes: bounded equivalence (character crops and full-scene frames separately). A crop sequence against its full-frame reference: bounded equivalence of the final 1920x1080 composites. Each limit was set on 2026-10-18 as the worst value then measured times a margin, and is unchanged; `measured` records the worst value on the current baseline (2026-10-19: the material pass, rig v6), so the remaining headroom is visible.",
+  "classes": [
+    {
+      "name": "production-rtx5080",
+      "purpose": "publication",
+      "match": { "os": "windows", "engine": "BLENDER_EEVEE", "gpu": { "vendor": "NVIDIA Corporation", "renderer": "NVIDIA GeForce RTX 5080/PCIe/SSE2", "version": "4.6.0 NVIDIA 616.56" } }
+    },
+    {
+      "name": "proof-linux-software-gl",
+      "purpose": "proof",
+      "match": { "os": "linux", "engine": "BLENDER_EEVEE", "gpu": { "rendererPrefix": "llvmpipe" } }
+    }
+  ],
+  "sameClass": "byte-identical",
+  "crossClassTolerance": {
+    "character": { "noiseLevel": 2, "maxFractionOverNoise": 0.0001, "maxMeanAbsDelta": 0.002, "maxCoverageDeltaPx": 0, "measured": { "fractionOverNoise": 9.95e-6, "meanAbsDelta": 4.86e-4, "coverageDeltaPx": 0 } },
+    "scene": { "noiseLevel": 2, "maxFractionOverNoise": 0.005, "maxMeanAbsDelta": 0.08, "maxCoverageDeltaPx": 0, "measured": { "fractionOverNoise": 4.11e-3, "meanAbsDelta": 4.92e-2, "coverageDeltaPx": 0 } }
+  },
+  "cropEquivalenceTolerance": { "noiseLevel": 2, "maxFractionOverNoise": 0.0001, "maxMeanAbsDelta": 0.001, "maxCoverageDeltaPx": 0, "measured": { "fractionOverNoise": 2.46e-5, "meanAbsDelta": 2.04e-4, "coverageDeltaPx": 0 } }
+}

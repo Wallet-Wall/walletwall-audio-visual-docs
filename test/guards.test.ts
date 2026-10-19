@@ -228,6 +228,10 @@ describe('repository rules', () => {
         assert.ok(!/\n\s+if:/.test(step), `${file}: an upload step must only run after every earlier step passed`);
       }
     }
-    assert.ok(uploads >= 2, `the scan found ${uploads} upload steps`);
+    // The review bundle of Public Output is uploaded by CI; the publication proof package is made on the production
+    // render host (npm run publication:proof) and never uploaded by a workflow.
+    assert.ok(uploads >= 1, `the scan found ${uploads} upload steps`);
+    assert.ok(workflows().some(({ text }) => text.includes('--bundle="$RUNNER_TEMP/public-output-review"')), 'the public-output review bundle is gated and uploaded');
+    assert.ok(!workflows().some(({ text }) => /npm run render(?![:\w-])/.test(text)), 'no workflow renders the whole video: that runs on the production render host');
   });
 });

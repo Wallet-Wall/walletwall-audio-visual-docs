@@ -13,7 +13,7 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { blenderRigDocument } from '../../src/character/walletwallaby/blender/rig-export.ts';
-import { compileRig } from '../../src/character/walletwallaby/rive/rig-compile.ts';
+import { compileRig } from '../../src/character/walletwallaby/rig/rig-compile.ts';
 import { loadVisualConfig } from '../../src/blender/visual.ts';
 import { outFile } from '../../src/blender/toolchain.ts';
 import { TOKENS } from '../../src/brand/tokens.ts';

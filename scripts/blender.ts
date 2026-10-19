@@ -12,12 +12,14 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { WallabyState } from '../src/character/walletwallaby/motion.ts';
 import { AIRBORNE, LAND_HARD, POSES, PUSH } from '../src/character/walletwallaby/rig.ts';
-import { compileRig } from '../src/character/walletwallaby/rive/rig-compile.ts';
+import { compileRig } from '../src/character/walletwallaby/rig/rig-compile.ts';
 import { BLENDER_MOTION_SCHEMA, bridgeFrame, PLANE_ORIGIN, UNITS_PER_PX, validateBridge } from '../src/character/walletwallaby/blender/bridge.ts';
 import { blenderRigDocument } from '../src/character/walletwallaby/blender/rig-export.ts';
 import type { Terrain } from '../src/layout/terrain.ts';
 import { staticState } from '../src/remotion/review/review-states.ts';
 import { readPng } from './review/png.ts';
+import { characterCrop } from '../src/character/walletwallaby/blender/crop.ts';
+import { RIG_ENVELOPE } from '../src/character/walletwallaby/rig/rig-source.ts';
 import { prettyJson } from '../src/core/canonical-json.ts';
 import { contentAddress, sha256Hex } from '../src/core/hash.ts';
 import { blenderIdentity, CHARACTER } from '../src/blender/identity.ts';
@@ -58,7 +60,19 @@ async function render(): Promise<void> {
   const lesson = await lessonMotion(videoId, engine);
   const bridge = lessonBridge(lesson, first, last);
   const terrain = lessonTerrain(lesson, bridge);
-  const shots = bridge.frames.filter((f) => f.visible && (f.frame - first) % every === 0).map((f) => ({ name: `f${String(f.frame).padStart(5, '0')}`, frame: f.frame, camera: { kind: 'teaching' } }));
+  // Teaching frames: WalletWallaby alone, in his crop (decided here, before Blender runs); --full-frame renders the
+  // whole 1920x1080 canvas instead (the reference the crops are proven against).
+  const fullFrame = args.includes('--full-frame');
+  const crop = cfg.render as unknown as { crop: { padPx: number }; resolution: [number, number] };
+  const frameSize = { width: crop.resolution[0], height: crop.resolution[1] };
+  const shots = bridge.frames
+    .filter((f) => f.visible && (f.frame - first) % every === 0)
+    .flatMap((f) => {
+      const name = `f${String(f.frame).padStart(5, '0')}`;
+      if (fullFrame) return [{ name, frame: f.frame, camera: { kind: 'teaching' } }];
+      const c = characterCrop(f, RIG_ENVELOPE, crop.crop.padPx, frameSize);
+      return c ? [{ name, frame: f.frame, camera: { kind: 'crop', x: c.x, y: c.y, width: c.width, height: c.height } }] : [];
+    });
   const outDir = `renders/${name}`;
   mkdirSync(path.join(BLENDER_OUT, ...outDir.split('/')), { recursive: true });
   writeFileSync(outFile(`${outDir}/bridge.json`), prettyJson(bridge));
@@ -68,10 +82,19 @@ async function render(): Promise<void> {
   const rig = blenderRigDocument(compileRig().model);
   const job = writeJob(`render.${name}`, { schema: 'walletwall.blender-job/v1', kind: 'render', config: cfg, rig, blend: CHARACTER.blend, bridge, terrain, shots, outputs: { dir: outDir, manifest: `${outDir}/render.json` } });
   const { ms } = runBlender(blender, cfg, 'render.py', job);
-  const manifest = JSON.parse(readFileSync(outFile(`${outDir}/render.json`), 'utf8')) as { shots: { name: string; sha256: string; ms: number; contactErrorPx: Record<string, number> }[] };
+  const manifest = JSON.parse(readFileSync(outFile(`${outDir}/render.json`), 'utf8')) as { shots: { name: string; frame: number; sha256: string; ms: number; crop?: { x: number; y: number; width: number; height: number }; contactErrorPx: Record<string, number> }[] };
   for (const s of manifest.shots) {
     const got = sha256Hex(readFileSync(outFile(`${outDir}/${s.name}.png`)));
     if (got !== s.sha256) throw new Error(`${outDir}/${s.name}.png does not match the manifest Blender wrote`);
+  }
+  if (!fullFrame) {
+    // The crop metadata Remotion composites from: bounds decided before the render, and each PNG's hash.
+    const crops = manifest.shots.map((s) => {
+      const c = characterCrop(bridge.frames[s.frame - first]!, RIG_ENVELOPE, crop.crop.padPx, frameSize)!;
+      if (!s.crop || s.crop.x !== c.x || s.crop.y !== c.y || s.crop.width !== c.width || s.crop.height !== c.height) throw new Error(`frame ${s.frame}: Blender rendered a crop other than the one decided for it`);
+      return { frame: s.frame, x: c.x, y: c.y, width: c.width, height: c.height, scale: c.scale, pngSha256: s.sha256 };
+    });
+    writeFileSync(outFile(`${outDir}/crops.json`), prettyJson({ schema: 'walletwall.blender-crops/v1', padPx: crop.crop.padPx, frameSize, crops }));
   }
   const worst = Math.max(0, ...manifest.shots.flatMap((s) => Object.values(s.contactErrorPx)));
   console.log(`[blender] ${manifest.shots.length} frames in ${(ms / 1000).toFixed(1)} s (process), bridge ${contentAddress(bridge).slice(0, 12)}, worst IK contact error ${worst.toFixed(4)} px -> dist/blender/out/${outDir}`);

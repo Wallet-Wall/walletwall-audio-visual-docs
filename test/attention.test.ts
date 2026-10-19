@@ -349,10 +349,10 @@ describe('what attention direction may never change', () => {
     assert.ok(world > 0 && fixed > world, 'one content world, then the fixed layer');
     assert.equal((docs.match(/framingCss\(/g) ?? []).length, 1, 'the framing is applied exactly once');
     assert.match(docs, /transform: framingCss\(framing\), transformOrigin: '960px 540px'/);
-    for (const tag of ['<WallabyBlender', '<WallabyRive']) {
-      const at = docs.indexOf(tag);
-      assert.ok(at > world && at < fixed, `${tag} is drawn inside the content world`);
-    }
+    // The character (drawn by Blender since the cutover; Rive is retired) is drawn inside the content world, once.
+    const at = docs.indexOf('<WallabyBlender');
+    assert.ok(at > world && at < fixed && docs.indexOf('<WallabyBlender', at + 1) < 0, '<WallabyBlender is drawn once, inside the content world');
+    assert.ok(!docs.includes('<WallabyRive'), 'no Rive path remains');
     for (const tag of ['reveal.dir', 'cue.rows', 'overlays.guides', 'END_SCREEN_ZONES']) assert.ok(docs.lastIndexOf(tag) > fixed, `${tag} is in the fixed layer`);
     // The provenance chip shares the eyebrow row: it rides the world (under the character, as before) and is title-safe-checked.
     const chip = docs.lastIndexOf('PROVENANCE_CHIP');
@@ -362,11 +362,11 @@ describe('what attention direction may never change', () => {
     assert.ok(!/framingCss|cameraAt|scale\(/.test(scenes), 'no transform from direction inside a scene');
   });
 
-  test('the Rive and Blender character paths and the characterless design test consume the same framing', () => {
+  test('the Blender character path and the characterless design test consume the same framing', () => {
     const docs = src('src/remotion/DocsVideo.tsx');
-    // One `framing` value, computed from the plan, before either character component; the characterless flag only omits the character.
+    // One `framing` value, computed from the plan, before the character component; the characterless flag only omits the character.
     assert.match(docs, /const framing = cameraAt\(model\.attention, ms\)/);
-    assert.match(docs, /reveal \|\| props\.overlays\.characterless \? null : props\.characterRenderer \? \(/);
+    assert.match(docs, /reveal \|\| props\.overlays\.characterless \|\| !props\.characterRenderer \? null : \(/);
     // A staged depth reveal (Blender's full frame) belongs to the transition, which is identity by construction.
     const push = clips.find((c) => c.kind === 'PUSH')!;
     assert.ok(isIdentity(cameraAt(plan, push.startMs)) && isIdentity(cameraAt(plan, push.endMs)));

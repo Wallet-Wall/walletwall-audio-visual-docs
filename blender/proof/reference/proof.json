@@ -1,0 +1,135 @@
+{
+  "schema": "walletwall.blender-proof/v1",
+  "run": "reference",
+  "environment": {
+    "blenderBuildHash": "d13f752e3b9c",
+    "blenderVersion": "5.2.2 LTS",
+    "engine": "BLENDER_EEVEE",
+    "gpu": {
+      "backend": "OPENGL",
+      "deviceType": "NVIDIA",
+      "renderer": "NVIDIA GeForce RTX 5080/PCIe/SSE2",
+      "vendor": "NVIDIA Corporation",
+      "version": "4.6.0 NVIDIA 616.56"
+    },
+    "os": "windows"
+  },
+  "environmentClass": "d9777826203659db",
+  "approvedClass": "production-rtx5080",
+  "canonicalModelSha256": "f8124e59dab3bcf578f62db4cbe20fec12be7ee78e3a13701df45d6bc0118a1a",
+  "realizationSha256": "ac81bb8e27868cb5feb0dee2c9cf7e66b6a4b63d5df77dd242a33bab5273f18c",
+  "blenderConfigSha256": "f89c3a8b238d23ae214a5abab381486cc2e629463bbdfdefea7216e9b310beeb",
+  "blenderSceneSourceSha256": "c7196071b6399ec93f6a48a03d91214d86b0971a65ba493cd028d93274e4985c",
+  "motionPlanSha256": "9cbcc317c5cee5908b785699c1bed8f34ab63f133a5589940b1744975df3e50a",
+  "roles": [
+    {
+      "role": "idle",
+      "frame": 39,
+      "file": "idle.png",
+      "sha256": "3187427f3cce0f934676b67ea9412f5133310534a224970350598acc50b23bc8",
+      "crop": {
+        "height": 353,
+        "width": 356,
+        "x": 980,
+        "y": 120
+      }
+    },
+    {
+      "role": "crouch",
+      "frame": 196,
+      "file": "crouch.png",
+      "sha256": "5ed6f9fc38377c5706882f122f29397e0f6e0d260e4f57934509b7cc8db040d0",
+      "crop": {
+        "height": 353,
+        "width": 356,
+        "x": 980,
+        "y": 120
+      }
+    },
+    {
+      "role": "airborne",
+      "frame": 20,
+      "file": "airborne.png",
+      "sha256": "166f479f2219932541ab477b05bff7870c267204e6d6f3fcd22d08ac7cc8ef93",
+      "crop": {
+        "height": 354,
+        "width": 357,
+        "x": 1540,
+        "y": 249
+      }
+    },
+    {
+      "role": "landing",
+      "frame": 30,
+      "file": "landing.png",
+      "sha256": "1f2a919199561cb7ee0824b2c33ea0ab85b44fb193c9c23074ab7202718fab33",
+      "crop": {
+        "height": 354,
+        "width": 356,
+        "x": 980,
+        "y": 120
+      }
+    },
+    {
+      "role": "perch",
+      "frame": 2721,
+      "file": "perch.png",
+      "sha256": "29c50fde342628ced3b66dbf76e523dcc045ade1179d391659cec70cb3b04133",
+      "crop": {
+        "height": 353,
+        "width": 356,
+        "x": 624,
+        "y": 120
+      }
+    },
+    {
+      "role": "inspect",
+      "frame": 64,
+      "file": "inspect.png",
+      "sha256": "e49fa2966aefc28370d3ba0767066b6beb9fc1a2fe98e01a266dd9df9f4c6b53",
+      "crop": {
+        "height": 353,
+        "width": 356,
+        "x": 980,
+        "y": 120
+      }
+    },
+    {
+      "role": "tail-brace",
+      "frame": 2341,
+      "file": "tail-brace.png",
+      "sha256": "6bb1f38bb14b272c6509778cbbf33995a99cfd3e3bccc503695df1da8afcaf79",
+      "crop": {
+        "height": 354,
+        "width": 356,
+        "x": 680,
+        "y": 120
+      }
+    },
+    {
+      "role": "transition-entry",
+      "frame": 1719,
+      "file": "transition-entry.png",
+      "sha256": "985f7d9266abe9b87fe42321638e8f64797aaa477d00af91789b1a86965ff1d9",
+      "crop": null
+    },
+    {
+      "role": "transition-peak",
+      "frame": 1760,
+      "file": "transition-peak.png",
+      "sha256": "9041fa22504cedd387115477f486d68668a6b47fa9f4b3b9ff024acc9e27ee99",
+      "crop": null
+    },
+    {
+      "role": "transition-exit",
+      "frame": 1814,
+      "file": "transition-exit.png",
+      "sha256": "c0226a68096b9000a0f772983c04c8c02e74c97b38ab667d18e5c834e92e9f1d",
+      "crop": null
+    }
+  ],
+  "layers": [
+    "8b2bc141a2e47f419f5091712589d1d350207b834be868e9ed3b8f40c2caff5e",
+    "05b073454bef1bbd5f2ac5982782ed25184060903275b3ae1feadb81f4a7b2ce"
+  ]
+}
