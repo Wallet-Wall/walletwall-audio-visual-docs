@@ -11,12 +11,13 @@
 // the version and the model hashes are recorded; the executable and model
 // locations never leave this process. Node-only.
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync, type Dirent } from 'node:fs';
 import path from 'node:path';
+import { readContainedFile } from '../../core/contained-read.ts';
 import { contentAddress, sha256Hex } from '../../core/hash.ts';
 import { NarrationProviderError, validateSettings, type NarrationProvider, type NarrationRequest, type NarrationSettings, type SettingsSchema, type SynthesisContext, type SynthesisResult } from '../contract.ts';
 import { parseWav } from '../wav.ts';
-import { minimalEnv, probeVersion, resolveExecutable, runChild } from './child.ts';
+import { minimalEnv, probeVersion, readOutput, resolveExecutable, runChild } from './child.ts';
 
 /** The baked speakers of magpie_tts_multilingual_357m v2607 (its tokenizer's speakers.json). */
 export const MAGPIE_VOICES = ['Aria', 'Jason', 'John', 'Leo', 'Sofia'] as const;
@@ -70,7 +71,13 @@ export function pinnedPath(modelDir: string, p: PinnedFile): string {
 
 /** Hash every file of a directory (one level) into one content address; the file list is part of it. */
 export function directoryContent(dir: string): { sha256: string; files: { file: string; sha256: string }[] } {
-  const files = readdirSync(dir, { withFileTypes: true })
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    throw new NarrationProviderError('the Magpie tokenizer directory is not in the model cache');
+  }
+  const files = entries
     .filter((e) => e.isFile())
     .map((e) => ({ file: e.name, sha256: sha256Hex(readFileSync(path.join(dir, e.name))) }))
     .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
@@ -93,16 +100,14 @@ export function resolveMagpieModels(binding: MagpieBinding, env: SynthesisContex
   const gguf = pinnedPath(dir, binding.model);
   const codec = pinnedPath(dir, binding.codec);
   const tokenizer = path.join(path.dirname(gguf), binding.model.tokenizerDir);
-  for (const [what, file] of [
-    ['Magpie GGUF', gguf],
-    ['NanoCodec GGUF', codec],
-  ] as const) {
-    if (!existsSync(file)) throw new NarrationProviderError(`${what} is not in the model cache: run "nemo-speech pull magpie" (the adapter never downloads)`);
-  }
-  if (!existsSync(tokenizer)) throw new NarrationProviderError('the Magpie tokenizer directory is not in the model cache');
-  const ggufSha = sha256Hex(readFileSync(gguf));
+  // Each model file is read through one handle: there is no exists-then-read window, and a link is refused.
+  const ggufBytes = readContainedFile(gguf, () => true);
+  if (!ggufBytes) throw new NarrationProviderError('Magpie GGUF is not in the model cache: run "nemo-speech pull magpie" (the adapter never downloads)');
+  const codecBytes = readContainedFile(codec, () => true);
+  if (!codecBytes) throw new NarrationProviderError('NanoCodec GGUF is not in the model cache: run "nemo-speech pull magpie" (the adapter never downloads)');
+  const ggufSha = sha256Hex(ggufBytes);
   if (ggufSha !== binding.model.sha256) throw new NarrationProviderError(`Magpie GGUF content drifted from the pin (${ggufSha.slice(0, 12)} != ${binding.model.sha256.slice(0, 12)})`);
-  const codecSha = sha256Hex(readFileSync(codec));
+  const codecSha = sha256Hex(codecBytes);
   if (codecSha !== binding.codec.sha256) throw new NarrationProviderError(`NanoCodec GGUF content drifted from the pin (${codecSha.slice(0, 12)} != ${binding.codec.sha256.slice(0, 12)})`);
   const tok = directoryContent(tokenizer);
   if (tok.sha256 !== binding.model.tokenizerSha256) throw new NarrationProviderError(`Magpie tokenizer content drifted from the pin (${tok.sha256.slice(0, 12)} != ${binding.model.tokenizerSha256.slice(0, 12)})`);
@@ -167,8 +172,8 @@ export class MagpieProvider implements NarrationProvider {
     const env = minimalEnv({ [this.binding.modelDirEnv]: nemoModelDir(this.binding.modelDirEnv, ctx.env) });
     const r = await (ctx.run ?? runChild)(runtime.exe, magpieArgs(s, { input, output, ...models }), { cwd: ctx.workDir, env, timeoutMs: 30 * 60_000, sampleVram: s.device === 'cuda' });
     if (r.status !== 0) throw new NarrationProviderError(`nemo-speech synthesize exited with ${r.status}: ${r.stderr.trim().slice(-500)}`);
-    if (!existsSync(output)) throw new NarrationProviderError('nemo-speech exited 0 but wrote no output');
-    const wav = new Uint8Array(readFileSync(output));
+    const wav = readOutput(ctx.workDir, `${request.passageId}.wav`);
+    if (!wav) throw new NarrationProviderError('nemo-speech exited 0 but wrote no output');
     parseWav(wav);
     return {
       wav,

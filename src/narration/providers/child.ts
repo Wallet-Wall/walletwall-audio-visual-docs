@@ -5,9 +5,28 @@
 // resolved here and never recorded anywhere. Node-only.
 
 import { execFile, spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import path from 'node:path';
+import { readContainedFile } from '../../core/contained-read.ts';
 import type { ChildResult, ChildRunner } from '../contract.ts';
+
+/**
+ * A file a tool wrote inside the work directory, read through one open handle
+ * (no exists-then-read race) and refused if it resolves outside that directory.
+ */
+export function readOutput(workDir: string, file: string): Uint8Array | null {
+  let root: string;
+  try {
+    root = realpathSync(workDir);
+  } catch {
+    return null;
+  }
+  const bytes = readContainedFile(path.join(workDir, path.basename(file)), (real) => {
+    const rel = path.relative(root, real);
+    return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+  });
+  return bytes ? new Uint8Array(bytes) : null;
+}
 
 const OUTPUT_CAP = 64 * 1024;
 

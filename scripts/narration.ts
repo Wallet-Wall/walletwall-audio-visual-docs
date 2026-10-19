@@ -12,11 +12,12 @@
 //   node scripts/narration.ts transcribe [--provider=<id>] [--variant=<name>] [--device=cuda|cpu]
 //   node scripts/narration.ts review [--lineup=provider:variant,...] [--target-lufs=-20]
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { estimateSpokenMs } from '../src/audio/voice-provider.ts';
 import { DIST_ROOT, loadPipelineConfig, VIDEO_ROOT } from '../src/config/load.ts';
 import { prettyJson } from '../src/core/canonical-json.ts';
+import { readContainedFile } from '../src/core/contained-read.ts';
 import { sha256Hex } from '../src/core/hash.ts';
 import { buildNarrationArtifact, validateNarrationArtifact, type NarrationArtifact } from '../src/narration/artifact.ts';
 import { isNarrationProviderId, NarrationContractError, PLAIN_ID, type NarrationProvider, type NarrationProviderId, type NarrationRequest, type SynthesisResult } from '../src/narration/contract.ts';
@@ -54,6 +55,30 @@ function measure(wav: Uint8Array): AudioMetrics {
   return analyzeAudio(decodePcm16Mono(wav, info), info.sampleRate);
 }
 
+/** A bakeoff output by its repository-relative path, read through one handle and refused if it resolves outside dist/narration-bakeoff/. */
+function readBakeoffFile(rel: string): Uint8Array | null {
+  let root: string;
+  try {
+    root = realpathSync(BAKEOFF_ROOT);
+  } catch {
+    return null;
+  }
+  const bytes = readContainedFile(abs(rel), (real) => {
+    const inside = path.relative(root, real);
+    return inside !== '' && !inside.startsWith('..') && !path.isAbsolute(inside);
+  });
+  return bytes ? new Uint8Array(bytes) : null;
+}
+
+/** JSON parsed from a file, or null when it is absent or unreadable (no exists-then-read window). */
+function readJsonOrNull<T>(file: string): T | null {
+  try {
+    return JSON.parse(readFileSync(file, 'utf8')) as T;
+  } catch {
+    return null;
+  }
+}
+
 function passagesWanted(corpus: NarrationCorpus): CorpusPassage[] {
   const wanted = opt('passages')?.split(',').map((s) => s.trim()).filter(Boolean);
   if (!wanted) return corpus.passages;
@@ -66,8 +91,13 @@ function passagesWanted(corpus: NarrationCorpus): CorpusPassage[] {
 
 function readCandidates(config: NarrationProvidersConfig, filter: { provider?: string; variant?: string } = {}): Candidate[] {
   const out: Candidate[] = [];
-  if (!existsSync(BAKEOFF_ROOT)) return out;
-  for (const provider of readdirSync(BAKEOFF_ROOT)) {
+  let providers: string[];
+  try {
+    providers = readdirSync(BAKEOFF_ROOT);
+  } catch {
+    return out;
+  }
+  for (const provider of providers) {
     if (!isNarrationProviderId(provider) || (filter.provider && provider !== filter.provider)) continue;
     for (const variant of readdirSync(path.join(BAKEOFF_ROOT, provider))) {
       if (!PLAIN_ID.test(variant) || (filter.variant && variant !== filter.variant)) continue;
@@ -78,9 +108,9 @@ function readCandidates(config: NarrationProvidersConfig, filter: { provider?: s
         const errors = validateNarrationArtifact(artifact, process.env);
         if (errors.length) throw new NarrationContractError(`${provider}/${variant}/${file}: ${errors.join('; ')}`);
         if (artifact.provider !== provider || artifact.variant !== variant) throw new NarrationContractError(`${provider}/${variant}/${file}: the record names another provider or variant`);
-        const wav = abs(artifact.audio.path);
-        if (!existsSync(wav)) throw new NarrationContractError(`${artifact.audio.path} is missing`);
-        if (sha256Hex(readFileSync(wav)) !== artifact.audio.sha256) throw new NarrationContractError(`${artifact.audio.path} no longer matches its record (stale narration)`);
+        const wav = readBakeoffFile(artifact.audio.path);
+        if (!wav) throw new NarrationContractError(`${artifact.audio.path} is missing`);
+        if (sha256Hex(wav) !== artifact.audio.sha256) throw new NarrationContractError(`${artifact.audio.path} no longer matches its record (stale narration)`);
         out.push({ provider, variant, passageId: artifact.text.passageId, dir, artifact });
       }
     }
@@ -178,8 +208,9 @@ async function nemoSpeechFor(config: NarrationProvidersConfig): Promise<{ exe: s
 function asrModel(config: NarrationProvidersConfig): string {
   const asr = config.diagnostics.asr;
   const gguf = pinnedPath(nemoModelDir(asr.modelDirEnv, process.env), asr.model);
-  if (!existsSync(gguf)) throw new NarrationContractError(`the ASR model is not in the model cache: run "nemo-speech pull parakeet-tdt"`);
-  const sha = sha256Hex(readFileSync(gguf));
+  const bytes = readContainedFile(gguf, () => true);
+  if (!bytes) throw new NarrationContractError(`the ASR model is not in the model cache: run "nemo-speech pull parakeet-tdt"`);
+  const sha = sha256Hex(bytes);
   if (sha !== asr.model.sha256) throw new NarrationContractError(`ASR model content drifted from the pin (${sha.slice(0, 12)})`);
   return gguf;
 }
@@ -202,8 +233,8 @@ async function transcribe(): Promise<void> {
     if (sha256Hex(request.spokenText) !== c.artifact.text.spokenSha256) throw new NarrationContractError(`${c.provider}/${c.variant}/${c.passageId}: the corpus text changed since this audio was made (stale narration)`);
     const out = path.join(c.dir, `${c.passageId}.asr.json`);
     const r = await runChild(runtime.exe, ['transcribe', abs(c.artifact.audio.path), '--model', gguf, '--device', device, '--format', 'json', '--output', out, '--force', '--quiet'], { cwd: c.dir, env: minimalEnv({ [asr.modelDirEnv]: nemoModelDir(asr.modelDirEnv, process.env) }), timeoutMs: 30 * 60_000, sampleVram: false });
-    if (r.status !== 0 || !existsSync(out)) throw new NarrationContractError(`transcribe ${c.provider}/${c.variant}/${c.passageId} failed: ${r.stderr.trim().slice(-400)}`);
-    const parsed = JSON.parse(readFileSync(out, 'utf8')) as { text?: string; words?: { word: string }[] };
+    const parsed = r.status === 0 ? readJsonOrNull<{ text?: string; words?: { word: string }[] }>(out) : null;
+    if (!parsed) throw new NarrationContractError(`transcribe ${c.provider}/${c.variant}/${c.passageId} failed: ${r.stderr.trim().slice(-400)}`);
     const text = typeof parsed.text === 'string' ? parsed.text : (parsed.words ?? []).map((w) => w.word).join(' ');
     const diff: TranscriptDiff = compareTranscript(request.spokenText, text);
     writeFileSync(path.join(c.dir, `${c.passageId}.transcript.json`), prettyJson({
@@ -373,10 +404,7 @@ async function review(): Promise<void> {
     corpus: { id: corpus.id, version: corpus.version, sha256: corpusSha256(corpus) },
     lineup: [...new Set(chosen.map((c) => `${c.provider}:${c.variant}`))].sort(),
     candidates: chosen.map((c) => {
-      const read = <T>(suffix: string): T | null => {
-        const f = path.join(c.dir, `${c.passageId}.${suffix}.json`);
-        return existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as T) : null;
-      };
+      const read = <T>(suffix: string): T | null => readJsonOrNull<T>(path.join(c.dir, `${c.passageId}.${suffix}.json`));
       const metrics = read<{ identity: string; metrics: AudioMetrics }>('metrics');
       const transcript = read<{ identity: string; text: string; diff: TranscriptDiff; asr: unknown }>('transcript');
       const determinism = read<{ identity: string; repeats: number; identical: boolean; sha256: string[] }>('determinism');
@@ -410,7 +438,8 @@ async function review(): Promise<void> {
     ordered.forEach((c, i) => {
       const L = String.fromCharCode(65 + i);
       letters.push(L);
-      const wav = new Uint8Array(readFileSync(abs(c.artifact.audio.path)));
+      const wav = readBakeoffFile(c.artifact.audio.path);
+      if (!wav) throw new NarrationContractError(`${c.artifact.audio.path} is missing`);
       writeFileSync(path.join(dir, `${L}.raw.wav`), wav);
       const info = parseWav(wav);
       const samples = decodePcm16Mono(wav, info);
@@ -448,7 +477,11 @@ async function doctor(): Promise<void> {
   } catch (err) {
     log(`magpie: ${(err as Error).message}`);
     const tok = path.join(path.dirname(pinnedPath(nemoModelDir(mb.modelDirEnv, process.env), mb.model)), mb.model.tokenizerDir);
-    if (existsSync(tok)) log(`magpie: tokenizer directory content is ${directoryContent(tok).sha256} (pin this if the model was re-pulled deliberately)`);
+    try {
+      log(`magpie: tokenizer directory content is ${directoryContent(tok).sha256} (pin this if the model was re-pulled deliberately)`);
+    } catch {
+      // No tokenizer directory to report.
+    }
   }
   try {
     asrModel(config);

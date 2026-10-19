@@ -105,11 +105,13 @@ describe('repository rules', () => {
     // ElevenLabs and nothing else; the next test proves the render and publish paths cannot reach it.
     const hosts = /api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis|replicate\.com|stability\.ai|runwayml|api\.elevenlabs\.io|pika\.art|lumalabs|heygen|synthesia/i;
     const referenceAdapter = path.join(VIDEO_ROOT, 'src', 'narration', 'providers', 'elevenlabs.ts');
+    const referenceHost = 'api.elevenlabs.io';
     for (const file of sources.filter((f) => !f.includes(`${path.sep}test${path.sep}`))) {
       const text = readFileSync(file, 'utf8');
       if (file === referenceAdapter) {
-        assert.ok(/api\.elevenlabs\.io/.test(text), 'the reference adapter pins its host');
-        assert.ok(!hosts.test(text.replace(/api\.elevenlabs\.io/g, '')), 'and names no other endpoint');
+        const pieces = text.split(referenceHost);
+        assert.ok(pieces.length > 1, 'the reference adapter pins its host');
+        assert.ok(!hosts.test(pieces.join('')), 'and names no other endpoint');
         continue;
       }
       assert.ok(!hosts.test(text), path.relative(VIDEO_ROOT, file));

@@ -9,13 +9,13 @@
 // and no prompt ever comes from content, and no reference audio is ever passed
 // (audioPrompt must be null): the built-in voice is the only voice. Node-only.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { VIDEO_ROOT } from '../../config/load.ts';
 import { prettyJson } from '../../core/canonical-json.ts';
 import { NarrationProviderError, validateSettings, type NarrationProvider, type NarrationRequest, type NarrationSettings, type SettingsSchema, type SynthesisContext, type SynthesisResult } from '../contract.ts';
 import { parseWav } from '../wav.ts';
-import { minimalEnv, runChild } from './child.ts';
+import { minimalEnv, readOutput, runChild } from './child.ts';
 
 export const CHATTERBOX_ENTRY = 'tools/chatterbox/synthesize.py';
 
@@ -125,10 +125,10 @@ export class ChatterboxProvider implements NarrationProvider {
     const env = minimalEnv({ HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', HF_HUB_DISABLE_TELEMETRY: '1', HF_HUB_DISABLE_PROGRESS_BARS: '1', PYTHONNOUSERSITE: '1', PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', ...(ctx.env.HF_HOME ? { HF_HOME: ctx.env.HF_HOME } : {}) });
     const r = await (ctx.run ?? runChild)(python, ['-I', '-B', entry, '--job', jobFile], { cwd: ctx.workDir, env, timeoutMs: 60 * 60_000, sampleVram: s.device === 'cuda' });
     if (r.status !== 0) throw new NarrationProviderError(`chatterbox synthesize exited with ${r.status}: ${r.stderr.trim().slice(-800)}`);
-    const output = path.join(ctx.workDir, `${request.passageId}.wav`);
-    const resultFile = path.join(ctx.workDir, `${request.passageId}.result.json`);
-    if (!existsSync(output) || !existsSync(resultFile)) throw new NarrationProviderError('chatterbox exited 0 but wrote no output');
-    const result = JSON.parse(readFileSync(resultFile, 'utf8')) as ChatterboxResult;
+    const wav = readOutput(ctx.workDir, `${request.passageId}.wav`);
+    const resultBytes = readOutput(ctx.workDir, `${request.passageId}.result.json`);
+    if (!wav || !resultBytes) throw new NarrationProviderError('chatterbox exited 0 but wrote no output');
+    const result = JSON.parse(new TextDecoder().decode(resultBytes)) as ChatterboxResult;
     if (result.schema !== 'walletwall.chatterbox-result/v1') throw new NarrationProviderError('unexpected chatterbox result schema');
     if (result.repo !== this.binding.model.repo || result.revision !== this.binding.model.revision) throw new NarrationProviderError(`chatterbox loaded ${result.repo}@${result.revision}, not the pinned revision`);
     if (result.package.name !== this.binding.package.name || result.package.version !== this.binding.package.version) throw new NarrationProviderError(`chatterbox package is ${result.package.name} ${result.package.version}; config pins ${this.binding.package.version}`);
@@ -138,7 +138,6 @@ export class ChatterboxProvider implements NarrationProvider {
     if (!pinned || Object.keys(pinned).length === 0) throw new NarrationProviderError('the Chatterbox checkpoint files are not pinned: run "narration pull chatterbox" and pin the hashes it reports');
     for (const [name, sha] of Object.entries(pinned)) if (result.files[name] !== sha) throw new NarrationProviderError(`chatterbox loaded ${name} with content ${result.files[name]?.slice(0, 12) ?? 'missing'}; config pins ${sha.slice(0, 12)}`);
     for (const name of Object.keys(result.files)) if (!(name in pinned)) throw new NarrationProviderError(`chatterbox loaded ${name}, which the pin does not list`);
-    const wav = new Uint8Array(readFileSync(output));
     parseWav(wav);
     return {
       wav,
