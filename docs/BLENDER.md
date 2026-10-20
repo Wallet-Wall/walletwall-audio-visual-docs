@@ -46,7 +46,9 @@ Every run uses the fixed arguments `--background --factory-startup --disable-aut
 | `npm run blender:determinism -- --frames=a,b,c` | Two builds, two fresh render processes, one shuffled order; compared |
 | `npm run blender:invariants` | The ported rig invariants on the frames Blender renders (Ported invariants) |
 | `npm run blender:proof -- render\|compare …` | The ten-frame proof set: same-class bytes, cross-class tolerance (Determinism) |
-| `npm run publication:proof` | The whole-video publication proof, on the production render host (Production) |
+| `npm run publication:proof` | The whole-video publication proof, on the production render host, ending in its receipt (Production) |
+| `npm run publication:verify-receipt -- <receipt>` | Re-derives and checks a publication proof receipt ([PUBLICATION.md](PUBLICATION.md)) |
+| `npm run blender:qualify-production` | Requalifies the production host after a driver, Blender, runtime, or OS change: candidate evidence, never an approval ([PUBLICATION.md](PUBLICATION.md)) |
 | `node scripts/review/blender-transition.ts --context=<seq>` | The 2D → 3D signature transition at the tiers → signals seam |
 
 ## The coordinate contract (2.5D)
@@ -181,8 +183,10 @@ the `.blend` cache's bytes), and the render environment and its class. `npm run 
 the repository alone and refuses a render to publish from any class that is not a publication class.
 
 **Publication** runs on the production render host: `npm run publication:proof` validates the spec, proves the ported
-invariants, renders the whole video, runs the publish dry run against that exact render, and runs the gate with the
-render required, writing the proof package to `dist/publication-proof/` for human review. Nothing uploads it.
+invariants, stops unless the environment Blender rendered them in is an approved publication class (printing what
+changed), renders the whole video, runs the publish dry run against that exact render, and runs the gate with the
+render required, writing the proof package to `dist/publication-proof/` for human review; last, it binds the passed
+proof in its receipt, `publication-proof-receipt.json` ([PUBLICATION.md](PUBLICATION.md)). Nothing uploads it.
 
 In Remotion Studio, a frame that shows WalletWallaby without staged Blender frames stops with an error rather than
 rendering without him; preview such frames with `npm run render:stills -- --frames=…`.
@@ -257,7 +261,10 @@ Two guarantees, over lossless frames only (MP4 bytes are not run-to-run stable a
 A render's environment class is the hash of the environment Blender reported plus the render config hash. Two
 classes are approved today: `production-rtx5080` (Windows, NVIDIA GeForce RTX 5080, driver 616.56; purpose:
 publication) and `proof-linux-software-gl` (Linux, Mesa llvmpipe; purpose: proof). A driver update is a new class
-until it is approved. Each pinned tolerance was set as the worst value measured on 2026-10-18 times a margin and is
+until it is approved: requalify the host (`npm run blender:qualify-production`, candidate evidence only) and approve
+it in a reviewed change ([PUBLICATION.md](PUBLICATION.md)). The environment record is a closed schema, and every
+class also requires the pinned Blender build (`src/blender/environment.ts`). Each pinned tolerance was set as the
+worst value measured on 2026-10-18 times a margin and is
 unchanged; none lets a drawn pixel appear or vanish. The worst values on the current baseline (2026-10-19: the material
 pass, rig v6):
 

@@ -8,7 +8,7 @@
 
 import { closeSync, fstatSync, openSync, readFileSync, realpathSync, statSync } from 'node:fs';
 
-export function readContainedFile(abs: string, isContained: (realPath: string) => boolean): Buffer | null {
+export function readContainedFile(abs: string, isContained: (realPath: string) => boolean, maxBytes?: number): Buffer | null {
   let fd: number;
   try {
     fd = openSync(abs, 'r');
@@ -18,6 +18,8 @@ export function readContainedFile(abs: string, isContained: (realPath: string) =
   try {
     const opened = fstatSync(fd);
     if (!opened.isFile()) return null;
+    // A size bound is checked on the open handle, before anything is read.
+    if (maxBytes !== undefined && opened.size > maxBytes) return null;
     let real: string;
     try {
       real = realpathSync(abs);

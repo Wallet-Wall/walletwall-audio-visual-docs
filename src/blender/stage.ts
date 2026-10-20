@@ -39,8 +39,11 @@ export function clearStagedBlender(): void {
   rmSync(path.join(PUBLIC_DIR, 'renderer', 'blender'), { recursive: true, force: true });
 }
 
-/** The content of a Blender render, for provenance: the frames it holds and where it ran, never its timings. */
-function renderContentSha256(manifest: Manifest): string {
+/**
+ * The content of a Blender render, for provenance: the frames it holds and where it ran, never its timings. The
+ * publication proof receipt re-derives it from the manifest it keeps as evidence (src/publish/proof-receipt.ts).
+ */
+export function renderContentSha256(manifest: { schema: string; environment?: unknown; shots: readonly { name: string; frame: number; sha256: string }[] }): string {
   return contentAddress({ schema: manifest.schema, environment: manifest.environment, shots: manifest.shots.map((s) => ({ name: s.name, frame: s.frame, sha256: s.sha256 })) });
 }
 

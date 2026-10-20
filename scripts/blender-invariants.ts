@@ -1,5 +1,7 @@
-// npm run blender:invariants [-- --every=9] [--lab-every=1]
-//   -> dist/blender/out/invariants/report.json; exits 1 if any invariant fails
+// npm run blender:invariants [-- [videoId] --every=9] [--lab-every=1] [--motion-engine=typescript|rust-wasm]
+//   -> dist/blender/out/invariants/report.json; exits 1 if any invariant fails. The bar (thresholds, coverage, the
+//   publication stride) is src/blender/invariants-policy.ts; the report records the video, engine, identity,
+//   environment, and exact frames it was measured on (walletwall.blender-invariants/v2).
 //
 // The rig invariants the Rive runtime proved before the cutover (test/rive-rig.test.ts), ported to the frames the
 // pinned Blender actually renders. Every 9th frame of the lesson and every frame of the motion lab (the ledge it hangs
@@ -28,14 +30,15 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { labLesson } from '../src/blender/lab.ts';
-import { lessonMotion, type LessonMotion } from '../src/blender/lesson.ts';
+import { lessonMotion, strideFrames, type LessonMotion } from '../src/blender/lesson.ts';
 import { ensureCharacter, renderCharacterSequence } from '../src/blender/production.ts';
 import { BLENDER_JOBS, findBlender, loadBlenderConfig, outFile, runBlender, writeJob } from '../src/blender/toolchain.ts';
 import { bridgeFrame, type BlenderMotionFrame } from '../src/character/walletwallaby/blender/bridge.ts';
 import { characterCrop } from '../src/character/walletwallaby/blender/crop.ts';
 import { resolvePose } from '../src/character/walletwallaby/blender/pose-resolve.ts';
 import { blenderRigDocument } from '../src/character/walletwallaby/blender/rig-export.ts';
-import { CHARACTER } from '../src/blender/identity.ts';
+import { CHARACTER, environmentClass, loadEnvironments, type RenderEnvironment } from '../src/blender/identity.ts';
+import { coverageMinimums, INVARIANT_THRESHOLDS, MAX_TAIL_RELEASE, PUBLICATION_STRIDE } from '../src/blender/invariants-policy.ts';
 import { compileRig } from '../src/character/walletwallaby/rig/rig-compile.ts';
 import { rigControls } from '../src/character/walletwallaby/rig/rig-controls.ts';
 import { RIG_ENVELOPE } from '../src/character/walletwallaby/rig/rig-source.ts';
@@ -48,19 +51,25 @@ import { readPng, type Image } from './review/png.ts';
 
 const args = process.argv.slice(2);
 const opt = (n: string): string | undefined => args.find((a) => a.startsWith(`--${n}=`))?.slice(n.length + 3);
-const every = Number(opt('every') ?? '9');
-const labEvery = Number(opt('lab-every') ?? '1');
+const every = Number(opt('every') ?? String(PUBLICATION_STRIDE.every));
+const labEvery = Number(opt('lab-every') ?? String(PUBLICATION_STRIDE.labEvery));
 if (!Number.isInteger(every) || every < 1 || !Number.isInteger(labEvery) || labEvery < 1) throw new Error('--every and --lab-every take positive integers');
+// The lesson whose frames are measured: the video and motion engine the publication render uses (publication:proof
+// passes both), so the receipt can bind the invariants to that render's own plan.
+const videoId = args.find((a) => !a.startsWith('--')) ?? 'migration-readiness';
+if (!/^[a-z0-9][a-z0-9-]*$/.test(videoId)) throw new Error('the video id must be a plain slug');
+const engine = opt('motion-engine') ?? 'typescript';
+if (engine !== 'typescript' && engine !== 'rust-wasm') throw new Error('--motion-engine is typescript or rust-wasm');
 
-const FOOT_PX = 0.05;
-const TAIL_PX = 0.05;
+// The bar (src/blender/invariants-policy.ts), shared with the publication proof receipt and host qualification.
+const FOOT_PX = INVARIANT_THRESHOLDS.footPx;
+const TAIL_PX = INVARIANT_THRESHOLDS.tailPx;
 /** The paw on the lip: Rive's tolerance (3 rig px). Blender's arm, near full reach on the climb, lands within 2.5. */
-const PAW_PX = 3;
-const LIP_PX = 3;
-const TAIL_JOINT_DEG = 70;
+const PAW_PX = INVARIANT_THRESHOLDS.pawPx;
+const LIP_PX = INVARIANT_THRESHOLDS.lipPx;
+const TAIL_JOINT_DEG = INVARIANT_THRESHOLDS.tailJointDeg;
 const FLIGHT_CLIPS = ['takeoff', 'airborne', 'mantle'];
 const TAIL_BONES = ['tail_0', 'tail_1', 'tail_2', 'tail_3', 'tail_4'];
-const scaled = (n: number) => Math.floor((n * 9) / every);
 
 const cfg = loadBlenderConfig();
 const blender = findBlender(cfg);
@@ -91,6 +100,9 @@ const excluded: Record<string, number[]> = {};
 const fail = (check: string, r: { run: string; frame: number }, detail: string) => failures.push({ check, run: r.run, frame: r.frame, detail });
 const count = (k: string) => (counts[k] = (counts[k] ?? 0) + 1);
 
+/** The frames each run measured (the bridge each was rendered from holds exactly these). */
+const measuredFrames: Record<string, number[]> = {};
+
 /** Render (always anew, with measurements) and load every measured frame of a lesson. */
 function measuredRun(run: string, lesson: LessonMotion, step: number): Row[] {
   const bridgeable = (i: number): boolean => {
@@ -103,7 +115,8 @@ function measuredRun(run: string, lesson: LessonMotion, step: number): Row[] {
       return false;
     }
   };
-  const frames = Array.from({ length: lesson.frames }, (_, i) => i).filter((i) => i % step === 0 && lesson.sample(i).state.visible && bridgeable(i));
+  const frames = strideFrames(lesson, step).filter(bridgeable);
+  measuredFrames[run] = frames;
   const name = `invariants-${run}`;
   const r = renderCharacterSequence(cfg, blender, { lesson, name, layout: 'crop', frames, measure: true });
   console.log(`[invariants] ${run}: ${r.frames} frames in ${(r.ms / 1000).toFixed(1)} s`);
@@ -140,13 +153,13 @@ const visual = (cfg as unknown as { visual: { palette: Record<string, string>; c
 const PALETTE = [rigDoc.palette.coat!, rigDoc.palette.coatShade!, rigDoc.palette.ink!, visual.palette.accent!, visual.palette.accentShade!, visual.palette.glint!, visual.contactShadow.color].map(hexRgb);
 const palette = paletteCheck(PALETTE);
 /** Opaque pixels outside every mix of palette colours, per frame (measured: 0 of 11 million). */
-const MAX_OFF_HULL = 1e-4;
+const MAX_OFF_HULL = INVARIANT_THRESHOLDS.maxOffHull;
 /** Opaque pixels that are exactly a palette colour, per frame (two flat tones per surface; measured worst 44.6%). */
-const MIN_EXACT = 0.3;
-const TAIL_BLEND_PX = 2;
+const MIN_EXACT = INVARIANT_THRESHOLDS.minExact;
+const TAIL_BLEND_PX = INVARIANT_THRESHOLDS.tailBlendPx;
 
 
-const lesson = await lessonMotion('migration-readiness');
+const lesson = await lessonMotion(videoId, engine);
 const lab = labLesson();
 const rows = [...measuredRun('lesson', lesson, every), ...measuredRun('lab', lab, labEvery)];
 let opaque = 0;
@@ -248,16 +261,9 @@ for (const row of rows) {
 }
 
 // Coverage, as the Rive tests required it (scaled to the stride).
-const need: [string, number][] = [
-  ['lesson.grounded', scaled(400)],
-  ['lesson.supportedHolds', scaled(300)],
-  ['lesson.sceneHolds', scaled(300)],
-  ['lab.unsupportedPerch', Math.floor(10 / labEvery)],
-  ['lab.hang', Math.floor(2 / labEvery)],
-];
-for (const [k, n] of need) if ((counts[k] ?? 0) < Math.max(1, n)) failures.push({ check: 'coverage', run: k.split('.')[0]!, frame: -1, detail: `${k}: ${counts[k] ?? 0} frames checked, at least ${Math.max(1, n)} needed` });
+for (const [k, n] of Object.entries(coverageMinimums(every, labEvery))) if ((counts[k] ?? 0) < n) failures.push({ check: 'coverage', run: k.split('.')[0]!, frame: -1, detail: `${k}: ${counts[k] ?? 0} frames checked, at least ${n} needed` });
 const supported = counts['lesson.supportedHolds'] ?? 0;
-if (supported > 0 && (counts['lesson.heldClear'] ?? 0) / supported >= 0.1) failures.push({ check: 'tail rest', run: 'lesson', frame: -1, detail: `the tail is released on ${counts['lesson.heldClear']} of ${supported} supported holds` });
+if (supported > 0 && (counts['lesson.heldClear'] ?? 0) / supported >= MAX_TAIL_RELEASE) failures.push({ check: 'tail rest', run: 'lesson', frame: -1, detail: `the tail is released on ${counts['lesson.heldClear']} of ${supported} supported holds` });
 
 // 8. Shuffled-frame purity: some measured lesson frames again, in a shuffled order, in one fresh process.
 const lessonRows = rows.filter((r) => r.run === 'lesson');
@@ -291,12 +297,22 @@ for (const s of shuffled.shots) {
   if (s.sha256 !== inOrder.shot.sha256) fail('shuffled purity', { run: 'lesson', frame: s.frame }, 'the frame differs when rendered in another order');
 }
 
+// What the lesson was measured on, so a PASS is bound to it (src/publish/proof-receipt.ts): the Blender identity of its
+// render (less the .blend cache's bytes), the render environment Blender recorded and its class, and the exact frames.
+const lessonIdentity = JSON.parse(readFileSync(outFile('renders/invariants-lesson/identity.json'), 'utf8')) as Record<string, unknown>;
+const lessonEnvironment = (JSON.parse(readFileSync(outFile('renders/invariants-lesson/render.json'), 'utf8')) as { environment: RenderEnvironment }).environment;
+const lessonClass = environmentClass(lessonEnvironment, cfg, loadEnvironments());
 const report = {
-  schema: 'walletwall.blender-invariants/v1',
+  schema: 'walletwall.blender-invariants/v2',
+  videoId,
+  motionEngine: engine,
   every,
   labEvery,
+  lessonFrames: measuredFrames.lesson ?? [],
   lessonBridgeSha256: contentAddress(bridge),
-  thresholds: { footPx: FOOT_PX, tailPx: TAIL_PX, tailBlendPx: TAIL_BLEND_PX, pawPx: PAW_PX, lipPx: LIP_PX, tailJointDeg: TAIL_JOINT_DEG, maxOffHull: MAX_OFF_HULL, minExact: MIN_EXACT },
+  identity: Object.fromEntries(Object.entries(lessonIdentity).filter(([k]) => k !== 'blendArtifactSha256')),
+  environment: { classId: lessonClass.id, approvedClass: lessonClass.approvedAs?.name ?? null, purpose: lessonClass.approvedAs?.purpose ?? null, record: lessonEnvironment },
+  thresholds: { ...INVARIANT_THRESHOLDS },
   counts,
   excluded,
   palette: { colours: PALETTE, opaquePixels: opaque, offHull: off, exactFraction: opaque ? +(exactPx / opaque).toFixed(4) : null, worstFrameExact: +worstExact.toFixed(4) },

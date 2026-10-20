@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { VIDEO_ROOT } from '../config/load.ts';
 import { contentAddress, sha256Hex } from '../core/hash.ts';
+import { classifyEnvironment, environmentsDocumentProblems } from './environment.ts';
 import { blenderConfigSha256, blenderSourceSha256, outFile, type BlenderConfig } from './toolchain.ts';
 
 export const BLENDER_IDENTITY_SCHEMA = 'walletwall.blender-identity/v1';
@@ -50,7 +51,10 @@ export interface ModelManifest {
 
 export const CHARACTER = { blend: 'character/walletwallaby.blend', manifest: 'character/model.json' } as const;
 
-/** What actually rendered, as Blender's GPU module reported it (render.py render_environment). */
+/**
+ * What actually rendered, as Blender's GPU module reported it (render.py render_environment). A closed schema:
+ * src/blender/environment.ts refuses any other field, so no host name, user, or path can ride along.
+ */
 export interface RenderEnvironment {
   os: string;
   blenderVersion: string;
@@ -89,28 +93,22 @@ export interface PixelTolerance {
 export function loadEnvironments(): EnvironmentsDocument {
   const doc = JSON.parse(readFileSync(path.join(VIDEO_ROOT, 'config', 'blender-environments.json'), 'utf8')) as EnvironmentsDocument;
   if (doc.schema !== 'walletwall.blender-environments/v1') throw new Error('config/blender-environments.json is not walletwall.blender-environments/v1');
+  // A class that pins nothing would approve anything: a malformed set of classes is refused, never read leniently.
+  const problems = environmentsDocumentProblems(doc);
+  if (problems.length > 0) throw new Error(`config/blender-environments.json does not define valid classes: ${problems.join('; ')}`);
   return doc;
 }
 
 /**
  * The render-environment class a render belongs to: its identity (a hash of everything that can change pixels on
  * the host side: OS family, Blender build, engine, GPU or software renderer and its driver or Mesa version, and the
- * render config) and, when one matches, the approved class it falls in.
+ * render config) and, when one matches, the approved class it falls in. A class matches only a record that is
+ * exactly the closed schema, made by the pinned Blender build, and agrees with every field the class pins
+ * (src/blender/environment.ts, which also explains a mismatch field by field).
  */
 export function environmentClass(env: RenderEnvironment, cfg: BlenderConfig, approved: EnvironmentsDocument): { id: string; approvedAs: EnvironmentClassSpec | null } {
-  const id = contentAddress({ env, renderConfigSha256: blenderConfigSha256(cfg) }).slice(0, 16);
-  const gpu = 'renderer' in env.gpu ? env.gpu : null;
-  const approvedAs =
-    approved.classes.find((c) => {
-      const m = c.match;
-      if (m.os !== env.os || m.engine !== env.engine || !gpu) return false;
-      if (m.gpu.vendor !== undefined && m.gpu.vendor !== gpu.vendor) return false;
-      if (m.gpu.renderer !== undefined && m.gpu.renderer !== gpu.renderer) return false;
-      if (m.gpu.rendererPrefix !== undefined && !gpu.renderer.startsWith(m.gpu.rendererPrefix)) return false;
-      if (m.gpu.version !== undefined && m.gpu.version !== gpu.version) return false;
-      return true;
-    }) ?? null;
-  return { id, approvedAs };
+  const c = classifyEnvironment(env, cfg, approved);
+  return { id: c.classId, approvedAs: c.approvedClass };
 }
 
 export function readModelManifest(): ModelManifest {
@@ -119,8 +117,17 @@ export function readModelManifest(): ModelManifest {
   return m;
 }
 
+/** The camera and render settings blocks of the config, each hashed on its own (both are also inside the config hash). */
+export function presentationHashes(cfg: BlenderConfig): { cameraDefinitionSha256: string; renderSettingsSha256: string } {
+  return {
+    cameraDefinitionSha256: contentAddress({ presentation: cfg.presentation, resolution: cfg.render.resolution }),
+    renderSettingsSha256: contentAddress({ render: cfg.render, lighting: cfg.lighting, materials: cfg.materials, outline: cfg.outline, contactShadow: cfg.contactShadow }),
+  };
+}
+
 export function blenderIdentity(cfg: BlenderConfig, blender: { version: string; buildHash: string }, rigVersion: number, bridge: object, bridgeSchema: string, terrain: object | null): BlenderIdentity {
   const model = readModelManifest();
+  const presentation = presentationHashes(cfg);
   if (model.blenderVersion.split(' ')[0] !== blender.version || model.blenderBuildHash !== blender.buildHash) throw new Error(`the character was built by Blender ${model.blenderVersion} (${model.blenderBuildHash}), not the pinned ${blender.version} (${blender.buildHash}): rebuild it`);
   return {
     schema: BLENDER_IDENTITY_SCHEMA,
@@ -138,7 +145,7 @@ export function blenderIdentity(cfg: BlenderConfig, blender: { version: string; 
     motionBridgeSchema: bridgeSchema,
     motionPlanSha256: contentAddress(bridge),
     terrainSha256: terrain ? contentAddress(terrain) : null,
-    cameraDefinitionSha256: contentAddress({ presentation: cfg.presentation, resolution: cfg.render.resolution }),
-    renderSettingsSha256: contentAddress({ render: cfg.render, lighting: cfg.lighting, materials: cfg.materials, outline: cfg.outline, contactShadow: cfg.contactShadow }),
+    cameraDefinitionSha256: presentation.cameraDefinitionSha256,
+    renderSettingsSha256: presentation.renderSettingsSha256,
   };
 }

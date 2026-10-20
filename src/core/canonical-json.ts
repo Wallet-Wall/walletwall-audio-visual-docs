@@ -14,7 +14,9 @@ function sortDeep(value: unknown): unknown {
     const out: Record<string, unknown> = {};
     for (const key of Object.keys(value as Record<string, unknown>).sort()) {
       const v = (value as Record<string, unknown>)[key];
-      if (v !== undefined) out[key] = sortDeep(v);
+      // Defined, never assigned: assigning `__proto__` (an own key JSON.parse can produce) would set the prototype and
+      // drop the member from the canonical form, so content could ride along outside every content address.
+      if (v !== undefined) Object.defineProperty(out, key, { value: sortDeep(v), enumerable: true, writable: true, configurable: true });
     }
     return out;
   }

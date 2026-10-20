@@ -97,6 +97,30 @@ export interface CharacterSequenceRequest {
   measure?: boolean;
 }
 
+/**
+ * The shots a character sequence renders for a bridge: every visible frame, in the crop layout only those whose envelope
+ * reaches the frame, each crop decided from the frame's placement alone, before Blender runs. The publication proof
+ * receipt re-derives the same list to prove its evidence is exactly the render of this plan.
+ */
+export interface CharacterShot {
+  name: string;
+  frame: number;
+  camera: { kind: 'teaching' } | { kind: 'crop'; x: number; y: number; width: number; height: number };
+}
+
+export function characterShots(bridge: BlenderMotionDocument, layout: BlenderLayout, cfg: BlenderConfig): CharacterShot[] {
+  const frameSize = { width: cfg.render.resolution[0], height: cfg.render.resolution[1] };
+  const padPx = (cfg.render as unknown as { crop: { padPx: number } }).crop.padPx;
+  return bridge.frames
+    .filter((f) => f.visible)
+    .flatMap((f): CharacterShot[] => {
+      const name = `f${String(f.frame).padStart(5, '0')}`;
+      if (layout === 'full-frame') return [{ name, frame: f.frame, camera: { kind: 'teaching' } }];
+      const c = characterCrop(f, RIG_ENVELOPE, padPx, frameSize);
+      return c ? [{ name, frame: f.frame, camera: { kind: 'crop', x: c.x, y: c.y, width: c.width, height: c.height } }] : [];
+    });
+}
+
 /** Render (or reuse) WalletWallaby's frames for the lesson. Returns whether a verified earlier render was reused. */
 export function renderCharacterSequence(cfg: BlenderConfig, blender: Blender, req: CharacterSequenceRequest): { reused: boolean; frames: number; ms: number } {
   const bridge = lessonBridgeFor(req.lesson, req.frames);
@@ -112,14 +136,7 @@ export function renderCharacterSequence(cfg: BlenderConfig, blender: Blender, re
   const frameSize = { width: cfg.render.resolution[0], height: cfg.render.resolution[1] };
   const padPx = (cfg.render as unknown as { crop: { padPx: number } }).crop.padPx;
   // Crops are decided here, from the placement alone, before Blender runs.
-  const shots = bridge.frames
-    .filter((f) => f.visible)
-    .flatMap((f) => {
-      const name = `f${String(f.frame).padStart(5, '0')}`;
-      if (req.layout === 'full-frame') return [{ name, frame: f.frame, camera: { kind: 'teaching' } }];
-      const c = characterCrop(f, RIG_ENVELOPE, padPx, frameSize);
-      return c ? [{ name, frame: f.frame, camera: { kind: 'crop', x: c.x, y: c.y, width: c.width, height: c.height } }] : [];
-    });
+  const shots = characterShots(bridge, req.layout, cfg);
   const outDir = `renders/${req.name}`;
   mkdirSync(outFile(outDir), { recursive: true });
   // A failed render leaves no manifest behind that staging could mistake for this one.

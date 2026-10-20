@@ -19,6 +19,7 @@ import path from 'node:path';
 import { bundle } from '@remotion/bundler';
 import { renderStill, selectComposition } from '@remotion/renderer';
 import { FixtureVoiceProvider } from '../src/audio/voice-provider.ts';
+import { measureEquivalence, withinTolerance } from '../src/blender/equivalence.ts';
 import { CHARACTER, environmentClass, loadEnvironments, type PixelTolerance, type RenderEnvironment } from '../src/blender/identity.ts';
 import { lessonBridge, lessonMotion, lessonTerrain } from '../src/blender/lesson.ts';
 import { characterProofFrames, PROOF_ROLES, transitionProofFrames, type ProofRole } from '../src/blender/proof-set.ts';
@@ -132,22 +133,11 @@ async function collect(run: string, blend: string): Promise<void> {
   console.log(`[proof] ${run}: class ${cls.id} (${record.approvedClass ?? 'not an approved class'}), model ${record.canonicalModelSha256.slice(0, 12)}, plan ${record.motionPlanSha256.slice(0, 12)}`);
 }
 
+/** The pinned tolerance, applied by the shared measure (src/blender/equivalence.ts; qualification applies the same one). */
 function tolerance(a: Image, b: Image, t: PixelTolerance) {
-  if (a.width !== b.width || a.height !== b.height) return { pass: false, why: 'different sizes' };
-  let over = 0;
-  let sum = 0;
-  let max = 0;
-  let coverage = 0;
-  for (let i = 0; i < a.data.length; i++) {
-    const d = Math.abs(a.data[i]! - b.data[i]!);
-    if (d > t.noiseLevel) over++;
-    if (d > max) max = d;
-    sum += d;
-  }
-  for (let i = 3; i < a.data.length; i += 4) if ((a.data[i]! > 0) !== (b.data[i]! > 0)) coverage++;
-  const fractionOverNoise = over / a.data.length;
-  const meanAbsDelta = sum / a.data.length;
-  return { pass: fractionOverNoise <= t.maxFractionOverNoise && meanAbsDelta <= t.maxMeanAbsDelta && coverage <= t.maxCoverageDeltaPx, maxDelta: max, fractionOverNoise, meanAbsDelta, coverageDeltaPx: coverage };
+  const m = measureEquivalence(a, b, t.noiseLevel);
+  if (!m) return { pass: false, why: 'different sizes' };
+  return { pass: withinTolerance(m, t), maxDelta: m.maxDelta, fractionOverNoise: m.fractionOverNoise, meanAbsDelta: m.meanAbsDelta, coverageDeltaPx: m.coverageDeltaPx };
 }
 
 /** The production class's proof frames, kept in the repository as the cross-class reference (blender/proof/reference/). */
@@ -174,6 +164,11 @@ function compare(runA: string, runB: string): void {
   const pngOf = (file: string): Image => readPng(path.isAbsolute(file) ? file : outFile(file));
   const a = load(runA);
   const b = load(runB);
+  // Every frame compared is the bytes its record names (the committed reference's too): a replaced PNG is refused, never
+  // compared, and same-class identity below is then a statement about the files, not only about the records.
+  for (const [label, rec] of [[runA, a], [runB, b]] as const) {
+    for (const r of rec.roles) if (sha256Hex(readFileSync(path.isAbsolute(r.file) ? r.file : outFile(r.file))) !== r.sha256) throw new Error(`${label} ${r.role}: ${path.basename(r.file)} is not the bytes its proof record names`);
+  }
   for (const k of ['canonicalModelSha256', 'motionPlanSha256', 'blenderConfigSha256', 'blenderSceneSourceSha256'] as const) {
     if (a[k] !== b[k]) throw new Error(`the two runs differ in ${k}: they do not render the same thing`);
   }
