@@ -3,10 +3,12 @@
 // changed (a driver, Blender, graphics runtime, or OS update), and the record a human reviews.
 //
 //   1. Blender: the installed build must be the one config/blender.json pins; otherwise nothing renders (BLOCKED, with
-//      the change named).
+//      the change named). Every approved class must pin that same build: a class qualified on another build is a
+//      source/config coherence failure (BLOCKED, naming both builds), which only a reviewed change resolves.
 //   2. The committed cross-class reference (blender/proof/reference/): its PNGs are the bytes it records, it was
 //      rendered in an approved publication class, and from this checkout's config, lane source, model, and plan.
-//   3. The environment Blender actually rendered in, classified, with its diff against the nearest approved class.
+//   3. The environment Blender actually rendered in, classified, with its diff against the nearest approved class. A
+//      render that records another Blender build than the pinned one is never a candidate (BLOCKED).
 //   4. Two builds of the character: both the pinned canonical model and materials, and one realization.
 //   5. The proof set rendered twice in fresh processes: byte-identical (same-class determinism).
 //   6. Against the reference: the same class must be byte-identical; another class must hold the pinned cross-class
@@ -23,7 +25,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { canonicalJson, prettyJson } from '../core/canonical-json.ts';
-import { classifyEnvironment, environmentDifferences, environmentSummary, formatEnvironmentDiff, type EnvironmentClassification, type EnvironmentStatus } from './environment.ts';
+import { blenderPinProblems, classifyEnvironment, environmentDifferences, environmentSummary, formatEnvironmentDiff, shownClassName, type EnvironmentClassification, type EnvironmentStatus } from './environment.ts';
 import { withinTolerance, type EquivalenceMeasures } from './equivalence.ts';
 import { invariantsBarProblems, PUBLICATION_STRIDE } from './invariants-policy.ts';
 import type { EnvironmentsDocument, PixelTolerance, RenderEnvironment } from './identity.ts';
@@ -153,6 +155,9 @@ export function decideQualification(inp: QualificationInputs): QualificationReco
   // 1. Blender.
   const blenderOk = observed !== null && observed.version === pinned.version && observed.buildHash === pinned.buildHash;
   add('blender-pinned', blenderOk ? 'PASS' : 'BLOCKED', observed ? `Blender ${observed.version ?? '?'} (${observed.buildHash ?? '?'}) is installed; config/blender.json pins ${pinned.version} (${pinned.buildHash})` : 'no Blender found (set WALLETWALL_BLENDER to the pinned build)');
+  // Each approved class names the Blender build it was qualified on; it must be the build config/blender.json pins.
+  const incoherent = blenderPinProblems(envs, inp.cfg);
+  add('class-blender-pins', incoherent.length > 0 ? 'BLOCKED' : 'PASS', incoherent.length > 0 ? `${incoherent.join('; ')}: config/blender.json and config/blender-environments.json disagree, so no class approves anything until a reviewed change makes them agree (this tool never edits a class)` : `every approved class pins the pinned Blender build ${inp.cfg.blender.version} (${inp.cfg.blender.buildHash})`);
 
   // 2. The reference.
   const ref = inp.reference.record;
@@ -169,8 +174,11 @@ export function decideQualification(inp: QualificationInputs): QualificationReco
   const a = inp.runs.a;
   const b = inp.runs.b;
   const cls = a ? classifyEnvironment(a.environment, inp.cfg, envs, { prefer: 'publication' }) : null;
+  const rendered = cls && cls.status !== 'INVALID' ? (a!.environment as RenderEnvironment) : null;
+  const unpinnedRender = rendered !== null && (rendered.blenderVersion.split(' ')[0] !== inp.cfg.blender.version || rendered.blenderBuildHash !== inp.cfg.blender.buildHash);
   if (!cls) add('environment', 'NOT_RUN', 'nothing was rendered');
   else if (cls.status === 'INVALID') add('environment', 'BLOCKED', `not a render-environment record (${cls.problems.join('; ')})`);
+  else if (unpinnedRender) add('environment', 'BLOCKED', `rendered with Blender ${rendered!.blenderVersion.split(' ')[0]} (${rendered!.blenderBuildHash}), not the pinned ${inp.cfg.blender.version} (${inp.cfg.blender.buildHash}): an unpinned build is never qualified`);
   else if (cls.status === 'APPROVED' && cls.approvedClass!.purpose !== 'publication') add('environment', 'BLOCKED', `approved as ${cls.approvedClass!.name} (${cls.approvedClass!.purpose}): this is not a production render host`);
   else add('environment', 'PASS', environmentSummary(cls));
 
@@ -264,16 +272,17 @@ export function decideQualification(inp: QualificationInputs): QualificationReco
         ? 'QUALIFICATION_REVERIFIED'
         : 'QUALIFICATION_CANDIDATE_PASS';
 
-  // A Blender that is not the pinned build is a change no render can show: name it.
+  // A Blender that is not the pinned build is a change no render can show: name it, with the labels the diff uses.
   const blenderChange = !blenderOk && observed !== null && !cls;
-  const blenderLine = (v: { version: string | null; buildHash: string | null }) => `  blender: ${v.version ?? '?'} (${v.buildHash ?? '?'})`;
+  const blenderChanged = blenderChange ? [...(observed!.version !== pinned.version ? ['blender version'] : []), ...(observed!.buildHash !== pinned.buildHash ? ['blender build'] : [])] : [];
+  const blenderLines = (v: { version: string | null; buildHash: string | null }) => [`  blender version: ${v.version ?? '?'}`, `  blender build: ${v.buildHash ?? '?'}`];
   const environment: QualificationRecord['environment'] = {
     status: cls?.status ?? 'NOT_RENDERED',
     classId: cls?.classId ?? null,
     approvedClass: cls?.status === 'APPROVED' ? cls.approvedClass!.name : null,
-    nearest: cls?.nearest?.name ?? null,
-    changed: blenderChange ? ['blender'] : (cls?.diff?.changed ?? []),
-    diff: blenderChange ? ['approved:', blenderLine(pinned), 'observed:', blenderLine(observed!), 'changed:', '  blender'].join('\n') : cls?.diff ? formatEnvironmentDiff(cls.diff) : null,
+    nearest: cls?.nearest ? shownClassName(cls.nearest.name) : null,
+    changed: blenderChange ? blenderChanged : (cls?.diff?.changed ?? []),
+    diff: blenderChange ? ['approved:', ...blenderLines(pinned), 'observed:', ...blenderLines(observed!), 'changed:', ...blenderChanged.map((c) => `  ${c}`)].join('\n') : cls?.diff ? formatEnvironmentDiff(cls.diff) : null,
     record: cls && cls.status !== 'INVALID' && a ? (a.environment as RenderEnvironment) : null,
     problems: cls?.problems ?? [],
   };
@@ -286,19 +295,20 @@ export function decideQualification(inp: QualificationInputs): QualificationReco
     checks,
     versusReference: rows,
     pins: { before: inp.pins.before, after: inp.pins.after, tolerances: { crossClassTolerance: envs.crossClassTolerance, cropEquivalenceTolerance: envs.cropEquivalenceTolerance } },
-    nextSteps: nextSteps(verdict, environment, rows, a, checks, blenderChange),
+    nextSteps: nextSteps(verdict, environment, rows, a, checks, blenderChange, unpinnedRender),
   };
 }
 
-function nextSteps(verdict: QualificationVerdict, env: QualificationRecord['environment'], rows: QualificationRecord['versusReference'], a: ProofRun | null, checks: QualificationCheck[], blenderChange: boolean): string[] {
+function nextSteps(verdict: QualificationVerdict, env: QualificationRecord['environment'], rows: QualificationRecord['versusReference'], a: ProofRun | null, checks: QualificationCheck[], blenderChange: boolean, unpinnedRender: boolean): string[] {
   const never = 'Do not raise a tolerance, replace the reference, or widen an approved class to make this pass: each is a separate source change with its own reviewed justification (docs/PUBLICATION.md).';
   if (verdict === 'QUALIFICATION_REVERIFIED') return [`This host is already approved as ${env.approvedClass}; the proof set reproduces the committed reference. Nothing to approve: npm run publication:proof.`];
   if (verdict === 'QUALIFICATION_BLOCKED') {
     const steps: string[] = [];
-    if (blenderChange) steps.push('A Blender change starts with a reviewed change of config/blender.json (version, build hash, and the release archives\' SHA-256), then qualification on that branch. Never render with an unpinned Blender.');
+    if (blenderChange || unpinnedRender) steps.push('A Blender change starts with one reviewed change of config/blender.json (version, build hash, and the release archives\' SHA-256) and of every class\'s Blender pin, with a new reference; then qualification on that branch. Never render with an unpinned Blender.');
+    if (checks.find((c) => c.id === 'class-blender-pins')?.result === 'BLOCKED') steps.push('Each approved class pins the Blender build it was qualified on, and config/blender.json pins the build every render uses: they must agree. Make them agree in a reviewed change (a Blender change also needs a new reference); this tool never edits a class.');
     if (checks.find((c) => c.id === 'reference-fresh')?.result === 'BLOCKED') steps.push('The committed reference was rendered from another config, lane source, model, or plan. A new reference is a reviewed change (npm run blender:proof -- export-reference, from an approved publication class), never part of qualifying a host.');
     if (checks.find((c) => c.id === 'reference-intact')?.result === 'BLOCKED') steps.push('The committed reference is not intact or not from a publication class: restore it from git before qualifying anything.');
-    if (checks.find((c) => c.id === 'environment')?.result === 'BLOCKED') steps.push('Run this on the production render host, whose render environment is a well-formed record (no field outside the closed schema).');
+    if (checks.find((c) => c.id === 'environment')?.result === 'BLOCKED' && !unpinnedRender) steps.push('Run this on the production render host, whose render environment is a well-formed record (no field outside the closed schema).');
     if (checks.find((c) => c.id === 'blender-pinned')?.result === 'BLOCKED' && !blenderChange) steps.push('Install the pinned Blender build (docs/BLENDER.md, Toolchain) and set WALLETWALL_BLENDER.');
     return [...steps, 'Nothing was approved.'];
   }
@@ -306,8 +316,9 @@ function nextSteps(verdict: QualificationVerdict, env: QualificationRecord['envi
   // A candidate: evidence for a human, never an approval.
   const identical = rows.every((x) => x.identical);
   const record = env.record;
-  const gpu = record && 'renderer' in record.gpu ? record.gpu : null;
-  const proposal = record && gpu ? JSON.stringify({ name: '<name it in review>', purpose: 'publication', match: { os: record.os, engine: record.engine, gpu: { vendor: gpu.vendor, renderer: gpu.renderer, version: gpu.version } } }) : null;
+  const gpu = record && Object.hasOwn(record.gpu, 'renderer') ? (record.gpu as Extract<RenderEnvironment['gpu'], { renderer: string }>) : null;
+  // Field by field from the parsed record, in the class shape environmentsDocumentProblems requires (never a spread record).
+  const proposal = record && gpu ? JSON.stringify({ name: '<name it in review>', purpose: 'publication', match: { os: record.os, blender: { version: record.blenderVersion.split(' ')[0], buildHash: record.blenderBuildHash }, engine: record.engine, gpu: { backend: gpu.backend, vendor: gpu.vendor, renderer: gpu.renderer, version: gpu.version } } }) : null;
   return [
     `This environment is NOT approved (changed: ${env.changed.join(', ') || 'nothing the class pins'}). This tool approves nothing.`,
     'Review: the diff above, the proof frames of run A, the comparison against the reference, and the invariants report.',

@@ -161,6 +161,58 @@ describe('forged or stale receipts are refused even when their hash is recompute
     refused(receiptPath, 'ENVIRONMENT_NOT_PUBLICATION');
   });
 
+  test('a record with another GPU backend under the production label is refused, with or without the package', () => {
+    for (const receiptOnly of [false, true]) {
+      const { receiptPath } = provenProof(`backend-${receiptOnly ? 'receipt-only' : 'package'}`);
+      forge(receiptPath, (r) => ((r.subject.renderEnvironment.record as { gpu: { backend: string } }).gpu.backend = 'VULKAN'));
+      assert.equal(readJsonFile<PublicationProofReceipt>(receiptPath).subject.renderEnvironment.approvedClass, 'production-rtx5080', 'the label still claims the class');
+      refused(receiptPath, 'ENVIRONMENT_NOT_PUBLICATION', { receiptOnly });
+    }
+  });
+
+  test('a record with another Blender build under the production label is refused, with or without the package', () => {
+    for (const receiptOnly of [false, true]) {
+      const { receiptPath } = provenProof(`blender-build-${receiptOnly ? 'receipt-only' : 'package'}`);
+      forge(receiptPath, (r) => ((r.subject.renderEnvironment.record as { blenderBuildHash: string }).blenderBuildHash = '0123456789ab'));
+      refused(receiptPath, 'ENVIRONMENT_NOT_PUBLICATION', { receiptOnly });
+    }
+  });
+
+  test('checked against classes whose Blender pin disagrees with config/blender.json, a receipt is refused, naming both builds', () => {
+    const { receiptPath } = provenProof('incoherent-classes');
+    assert.deepEqual(verifyReceipt(receiptPath, state).findings, [], 'the control: it verifies against this checkout');
+    const environments = structuredClone(state.environments);
+    environments.classes[0]!.match.blender.buildHash = '0123456789ab';
+    const bumped = { ...state.blenderConfig, blender: { ...state.blenderConfig.blender, version: '5.2.3', buildHash: '0123456789ab' } };
+    for (const [label, s, want] of [
+      ['a class qualified on another build', { ...state, environments }, /publication class "production-rtx5080" was qualified with Blender build 5\.2\.2 \(0123456789ab\), but the current pinned build is 5\.2\.2 \(d13f752e3b9c\)/],
+      ['config/blender.json bumped without the classes', { ...state, blenderConfig: bumped }, /publication class "production-rtx5080" was qualified with Blender build 5\.2\.2 \(d13f752e3b9c\), but the current pinned build is 5\.2\.3 \(0123456789ab\)/],
+    ] as const) {
+      for (const receiptOnly of [false, true]) {
+        const v = verifyReceipt(receiptPath, s, { receiptOnly });
+        assert.equal(v.ok, false, label);
+        const f = v.findings.find((x) => x.code === 'ENVIRONMENT_NOT_PUBLICATION');
+        assert.ok(f, `${label}: ${v.findings.map((x) => `${x.code} ${x.message}`).join('\n')}`);
+        assert.match(f.message, want, label);
+      }
+    }
+  });
+
+  test("the gate, the receipt, and both verifications classify with the state's classes, never the files on disk", () => {
+    // A checkout whose production class pins the new driver: a coherent, well-formed class the classes on disk do not hold.
+    const environments = structuredClone(state.environments);
+    environments.classes[0]!.match.gpu.version = ENVIRONMENTS['new-driver'].gpu.version;
+    const s: PublicState = { ...state, environments };
+    // The fixture's package must pass the gate under `s` (it throws otherwise), and the receipt is derived under `s`.
+    const fx = proofFixture(area.dir, s, cleanPackage, 'state-classes', { environment: 'new-driver' });
+    stageEvidence(fx.bundle, fx.sources);
+    const receiptPath = writeReceipt(fx.bundle, buildReceipt(fx.bundle, s, WRITTEN_AT), s);
+    assert.equal(readJsonFile<PublicationProofReceipt>(receiptPath).subject.renderEnvironment.approvedClass, 'production-rtx5080');
+    for (const receiptOnly of [false, true]) assert.deepEqual(verifyReceipt(receiptPath, s, { receiptOnly }).findings, [], `receiptOnly=${receiptOnly}`);
+    // The control: under the classes on disk the same receipt is refused, so the state's classes are what decided.
+    refused(receiptPath, 'ENVIRONMENT_NOT_PUBLICATION', { receiptOnly: true });
+  });
+
   test('evidence relabelled from another machine: the package records another environment than the receipt', () => {
     const { receiptPath } = provenProof('relabel');
     forge(receiptPath, (r) => ((r.subject.renderEnvironment.record as { gpu: { deviceType: string } }).gpu.deviceType = 'NVIDIA-OTHER'));

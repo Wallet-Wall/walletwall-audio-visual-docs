@@ -21,7 +21,7 @@
 import { linkSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { classifyEnvironment, environmentSummary, parseRenderEnvironment, shownClassId, shownClassName } from '../blender/environment.ts';
-import { loadEnvironments, presentationHashes } from '../blender/identity.ts';
+import { presentationHashes } from '../blender/identity.ts';
 import { invariantsBarProblems, PUBLICATION_STRIDE } from '../blender/invariants-policy.ts';
 import { lessonBridge, lessonBridgeFor, lessonTerrain, strideFrames, type LessonMotion } from '../blender/lesson.ts';
 import { characterShots } from '../blender/production.ts';
@@ -484,7 +484,7 @@ function invariantsBlock(doc: Record<string, unknown> | null, state: PublicState
   if (identity.walletwallabyRealizationSha256 !== realization) bad("it was measured on another host realization of the character than the publication render's");
   const env = isObject(doc.environment) ? doc.environment : {};
   if (!same(env.record, environment)) bad('it was measured in another render environment than the publication render');
-  const cls = classifyEnvironment(env.record, loadBlenderConfig(), loadEnvironments());
+  const cls = classifyEnvironment(env.record, state.blenderConfig, state.environments);
   if (cls.classId !== env.classId || (cls.approvedClass?.name ?? null) !== env.approvedClass) bad('its recorded environment class is not what its record derives');
   findings.push(...leakFindings(doc, INVARIANTS_EVIDENCE, state));
   if (findings.length > 0) return { block: null, findings };
@@ -525,7 +525,7 @@ export function deriveSubject(packageDir: string, state: PublicState): { subject
   const records = [ch.sequence, ...ch.reveals];
   const environment = ch.sequence.environment.record;
   for (const [i, r] of records.entries()) if (!same(r.environment, ch.sequence.environment)) pkg(`${id}/render.json`, `character ${i === 0 ? 'sequence' : `reveal ${i - 1}`}: one publication is rendered in one environment`);
-  const cls = classifyEnvironment(environment, loadBlenderConfig(), loadEnvironments());
+  const cls = classifyEnvironment(environment, state.blenderConfig, state.environments);
   if (cls.status !== 'APPROVED' || cls.approvedClass?.purpose !== 'publication') findings.push({ code: 'ENVIRONMENT_NOT_PUBLICATION', path: `${id}/render.json`, message: `${RECEIPT_CODES.ENVIRONMENT_NOT_PUBLICATION} ${environmentSummary(cls)}` });
   if (findings.length > 0) return done();
 
@@ -653,7 +653,9 @@ function checkoutFindings(r: PublicationProofReceipt, state: PublicState): Recei
   const parsed = parseRenderEnvironment(s.renderEnvironment.record);
   if (!parsed.ok) for (const p of parsed.problems) bad('RECEIPT_SCHEMA', `subject.renderEnvironment.record${p.slice(1)}`, 'the render environment is not the closed render-environment schema');
   else {
-    const cls = classifyEnvironment(parsed.env, loadBlenderConfig(), loadEnvironments());
+    // Re-derived from the record with this checkout's classes and Blender pin: a recorded label, or a class whose Blender
+    // pin disagrees with config/blender.json, never makes an environment a publication class.
+    const cls = classifyEnvironment(parsed.env, state.blenderConfig, state.environments);
     if (cls.status !== 'APPROVED' || cls.approvedClass?.purpose !== 'publication') bad('ENVIRONMENT_NOT_PUBLICATION', 'subject.renderEnvironment', environmentSummary(cls));
     else if (cls.classId !== s.renderEnvironment.classId || cls.approvedClass.name !== s.renderEnvironment.approvedClass) bad('ENVIRONMENT_NOT_PUBLICATION', 'subject.renderEnvironment', `the recorded class ${shownClassId(s.renderEnvironment.classId)} (${shownClassName(s.renderEnvironment.approvedClass)}) is not what the record derives (${cls.classId}, ${cls.approvedClass.name})`);
   }

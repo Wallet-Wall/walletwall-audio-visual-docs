@@ -63,14 +63,24 @@ export interface RenderEnvironment {
   gpu: { backend: string; vendor: string; renderer: string; version: string; deviceType: string } | { unavailable: string };
 }
 
+/**
+ * One approved render-environment class (src/blender/environment.ts environmentsDocumentProblems). Every class pins the
+ * Blender build it was qualified on, which must equal config/blender.json's pin, and the GPU backend; a publication class
+ * also pins the GPU vendor, the exact renderer, and the driver.
+ */
 export interface EnvironmentClassSpec {
   name: string;
   purpose: 'publication' | 'proof';
-  match: { os: string; engine: string; gpu: { vendor?: string; renderer?: string; rendererPrefix?: string; version?: string } };
+  match: {
+    os: string;
+    blender: { version: string; buildHash: string };
+    engine: string;
+    gpu: { backend: string; vendor?: string; renderer?: string; rendererPrefix?: string; version?: string };
+  };
 }
 
 export interface EnvironmentsDocument {
-  schema: 'walletwall.blender-environments/v1';
+  schema: 'walletwall.blender-environments/v2';
   classes: EnvironmentClassSpec[];
   /** Same approved class: lossless frames must be byte-identical. */
   sameClass: 'byte-identical';
@@ -90,9 +100,11 @@ export interface PixelTolerance {
   maxCoverageDeltaPx: number;
 }
 
-export function loadEnvironments(): EnvironmentsDocument {
-  const doc = JSON.parse(readFileSync(path.join(VIDEO_ROOT, 'config', 'blender-environments.json'), 'utf8')) as EnvironmentsDocument;
-  if (doc.schema !== 'walletwall.blender-environments/v1') throw new Error('config/blender-environments.json is not walletwall.blender-environments/v1');
+/** The approved classes and tolerances, validated (`file` is this checkout's config/blender-environments.json; tests pass another). */
+export function loadEnvironments(file = path.join(VIDEO_ROOT, 'config', 'blender-environments.json')): EnvironmentsDocument {
+  const doc = JSON.parse(readFileSync(file, 'utf8')) as EnvironmentsDocument;
+  // v1 classes pinned neither the Blender build they were qualified on nor the GPU backend: never read as wildcards.
+  if (doc.schema !== 'walletwall.blender-environments/v2') throw new Error('config/blender-environments.json is not walletwall.blender-environments/v2 (classes must pin the Blender build and the GPU backend; docs/PUBLICATION.md)');
   // A class that pins nothing would approve anything: a malformed set of classes is refused, never read leniently.
   const problems = environmentsDocumentProblems(doc);
   if (problems.length > 0) throw new Error(`config/blender-environments.json does not define valid classes: ${problems.join('; ')}`);
@@ -103,8 +115,8 @@ export function loadEnvironments(): EnvironmentsDocument {
  * The render-environment class a render belongs to: its identity (a hash of everything that can change pixels on
  * the host side: OS family, Blender build, engine, GPU or software renderer and its driver or Mesa version, and the
  * render config) and, when one matches, the approved class it falls in. A class matches only a record that is
- * exactly the closed schema, made by the pinned Blender build, and agrees with every field the class pins
- * (src/blender/environment.ts, which also explains a mismatch field by field).
+ * exactly the closed schema, made by the Blender build the class pins (which must be config/blender.json's), and agrees
+ * with every field the class pins (src/blender/environment.ts, which also explains a mismatch field by field).
  */
 export function environmentClass(env: RenderEnvironment, cfg: BlenderConfig, approved: EnvironmentsDocument): { id: string; approvedAs: EnvironmentClassSpec | null } {
   const c = classifyEnvironment(env, cfg, approved);

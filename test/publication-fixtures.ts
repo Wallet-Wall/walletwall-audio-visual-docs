@@ -152,9 +152,12 @@ export const ENVIRONMENTS = {
 } as const satisfies Record<string, RenderEnvironment>;
 export type EnvironmentName = keyof typeof ENVIRONMENTS;
 
-/** The environment block scripts/render.ts records: the class re-derived from the record, as staging derives it. */
-export function environmentRecord(record: unknown) {
-  const cls = environmentClass(record as RenderEnvironment, loadBlenderConfig(), loadEnvironments());
+/**
+ * The environment block scripts/render.ts records: the class re-derived from the record, as staging derives it, with the
+ * classes and Blender config of `state` (this checkout's own unless a test hands it others).
+ */
+export function environmentRecord(record: unknown, state?: Pick<PublicState, 'blenderConfig' | 'environments'>) {
+  const cls = environmentClass(record as RenderEnvironment, state?.blenderConfig ?? loadBlenderConfig(), state?.environments ?? loadEnvironments());
   return { classId: cls.id, approvedClass: cls.approvedAs?.name ?? null, purpose: cls.approvedAs?.purpose ?? null, record };
 }
 
@@ -190,7 +193,7 @@ export const renderContentSha256 = (m: ReturnType<typeof blenderManifest>): stri
  */
 export function characterEvidence(state: PublicState, engine: 'typescript' | 'rust-wasm' = 'typescript', environment: EnvironmentName = 'production-rtx5080', opts: { truncateShots?: boolean } = {}) {
   const record = ENVIRONMENTS[environment];
-  const env = environmentRecord(record);
+  const env = environmentRecord(record, state);
   const lesson = state.lesson(engine);
   const seam = findRevealSeam(lesson);
   const sequenceBridge = lessonBridgeFor(lesson, undefined);
@@ -293,7 +296,7 @@ export function invariantsReport(state: PublicState, opts: { environment?: Envir
     lessonFrames: frames,
     lessonBridgeSha256,
     identity: opts.identity ?? { ...shared, ...(opts.realization ? { walletwallabyRealizationSha256: opts.realization } : {}), motionPlanSha256: lessonBridgeSha256, terrainSha256: contentAddress(lessonTerrain(lesson, lessonBridgeFor(lesson, frames))) },
-    environment: environmentRecord(ENVIRONMENTS[opts.environment ?? 'production-rtx5080']),
+    environment: environmentRecord(ENVIRONMENTS[opts.environment ?? 'production-rtx5080'], state),
     thresholds: opts.thresholds ?? { ...INVARIANT_THRESHOLDS },
     counts: opts.counts ?? PASSING_COUNTS,
     excluded: { ...(opts.excludedLesson ? { lesson: opts.excludedLesson } : {}), lab: [212, 213] },

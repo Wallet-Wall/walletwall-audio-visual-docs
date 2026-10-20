@@ -67,6 +67,45 @@ npm run publication:proof            → PASS under the newly approved class, wi
 Never: *new driver → a script rewrites the approved environment → publication proceeds.* No command in this
 repository writes `config/blender-environments.json` or the cross-class reference (`blender/proof/reference/`).
 
+### What a publication class binds
+
+A publication class (`config/blender-environments.json`, `walletwall.blender-environments/v2`) states the whole render
+environment it approves:
+
+| Field | Pinned as |
+|---|---|
+| OS | `match.os` |
+| Blender version and build | `match.blender.version` and `match.blender.buildHash`: the build the class was qualified on, written as `config/blender.json` pins it |
+| Render engine | `match.engine` |
+| GPU backend | `match.gpu.backend`, as Blender names it (`OPENGL` today) |
+| GPU vendor, renderer, driver | `match.gpu.vendor`, `match.gpu.renderer` (exact, never a prefix), `match.gpu.version` |
+
+Only `gpu.deviceType` stays unpinned: Blender derives it from the vendor. The Blender version is compared without its
+release type (`LTS`), because the build hash pins the build. The proof class pins the same Blender build and backend,
+and the GPU by renderer prefix. Every pin is required. A class without one (the older v1 shape) is
+refused, never read as a wildcard. A class's Blender pin must equal `config/blender.json`'s, or the class approves
+nothing:
+
+```text
+publication class "production-rtx5080" was qualified with Blender build 5.2.2 (d13f752e3b9c), but the current pinned build is 5.2.3 (…)
+```
+
+A Blender build update is one reviewed change:
+
+```text
+config/blender.json bumped    → every class is incoherent: publication:proof, the gate, and the receipt refuse,
+      ↓                         qualification is BLOCKED, and npm run render warns; each names both builds
+each class's Blender pin updated in the same change, and a new reference exported on the production host
+      ↓
+npm run blender:qualify-production   → REVERIFIED against the new reference, or a candidate: never an approval
+      ↓
+human review, CI, merge → npm run publication:proof
+```
+
+A GPU backend change, for example OPENGL to VULKAN on the same GPU and driver, is like a new driver. The environment is
+unapproved (`changed: gpu backend`), `publication:proof` stops with the diff, and qualification reaches
+`QUALIFICATION_CANDIDATE_PASS` at best, never `QUALIFICATION_REVERIFIED`. Approving it is a reviewed edit of the class.
+
 ### What the refusal looks like
 
 The environment is classified from the record Blender wrote (`render.py render_environment()`), and the refusal
@@ -76,14 +115,17 @@ names the change. Only fields of the closed environment schema appear:
 [publication:proof] this host's render environment is not an approved publication class (not approved; nearest approved class production-rtx5080 (publication); changed: driver 4.6.0 NVIDIA 616.56 -> 4.6.0 NVIDIA 620.10)
 approved (production-rtx5080, publication):
   os: windows
-  blender: 5.2.2 (d13f752e3b9c)
+  blender version: 5.2.2
+  blender build: d13f752e3b9c
   engine: BLENDER_EEVEE
   gpu vendor: NVIDIA Corporation
   gpu: NVIDIA GeForce RTX 5080/PCIe/SSE2
   driver: 4.6.0 NVIDIA 616.56
+  gpu backend: OPENGL
 observed:
   os: windows
-  blender: 5.2.2 (d13f752e3b9c)
+  blender version: 5.2.2
+  blender build: d13f752e3b9c
   engine: BLENDER_EEVEE
   gpu vendor: NVIDIA Corporation
   gpu: NVIDIA GeForce RTX 5080/PCIe/SSE2
@@ -94,9 +136,11 @@ changed:
   driver
 ```
 
-The "approved" block lists what the class pins; fields it does not pin (backend, device type) appear only as
-observed. `npm run render` prints the same diff when it renders outside an approved class, and the public-output
-gate's `RENDER_ENVIRONMENT_UNAPPROVED` finding carries it in one line.
+The "approved" block lists what the class pins; the field it does not pin (the device type) appears only as observed.
+The changed fields are listed in this fixed field order. A class that approves nothing whatever the host reports (its
+Blender pin is not `config/blender.json`'s, or it lacks a required pin) adds a last block,
+`the class approves nothing:`, saying why. `npm run render` prints the same diff when it renders outside an approved
+class, and the public-output gate's `RENDER_ENVIRONMENT_UNAPPROVED` finding carries it in one line.
 
 ### Requalifying the host
 
@@ -109,12 +153,13 @@ On the production host, with the pinned Blender:
 | Check | Rule |
 |---|---|
 | `blender-pinned` | The installed Blender is the build `config/blender.json` pins. Otherwise nothing renders and the record names the change (BLOCKED). |
+| `class-blender-pins` | Every approved class pins that same Blender build. A class qualified on another build is a source/config coherence failure, named with both builds (BLOCKED). Only a reviewed change resolves it. |
 | `reference-intact` | Every PNG of the committed reference is the bytes its `proof.json` records, and it was rendered in an approved publication class (BLOCKED otherwise). |
 | `reference-fresh` | The reference was rendered from this checkout's Blender config, lane source, canonical model, and plan (BLOCKED otherwise: a stale reference cannot vouch for anything). |
-| `environment` | The environment Blender reported, classified and diffed. A record outside the closed schema, or the proof class, is no production candidate (BLOCKED). |
+| `environment` | The environment Blender reported, classified and diffed. A record outside the closed schema, a record of another Blender build than the pinned one, or the proof class is no production candidate (BLOCKED). |
 | `character-pinned` | Two builds from code, both the pinned canonical model and materials (`BLENDER_CHARACTER`), one realization. |
 | `same-class-repeat` | The ten-frame proof set rendered twice, in fresh processes: every PNG byte-identical, one environment. |
-| `versus-reference` | Run A against the reference: the same proof frames and crops. Within the reference's own class, every frame must be byte-identical (guarantee A). That covers the same class id, and the same approved class with a field the class does not pin changed (a backend, a device type). Another class must hold the pinned cross-class tolerance, frame by frame (guarantee B). |
+| `versus-reference` | Run A against the reference: the same proof frames and crops. Within the reference's own class, every frame must be byte-identical (guarantee A). That covers the same class id, and the same approved class with a field the class does not pin changed (the device type). Another class, or an unapproved environment such as another GPU backend, must hold the pinned cross-class tolerance, frame by frame (guarantee B). |
 | `contacts-and-invariants` | The ported invariants (planted feet, paws on the lip, the tail on its supports, the envelope, protected text, title-safe, the palette) at the publication stride, in the same environment. They are judged against this checkout's thresholds and coverage minimums (`src/blender/invariants-policy.ts`), not the ones a report claims. |
 | `pins-unchanged` | `config/blender-environments.json`, the reference, `config/blender.json`, and the character pins (`src/character/walletwallaby/versions.ts`) are byte-identical at the end to the start. |
 
@@ -130,12 +175,13 @@ Verdicts:
 - **`QUALIFICATION_FAIL`**: a check failed, stated with the measure and the unchanged pin (three significant digits),
   for example
   `transition-peak (frame 1760): changed fraction 0.570% > approved maximum 0.500% (crossClassTolerance.scene.maxFractionOverNoise)`.
-- **`QUALIFICATION_BLOCKED`**: qualification could not mean anything (an unpinned Blender, a stale or damaged
-  reference, an invalid environment record, the proof class).
+- **`QUALIFICATION_BLOCKED`**: qualification could not mean anything: an unpinned Blender installed or recorded,
+  classes whose Blender pin is not `config/blender.json`'s, a stale or damaged reference, an invalid environment record,
+  or the proof class.
 
-A **Blender update** starts with a reviewed change of `config/blender.json` (version, build hash, archive SHA-256s).
-Qualification never renders with an unpinned Blender. On the branch with the new pin, the committed reference is stale
-until a new one is exported and reviewed.
+A **Blender update** is the one reviewed change [above](#what-a-publication-class-binds): `config/blender.json`
+(version, build hash, archive SHA-256s), every class's Blender pin, and a new reference. Qualification never renders
+with an unpinned Blender, and a different Blender build is never a candidate (BLOCKED).
 
 ## Requalification never lowers the bar
 
@@ -169,13 +215,19 @@ review.
 - **Problems.** A problem names the field, never its value.
 
 `config/blender-environments.json` is validated when it is read. Each class needs a plain unique name and a purpose.
-Its match must pin the OS, the engine, and the GPU by renderer or renderer prefix, with no other field. A class that
-pinned nothing would approve anything, so a malformed document is refused, never read leniently.
+Its match must pin the OS, the Blender build it was qualified on (`blender: { version, buildHash }`), the engine, and
+the GPU by backend and by renderer or renderer prefix, with no other field. A publication class must also pin the GPU
+vendor, the exact renderer, and the driver. A class that pinned nothing would approve anything, so a malformed
+document is refused, never read leniently. That includes a v1 document, whose classes pin no Blender build or backend.
+Classification fails closed on its own, too, even for a document that skipped validation. A missing required pin is
+never a wildcard: either the field shows as changed or the class reports the problem, and the class approves nothing.
+Each class is read once, as plain data. Own members only: a prototype name is an unknown field, and an inherited
+member is missing.
 
-A class approves an environment exactly when the diff against it has no changed field, so the decision and the
-explanation cannot disagree. Every class also requires the Blender build `config/blender.json` pins. A record with an
-unknown field (a host name, a user, a path) is INVALID and never approved. The class id is derived as before (the
-record and the render config, hashed), so recorded ids stay valid.
+A class approves an environment exactly when the diff against it has no changed field, and the class is well formed
+and coherent: its Blender pin is the build `config/blender.json` pins. The decision and the explanation cannot
+disagree. A record with an unknown field (a host name, a user, a path) is INVALID and never approved. The class id is
+derived as before (the record and the render config, hashed), so recorded ids stay valid.
 
 ## The receipt
 
@@ -265,7 +317,8 @@ everything that does not need the package's bytes (the MP4 included), and says t
 ## Security review
 
 - **Can a malicious or stale render claim the production class?** A label cannot: the class is re-derived from the
-  closed environment record, against the pinned Blender and every field the class pins. A stale render cannot: the
+  closed environment record, against every field the class pins (the Blender build and the GPU backend included) and
+  `config/blender.json`'s pin. A stale render cannot: the
   spec, build identity, MotionPlan, character pins, and the invariants' plan are all re-derived. A fully fabricated
   environment record (a render made elsewhere, edited to read like the production host) cannot be told apart by
   inspecting files. There is no host signing key. It is detectable by audit: the receipt binds every Blender frame's
@@ -279,13 +332,22 @@ everything that does not need the package's bytes (the MP4 included), and says t
   is unapproved: the gate refuses, and `publication:proof` stops before rendering, with the diff. Approval is a
   reviewed edit of `config/blender-environments.json`, which also changes the build identity, so earlier artifacts go
   stale.
+- **Can a GPU backend or Blender change keep the old class approved?** No.
+  - The backend and the Blender build are pinned fields of every class.
+  - A bump of `config/blender.json` alone leaves every class incoherent: they approve nothing, neither the old build nor
+    the new one.
+  - A class edited alone cannot bless an unpinned Blender: the class and `config/blender.json` must agree, and
+    qualification blocks an installed or recorded build that is not the pinned one.
+  - A unit test fails on any committed disagreement between the two files.
 - **Can qualification rewrite its own threshold?** No. The tolerances are read-only inputs. There is no write path
   outside the record writer, and the CLI runs only its listed steps (both guarded, with positive controls). The pins
   (classes and tolerances, reference, Blender config, character pins) are hashed before and after. The invariants'
   thresholds and coverage live in one module that the receipt also checks.
 - **Can a stale reference frame be accepted?** No. Qualification checks every reference PNG against `proof.json`, and
   the reference's config, lane source, model, and plan against this checkout. `blender:proof compare` now verifies
-  every PNG against its record before comparing.
+  every PNG against its record before comparing. `blender:proof export-reference` re-derives the run's class from its
+  own record with this checkout's classes and Blender pin: a label, even one recorded before a class changed, never
+  makes a run the reference.
 - **Can a proof from another MotionPlan be attached?** No:
   - the plan and the reveal are re-derived;
   - Blender's manifests must hash to the `renderSha256` the render recorded, and must hold exactly the frames and crops
@@ -316,18 +378,20 @@ everything that does not need the package's bytes (the MP4 included), and says t
 
 - **No hardware-rooted attestation.** A deliberate insider can fabricate a consistent package. The defenses are human
   review, re-render audit, and recording the receipt identity at publication.
-- **The production class pins vendor, renderer, and driver, but not `gpu.backend` or `gpu.deviceType`.** Qualification
-  catches such a change: an environment still approved as the reference's class must reproduce the reference byte for
-  byte. `publication:proof` does not compare with the reference. Pinning those fields is a separate, reviewed config
-  change.
+- **`gpu.deviceType` is not pinned.** Blender derives it from the vendor, which the class pins. A device-type change
+  under the same class is caught by qualification (the reference's own class must reproduce it byte for byte), not by
+  `publication:proof`.
+- **The proof class's backend comes from the recorded Linux proof run.** That was WSL with Mesa llvmpipe, approved as
+  `proof-linux-software-gl`. The hosted runner reports its own record each time the required Render determinism job
+  renders. If a runner ever reported another backend, that job's gate would refuse it as unapproved, which is fail
+  closed. Approving it would be a reviewed class change.
+- **A Blender update cannot be compared with the old reference.** The reference records the Blender config it was
+  rendered with, so on a new pin it is stale (qualification BLOCKED). The update therefore ships with a new reference,
+  and the visual difference between builds is reviewed in that change.
 - **A reused render from an earlier environment fails late.** Blender frames rendered earlier (verified and reused by
   `npm run render`) may come from another approved environment than the one the invariants just ran in. The receipt
   requires one environment, so such a proof stops at its last step, after the encode. Delete
   `dist/blender/out/renders` (or render with `--fresh-blender`) and run the proof again.
-- **No class pins a Blender build itself.** A reviewed bump of `config/blender.json` changes the pinned build every
-  class requires, so the production class matches again by its other fields. The reference goes stale (qualification
-  BLOCKED until a new one is reviewed), but `publication:proof` does not check reference freshness. Pinning the Blender
-  build in the class is a separate, reviewed config change.
 - **MP4 bytes are not run-to-run stable.** A receipt identifies one artifact; determinism is proven on lossless frames.
 - **The invariants evidence proves which frames, plan, character, environment, and bar were measured.** Only a
   re-render can re-measure the values.
