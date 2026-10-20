@@ -1,5 +1,10 @@
 {
-  "schema": "walletwall.narration-bakeoff-results/v1",
+  "schema": "walletwall.narration-bakeoff-results/v2",
+  "voiceIdentity": {
+    "id": "walletwallaby-v2",
+    "language": "en-AU",
+    "accent": "Australian English"
+  },
   "corpus": {
     "id": "walletwallaby-narration-eval",
     "version": 1,
@@ -14,8 +19,13 @@
       "provider": "chatterbox-multilingual",
       "variant": "paced-calm",
       "passageId": "long-form",
+      "accent": {
+        "declared": "en-US",
+        "identity": "en-AU",
+        "matches": false
+      },
       "artifact": {
-        "identity": "f89264b89be443c74d76425cfabf9245a2fbf27b4dae1a275692d172d497f3fb",
+        "identity": "81221988d9a685abbc07b39015c6f1b580d78d9a725208f6986d76bfaba95552",
         "synthesis": "adapter",
         "audioSha256": "dda27db3a5a5e170d6f8283c0a8a91a35111846f5fc0a0fe2cd878f36d071738",
         "durationMs": 30280,
@@ -32,6 +42,7 @@
           "ve.pt": "4b16d836bc598509860f6fa068165a8bb5e9ac84f05582dfcf278a5a372879f1"
         },
         "voiceId": "built-in",
+        "voiceIdentityId": "walletwallaby-v2",
         "seed": 7,
         "settings": {
           "t3Model": "v3",
@@ -63,9 +74,9 @@
         }
       },
       "performance": {
-        "wallMs": 59084.0613,
+        "wallMs": 61914.721500000014,
         "coldStart": true,
-        "vramPeakMiB": 5334
+        "vramPeakMiB": 5276
       },
       "metrics": {
         "sampleRate": 24000,
@@ -220,8 +231,13 @@
       "provider": "chatterbox-multilingual",
       "variant": "paced-calm",
       "passageId": "normal-explanation",
+      "accent": {
+        "declared": "en-US",
+        "identity": "en-AU",
+        "matches": false
+      },
       "artifact": {
-        "identity": "4b1b1b40cf01ea07a30f3d567cf3ce88552f7728cab1db25cfbee663627ce615",
+        "identity": "bf3844a297a26c5114597f6826ddbd80344e5e740f9e3c4c3fc3367cc0aa2e14",
         "synthesis": "adapter",
         "audioSha256": "7707df349d6cf9403da9d0f912bb5ce3465af2cec13932cf6f6d1a39051ce622",
         "durationMs": 16640,
@@ -238,6 +254,7 @@
           "ve.pt": "4b16d836bc598509860f6fa068165a8bb5e9ac84f05582dfcf278a5a372879f1"
         },
         "voiceId": "built-in",
+        "voiceIdentityId": "walletwallaby-v2",
         "seed": 7,
         "settings": {
           "t3Model": "v3",
@@ -269,9 +286,9 @@
         }
       },
       "performance": {
-        "wallMs": 52830.246,
+        "wallMs": 58645.524,
         "coldStart": true,
-        "vramPeakMiB": 4209
+        "vramPeakMiB": 4019
       },
       "metrics": {
         "sampleRate": 24000,
@@ -343,8 +360,13 @@
       "provider": "chatterbox-multilingual",
       "variant": "paced-calm",
       "passageId": "short-instruction",
+      "accent": {
+        "declared": "en-US",
+        "identity": "en-AU",
+        "matches": false
+      },
       "artifact": {
-        "identity": "984511606de38743157569a1d83153a255d0a978816e83cafcc1bc5338d0969e",
+        "identity": "60f14321f9e152048409cc03d32f701e80903fccb57616a074cf4fcca8ae67cf",
         "synthesis": "adapter",
         "audioSha256": "9b1aff2fced0e9ecfcd292dcfd6de90577c09f151e651332cb12902b655bb409",
         "durationMs": 4920,
@@ -361,6 +383,7 @@
           "ve.pt": "4b16d836bc598509860f6fa068165a8bb5e9ac84f05582dfcf278a5a372879f1"
         },
         "voiceId": "built-in",
+        "voiceIdentityId": "walletwallaby-v2",
         "seed": 7,
         "settings": {
           "t3Model": "v3",
@@ -392,9 +415,9 @@
         }
       },
       "performance": {
-        "wallMs": 54798.7667,
+        "wallMs": 73636.7109,
         "coldStart": true,
-        "vramPeakMiB": 3608
+        "vramPeakMiB": 3738
       },
       "metrics": {
         "sampleRate": 24000,
@@ -459,8 +482,13 @@
       "provider": "chatterbox-multilingual",
       "variant": "paced-calm",
       "passageId": "technical-passage",
+      "accent": {
+        "declared": "en-US",
+        "identity": "en-AU",
+        "matches": false
+      },
       "artifact": {
-        "identity": "e03e5c721c806d6e8a148da44ac64a645c1ef2d68f5990444e06cacbd3449776",
+        "identity": "8032e25af57702ebdcd458f1d18c60b3c57445f073aa7ef6a4fba4fb1f688394",
         "synthesis": "adapter",
         "audioSha256": "0aacc54e3c6d01010d045b7f81dc2c2db446559bdfba2be3166550c416a0f70d",
         "durationMs": 27760,
@@ -477,6 +505,7 @@
           "ve.pt": "4b16d836bc598509860f6fa068165a8bb5e9ac84f05582dfcf278a5a372879f1"
         },
         "voiceId": "built-in",
+        "voiceIdentityId": "walletwallaby-v2",
         "seed": 7,
         "settings": {
           "t3Model": "v3",
@@ -508,9 +537,9 @@
         }
       },
       "performance": {
-        "wallMs": 65661.5885,
+        "wallMs": 60502.32519999999,
         "coldStart": true,
-        "vramPeakMiB": 4892
+        "vramPeakMiB": 4971
       },
       "metrics": {
         "sampleRate": 24000,
@@ -575,8 +604,13 @@
       "provider": "magpie-nemo-speech",
       "variant": "jason-cool",
       "passageId": "long-form",
+      "accent": {
+        "declared": "en-US",
+        "identity": "en-AU",
+        "matches": false
+      },
       "artifact": {
-        "identity": "12dd2a7429c10ed3ed8be9219b49349fc7b2eb57f4688846e0ad8c3ad60aef63",
+        "identity": "9bbe52ebc4bb6b293e98d5f868772d1f3ff475f807a5d3482f41fc76efbaf02b",
         "synthesis": "adapter",
         "audioSha256": "8bccbc77197b4d4431d7f4f7fa1c633bac5dacd82da7e578f2db55436ee5c22d",
         "durationMs": 77183,
@@ -590,6 +624,7 @@
           "tokenizer/": "36529a70c72a7cc60e301579eab88a945ba58d915573bf0a2bc8ba0ec5acf036"
         },
         "voiceId": "Jason",
+        "voiceIdentityId": "walletwallaby-v2",
         "seed": 7,
         "settings": {
           "voice": "Jason",
@@ -616,9 +651,9 @@
         }
       },
       "performance": {
-        "wallMs": 3136.540400000001,
+        "wallMs": 5551.2796,
         "coldStart": true,
-        "vramPeakMiB": 1866
+        "vramPeakMiB": 1901
       },
       "metrics": {
         "sampleRate": 22050,
@@ -698,8 +733,13 @@
       "provider": "magpie-nemo-speech",
       "variant": "jason-cool",
       "passageId": "normal-explanation",
+      "accent": {
+        "declared": "en-US",
+        "identity": "en-AU",
+        "matches": false
+      },
       "artifact": {
-        "identity": "8dc94a4353103a37d15cb5577204e7d8fe4e87c4c2a68a3aa05259d7da5a2090",
+        "identity": "8d93b12f939cdddd02a787cba83f20ba14a786cb01f62e6f08c0fabaa88d0a4a",
         "synthesis": "adapter",
         "audioSha256": "cb26d5dba815b11054ddd3ef628f1a49e722cbf37f3a063b4eb8d14231c24ce8",
         "durationMs": 27771,
@@ -713,6 +753,7 @@
           "tokenizer/": "36529a70c72a7cc60e301579eab88a945ba58d915573bf0a2bc8ba0ec5acf036"
         },
         "voiceId": "Jason",
+        "voiceIdentityId": "walletwallaby-v2",
         "seed": 7,
         "settings": {
           "voice": "Jason",
@@ -739,9 +780,9 @@
         }
       },
       "performance": {
-        "wallMs": 1985.1392,
+        "wallMs": 2146.3316,
         "coldStart": true,
-        "vramPeakMiB": 1879
+        "vramPeakMiB": 1876
       },
       "metrics": {
         "sampleRate": 22050,
@@ -820,8 +861,13 @@
       "provider": "magpie-nemo-speech",
       "variant": "jason-cool",
       "passageId": "short-instruction",
+      "accent": {
+        "declared": "en-US",
+        "identity": "en-AU",
+        "matches": false
+      },
       "artifact": {
-        "identity": "2460ef752be5e872dba75087c3d61d99020c8f755cfa50ebce40461d08722a4d",
+        "identity": "d81c905553acf66df2bc968b12fbd8ca5cd3489c8c8282b3d7ad8d02213b14e1",
         "synthesis": "adapter",
         "audioSha256": "5596acdf7617003c5edf39c43f884b569750b07d21e19976d83ebde802697652",
         "durationMs": 5759,
@@ -835,6 +881,7 @@
           "tokenizer/": "36529a70c72a7cc60e301579eab88a945ba58d915573bf0a2bc8ba0ec5acf036"
         },
         "voiceId": "Jason",
+        "voiceIdentityId": "walletwallaby-v2",
         "seed": 7,
         "settings": {
           "voice": "Jason",
@@ -861,9 +908,9 @@
         }
       },
       "performance": {
-        "wallMs": 1195.351,
+        "wallMs": 1528.6444999999999,
         "coldStart": true,
-        "vramPeakMiB": 1007
+        "vramPeakMiB": 1482
       },
       "metrics": {
         "sampleRate": 22050,
@@ -928,8 +975,13 @@
       "provider": "magpie-nemo-speech",
       "variant": "jason-cool",
       "passageId": "technical-passage",
+      "accent": {
+        "declared": "en-US",
+        "identity": "en-AU",
+        "matches": false
+      },
       "artifact": {
-        "identity": "2dc3dfc7d949d4e3e86078fa3041feb2cd59d5b2408955682a700f8d0e347fef",
+        "identity": "65e25cd6117e16c24ce8551b80b61e7826c8c19d59b51eb8f436b76465337efa",
         "synthesis": "adapter",
         "audioSha256": "61ab72d9816185bf8afc906621e4b723ca7392911302bfef3f8ad5feae5a7bea",
         "durationMs": 39567,
@@ -943,6 +995,7 @@
           "tokenizer/": "36529a70c72a7cc60e301579eab88a945ba58d915573bf0a2bc8ba0ec5acf036"
         },
         "voiceId": "Jason",
+        "voiceIdentityId": "walletwallaby-v2",
         "seed": 7,
         "settings": {
           "voice": "Jason",
@@ -969,9 +1022,9 @@
         }
       },
       "performance": {
-        "wallMs": 2075.2001,
+        "wallMs": 2123.6679000000004,
         "coldStart": true,
-        "vramPeakMiB": 1867
+        "vramPeakMiB": 1879
       },
       "metrics": {
         "sampleRate": 22050,

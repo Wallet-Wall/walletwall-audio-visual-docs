@@ -42,6 +42,9 @@ export interface PinnedFile {
 
 export interface MagpieBinding {
   kind: 'local';
+  role: string;
+  /** The variety the baked speakers speak (BCP 47). Magpie has no Australian voice; the deviation is recorded, never hidden. */
+  accent: string;
   binaryEnv: string;
   modelDirEnv: string;
   runtime: { name: string; version: string };

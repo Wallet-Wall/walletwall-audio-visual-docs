@@ -1,12 +1,48 @@
 {
-  "schema": "walletwall.voice-identity/v1",
-  "id": "walletwallaby-v1",
+  "schema": "walletwall.voice-identity/v2",
+  "id": "walletwallaby-v2",
   "character": "WalletWallaby",
   "direction": {
-    "summary": "Calm adult expedition guide: warm, grounded, precise, evidence-first.",
+    "concept": "Seasoned expedition guide through difficult information terrain.",
+    "summary": "Calm adult Australian English expedition guide: grounded, experienced, precise, evidence-first, quietly confident.",
+    "language": "en-AU",
+    "accent": {
+      "variety": "Australian English",
+      "rendering": "Natural and regionally Australian, the way an experienced local sounds on a field recording. Never performed as a gimmick."
+    },
     "register": "medium-to-low",
-    "qualities": ["warm", "grounded", "precise technical diction", "conversational", "measured pacing", "comfortable pauses", "slight field-documentary character"],
-    "avoid": ["salesy", "cartoonish", "hyperactive", "imitating any real, identifiable person", "ethnicized accent or caricature"]
+    "qualities": [
+      "calm",
+      "grounded",
+      "experienced",
+      "warm but restrained",
+      "precise technical diction",
+      "field-documentary tone",
+      "evidence-first",
+      "quietly confident",
+      "conversational",
+      "measured pacing",
+      "comfortable pauses",
+      "thoughtful under uncertainty",
+      "capable of dry situational humor",
+      "comfortable with technical language"
+    ],
+    "avoid": [
+      "caricatured or exaggerated Australian accent",
+      "slang for its own sake",
+      "broad comedic delivery",
+      "cartoon mascot voice",
+      "announcer voice",
+      "movie-trailer gravitas",
+      "hyperactive YouTuber cadence",
+      "corporate training voice",
+      "synthetic sing-song rhythm",
+      "fake gravitas",
+      "excessive breathiness",
+      "dramatic pauses",
+      "salesy",
+      "imitating any real, identifiable person"
+    ]
   },
   "pacing": {
     "targetWpm": 145,
@@ -16,7 +52,7 @@
     "commaPauseMs": 90
   },
   "providerBindings": {
-    "note": "Provider-specific settings live here, never in a VideoSpec. Credentials are read from the environment at synthesis time only and are never written to manifests.",
+    "note": "Provider-specific settings live here, never in a VideoSpec, and never a voice id: a provider interprets the direction above with its own controls. Credentials are read from the environment at synthesis time only and are never written to manifests. The narration bakeoff's evaluation bindings (voice ids, pinned models, named variants) live in config/narration-providers.json; the publication binding below stays NOT_CONFIGURED until a provider is promoted.",
     "elevenlabs": {
       "voiceIdEnv": "WALLETWALLABY_ELEVENLABS_VOICE_ID",
       "apiKeyEnv": "ELEVENLABS_API_KEY",

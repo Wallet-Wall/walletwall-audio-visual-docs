@@ -19,7 +19,8 @@ import { DIST_ROOT, loadPipelineConfig, VIDEO_ROOT } from '../src/config/load.ts
 import { prettyJson } from '../src/core/canonical-json.ts';
 import { readContainedFile } from '../src/core/contained-read.ts';
 import { sha256Hex } from '../src/core/hash.ts';
-import { buildNarrationArtifact, validateNarrationArtifact, type NarrationArtifact } from '../src/narration/artifact.ts';
+import { buildNarrationArtifact, staleFor, validateNarrationArtifact, type NarrationArtifact } from '../src/narration/artifact.ts';
+import type { PipelineConfig } from '../src/config/types.ts';
 import { isNarrationProviderId, NarrationContractError, PLAIN_ID, type NarrationProvider, type NarrationProviderId, type NarrationRequest, type SynthesisResult } from '../src/narration/contract.ts';
 import { corpusSha256, loadCorpus, passageRequest, type CorpusPassage, type NarrationCorpus } from '../src/narration/corpus.ts';
 import { analyzeAudio, applyGainDb, loudnessMatchGainDb, type AudioMetrics } from '../src/narration/metrics.ts';
@@ -89,7 +90,21 @@ function passagesWanted(corpus: NarrationCorpus): CorpusPassage[] {
   });
 }
 
-function readCandidates(config: NarrationProvidersConfig, filter: { provider?: string; variant?: string } = {}): Candidate[] {
+/** The bakeoff bindings must track the canonical identity; a mismatch means one of the two moved without the other. */
+function assertIdentityTracked(config: NarrationProvidersConfig, pipeline: PipelineConfig): void {
+  if (config.voiceIdentity !== pipeline.voice.id) throw new NarrationContractError(`config/narration-providers.json binds voice identity ${config.voiceIdentity}, but config/voice-identity.json is ${pipeline.voice.id}`);
+}
+
+/** A provider whose declared accent is not the identity's: allowed for development and fallback roles, always said out loud. */
+function accentDeviation(config: NarrationProvidersConfig, provider: NarrationProviderId, pipeline: PipelineConfig): { declared: string; identity: string; matches: boolean } {
+  const declared = config.providers[provider].accent;
+  const identity = pipeline.voice.direction.language;
+  return { declared, identity, matches: declared === identity };
+}
+
+function readCandidates(config: NarrationProvidersConfig, pipeline: PipelineConfig, corpus: NarrationCorpus, filter: { provider?: string; variant?: string } = {}): Candidate[] {
+  assertIdentityTracked(config, pipeline);
+  const current = { voiceIdentityId: pipeline.voice.id, corpusId: corpus.id, corpusVersion: corpus.version };
   const out: Candidate[] = [];
   let providers: string[];
   try {
@@ -108,6 +123,8 @@ function readCandidates(config: NarrationProvidersConfig, filter: { provider?: s
         const errors = validateNarrationArtifact(artifact, process.env);
         if (errors.length) throw new NarrationContractError(`${provider}/${variant}/${file}: ${errors.join('; ')}`);
         if (artifact.provider !== provider || artifact.variant !== variant) throw new NarrationContractError(`${provider}/${variant}/${file}: the record names another provider or variant`);
+        const stale = staleFor(artifact, current);
+        if (stale) throw new NarrationContractError(`${provider}/${variant}/${file}: ${stale}; re-synthesize it (stale narration is never re-labelled)`);
         const wav = readBakeoffFile(artifact.audio.path);
         if (!wav) throw new NarrationContractError(`${artifact.audio.path} is missing`);
         if (sha256Hex(wav) !== artifact.audio.sha256) throw new NarrationContractError(`${artifact.audio.path} no longer matches its record (stale narration)`);
@@ -143,7 +160,10 @@ async function synthesize(): Promise<void> {
   const settings = variantSettings(config, provider, variant);
   const repeat = Number(opt('repeat') ?? '1');
   if (!Number.isInteger(repeat) || repeat < 1 || repeat > 5) throw new NarrationContractError('--repeat must be 1..5');
+  assertIdentityTracked(config, pipeline);
   log(`${provider.id} / ${variant}: ${JSON.stringify(settings)}`);
+  const accent = accentDeviation(config, provider.id, pipeline);
+  if (!accent.matches) log(`${provider.id}: speaks ${accent.declared}; the identity ${pipeline.voice.id} asks for ${accent.identity} (recorded as a deviation; this provider cannot honour the direction)`);
   for (const passage of passagesWanted(corpus)) {
     const request = passageRequest(passage, pipeline);
     const workDir = path.join(candidateDir(provider.id, variant), 'work');
@@ -175,6 +195,7 @@ async function place(): Promise<void> {
   const passageId = opt('passage');
   if (!variant || !file || !passageId) throw new NarrationContractError('--variant, --passage and --file are required');
   const settings = variantSettings(config, provider, variant);
+  assertIdentityTracked(config, pipeline);
   const passage = corpus.passages.find((p) => p.id === passageId);
   if (!passage) throw new NarrationContractError(`unknown passage ${passageId}`);
   if (!file.toLowerCase().endsWith('.wav')) throw new NarrationContractError('the placed file must be a .wav (raw provider output, no transcoding)');
@@ -224,7 +245,7 @@ async function transcribe(): Promise<void> {
   const runtime = await nemoSpeechFor(config);
   const gguf = asrModel(config);
   const asr = config.diagnostics.asr;
-  const candidates = readCandidates(config, { provider: opt('provider'), variant: opt('variant') });
+  const candidates = readCandidates(config, pipeline, corpus, { provider: opt('provider'), variant: opt('variant') });
   if (!candidates.length) throw new NarrationContractError('nothing to transcribe: synthesize first');
   for (const c of candidates) {
     const passage = corpus.passages.find((p) => p.id === c.passageId);
@@ -392,15 +413,17 @@ ${sections}
 
 async function review(): Promise<void> {
   const config = loadProvidersConfig();
+  const pipeline = loadPipelineConfig();
   const corpus = loadCorpus();
   const targetLufs = Number(opt('target-lufs') ?? '-20');
   if (!Number.isFinite(targetLufs) || targetLufs > -6 || targetLufs < -40) throw new NarrationContractError('--target-lufs must be between -40 and -6');
   const lineupOpt = opt('lineup')?.split(',').map((s) => s.trim()).filter(Boolean);
-  const all = readCandidates(config);
+  const all = readCandidates(config, pipeline, corpus);
   const chosen = lineupOpt ? all.filter((c) => lineupOpt.includes(`${c.provider}:${c.variant}`)) : all;
   if (!chosen.length) throw new NarrationContractError('no candidates: synthesize or place audio first');
   const results = {
-    schema: 'walletwall.narration-bakeoff-results/v1',
+    schema: 'walletwall.narration-bakeoff-results/v2',
+    voiceIdentity: { id: pipeline.voice.id, language: pipeline.voice.direction.language, accent: pipeline.voice.direction.accent.variety },
     corpus: { id: corpus.id, version: corpus.version, sha256: corpusSha256(corpus) },
     lineup: [...new Set(chosen.map((c) => `${c.provider}:${c.variant}`))].sort(),
     candidates: chosen.map((c) => {
@@ -413,7 +436,8 @@ async function review(): Promise<void> {
         provider: c.provider,
         variant: c.variant,
         passageId: c.passageId,
-        artifact: { identity: a.identity, synthesis: a.synthesis, audioSha256: a.audio.sha256, durationMs: a.audio.durationMs, sampleRate: a.audio.sampleRate, channels: a.audio.channels, modelId: a.modelId, modelVersion: a.modelVersion, modelContent: a.modelContent, voiceId: a.voiceId, seed: a.seed, settings: a.settings, runtime: a.runtime, text: a.text },
+        accent: accentDeviation(config, c.provider, pipeline),
+        artifact: { identity: a.identity, synthesis: a.synthesis, audioSha256: a.audio.sha256, durationMs: a.audio.durationMs, sampleRate: a.audio.sampleRate, channels: a.audio.channels, modelId: a.modelId, modelVersion: a.modelVersion, modelContent: a.modelContent, voiceId: a.voiceId, voiceIdentityId: a.voiceIdentityId, seed: a.seed, settings: a.settings, runtime: a.runtime, text: a.text },
         performance: a.performance,
         metrics: metrics && metrics.identity === a.identity ? metrics.metrics : null,
         transcript: transcript && transcript.identity === a.identity ? { text: transcript.text, diff: transcript.diff, asr: transcript.asr } : null,
@@ -461,6 +485,8 @@ async function doctor(): Promise<void> {
   const config = loadProvidersConfig();
   const pipeline = loadPipelineConfig();
   const corpus = loadCorpus();
+  assertIdentityTracked(config, pipeline);
+  log(`voice identity ${pipeline.voice.id}: ${pipeline.voice.direction.language} (${pipeline.voice.direction.accent.variety}); providers declare ${(['elevenlabs', 'magpie-nemo-speech', 'chatterbox-multilingual'] as const).map((p) => `${p} ${config.providers[p].accent}`).join(', ')}`);
   log(`corpus ${corpus.id} v${corpus.version} ${corpusSha256(corpus).slice(0, 12)}: ${corpus.passages.map((p) => `${p.id} ~${fmt(estimateSpokenMs(passageRequest(p, pipeline).spokenText, pipeline.voice.pacing) / 1000, 0)} s`).join(', ')}`);
   const el = config.providers.elevenlabs;
   // Only the presence of the credential is reported, as a boolean. Neither its value nor the binding's

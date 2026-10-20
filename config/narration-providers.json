@@ -1,11 +1,13 @@
 {
   "schema": "walletwall.narration-providers/v1",
   "note": "Bakeoff provider bindings (docs/NARRATION.md). These are evaluation adapters, not the publication voice: scripts/render.ts keeps the fixture voice and config/voice-identity.json still reports the publication binding as NOT_CONFIGURED. Credentials are named by environment variable only; model identities are pinned by revision and sha256; every variant is a complete, closed settings object validated by its adapter.",
-  "voiceIdentity": "walletwallaby-v1",
+  "voiceIdentity": "walletwallaby-v2",
+  "accentNote": "Each binding declares the variety its voice actually speaks. The identity asks for en-AU; a provider whose declared accent differs is a documented deviation (recorded per candidate in results.json), never a silent one. The ElevenLabs adapter also checks the voice's own labels through the API.",
   "providers": {
     "elevenlabs": {
       "kind": "remote",
-      "role": "Publication-quality reference. Never cloned, scraped, or used as conditioning for another model.",
+      "role": "Publication target and quality reference. Never cloned, scraped, or used as conditioning for another model.",
+      "accent": "en-AU",
       "apiKeyEnv": "ELEVENLABS_API_KEY",
       "voiceIdEnv": "WALLETWALLABY_ELEVENLABS_VOICE_ID",
       "voiceId": "DTLT09E2cxHF0DqjKVbc",
@@ -36,6 +38,8 @@
     },
     "magpie-nemo-speech": {
       "kind": "local",
+      "role": "Local development and offline fallback. Five fixed American English speakers; no Australian voice exists, so it cannot honour the identity's accent.",
+      "accent": "en-US",
       "binaryEnv": "WALLETWALL_NEMO_SPEECH",
       "modelDirEnv": "NEMO_SPEECH_MODEL_DIR",
       "runtime": { "name": "nemo-speech", "version": "0.2.0" },
@@ -66,6 +70,8 @@
     },
     "chatterbox-multilingual": {
       "kind": "local",
+      "role": "Experimental. The built-in voice is American English; an Australian voice would need owned, licensed reference audio and a separate decision.",
+      "accent": "en-US",
       "pythonEnv": "WALLETWALL_CHATTERBOX_PYTHON",
       "entry": "tools/chatterbox/synthesize.py",
       "package": { "name": "chatterbox-tts", "version": "0.1.7", "sourceCommit": "5de7a54aa4e5e2baadb0182dde554908b48b85c2" },
