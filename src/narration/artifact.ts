@@ -101,6 +101,16 @@ export function buildNarrationArtifact(args: {
   return artifact;
 }
 
+/**
+ * Why an artifact is stale for the current voice identity and corpus, or null when it is current. An artifact
+ * made under an earlier identity is a different narration: it must be re-synthesized, never re-labelled.
+ */
+export function staleFor(artifact: NarrationArtifact, current: { voiceIdentityId: string; corpusId: string; corpusVersion: number }): string | null {
+  if (artifact.voiceIdentityId !== current.voiceIdentityId) return `made for voice identity ${artifact.voiceIdentityId}; the identity is now ${current.voiceIdentityId}`;
+  if (artifact.text.corpusId !== current.corpusId || artifact.text.corpusVersion !== current.corpusVersion) return `made for corpus ${artifact.text.corpusId} v${artifact.text.corpusVersion}; the corpus is now ${current.corpusId} v${current.corpusVersion}`;
+  return null;
+}
+
 function closedKeys(value: unknown, keys: readonly string[], where: string, errors: string[]): value is Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     errors.push(`${where}: not an object`);

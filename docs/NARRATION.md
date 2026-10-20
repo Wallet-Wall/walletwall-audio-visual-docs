@@ -43,6 +43,40 @@ NarrationArtifact (walletwall.narration-artifact/v1)  ──▶  metrics · tran
   timestamp and the performance numbers are recorded outside the identity. Two records with the same
   identity name the same narration; a model, voice, setting, seed, text, or byte change gives a new one.
 
+### The character (voice identity v2)
+
+`config/voice-identity.json` (`walletwallaby-v2`) is the canonical, provider-neutral statement of how
+WalletWallaby sounds. It is a character decision, not a provider setting:
+
+> WalletWallaby is an Australian English expedition-guide voice: natural, restrained, technically precise,
+> not caricatured. An adult voice in a medium-to-low register; calm, grounded, experienced, evidence-first,
+> quietly confident, warm but restrained, capable of dry situational humor. Field documentary, never
+> announcer, trailer, mascot, or YouTuber.
+
+The direction carries `language: en-AU` and an `accent` block whose rendering rule is "natural and
+regionally Australian, never performed as a gimmick"; the `avoid` list names the caricatured accent, slang
+for its own sake and broad comedic delivery alongside the v1 exclusions. The pacing is unchanged from v1.
+The identity names no voice id: a provider interprets the direction with its own controls, and
+`config/narration-providers.json` declares, per binding, the variety its voice actually speaks.
+
+| Provider | Role | Declared variety | How the direction is honoured |
+|---|---|---|---|
+| ElevenLabs | publication target | `en-AU` | voice choice; the adapter refuses a binding or an API-labelled voice of another variety before requesting speech |
+| Magpie (NeMo-Speech.cpp) | local development and offline fallback | `en-US` | cannot: five fixed American speakers, no Australian voice; the deviation is logged at synthesis and recorded per candidate in `results.json` |
+| Chatterbox Multilingual V3 | experimental | `en-US` | cannot without owned, licensed Australian reference audio, which is a separate decision |
+
+Magpie's rendering of "Wallaby" as "wall-uh-bye" is a provider defect, not a text problem (its dictionary
+has the word right). No pronunciation alias was added for it: canonical text, the lexicon
+(`WalletWallaby` → `Wallet Wallaby`), and what every provider receives are unchanged. If the owner
+approves one of the pronunciation probes, the override would live in the Magpie adapter as a
+provider-specific substitution recorded in the artifact's settings, never in the lexicon.
+
+The bump from v1 invalidates everything derived from the identity by construction: the build identity's
+hash of `config/voice-identity.json`, the committed spec's `audio.voiceIdentityId` (regenerated with
+`npm run plan`), and every narration artifact, whose identity includes `voiceIdentityId`. The bakeoff CLI
+refuses an artifact made under another identity or corpus as stale (`staleFor`); it is re-synthesized,
+never re-labelled. `test/voice-identity.test.ts` pins all of this.
+
 ### Adapters
 
 | Provider | Kind | Runs through | Model identity | Credentials |
@@ -180,8 +214,9 @@ not use.
 - The reference voice is an Australian English voice, and that accent is the intended character (the wallaby's
   geography), natural rather than caricatured. Neither local candidate can offer it: Magpie ships five fixed
   American English speakers and no `en-AU`, and Chatterbox's built-in voice is American, so an Australian
-  Chatterbox voice would need owned, licensed Australian reference audio. The voice identity's `direction` should
-  say so when it is next bumped (`walletwallaby-v2`), which also regenerates the spec's `voiceIdentityId`.
+  Chatterbox voice would need owned, licensed Australian reference audio. Done: voice identity v2 states the
+  Australian direction (see "The character"), the spec's `voiceIdentityId` was regenerated, and the bakeoff
+  record was re-synthesized under v2.
 
 ### Objective verdict (the listening verdict is the owner's)
 
