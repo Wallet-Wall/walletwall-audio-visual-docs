@@ -259,14 +259,14 @@ Two guarantees, over lossless frames only (MP4 bytes are not run-to-run stable a
   render config hash a class is defined by).
 
 A render's environment class is the hash of the environment Blender reported plus the render config hash. Two
-classes are approved today: `production-rtx5080` (Windows, NVIDIA GeForce RTX 5080, driver 616.56; purpose:
-publication) and `proof-linux-software-gl` (Linux, Mesa llvmpipe; purpose: proof). A driver update is a new class
-until it is approved: requalify the host (`npm run blender:qualify-production`, candidate evidence only) and approve
-it in a reviewed change ([PUBLICATION.md](PUBLICATION.md)). The environment record is a closed schema, and every
-class also requires the pinned Blender build (`src/blender/environment.ts`). Each pinned tolerance was set as the
-worst value measured on 2026-10-18 times a margin and is
-unchanged; none lets a drawn pixel appear or vanish. The worst values on the current baseline (2026-10-19: the material
-pass, rig v6):
+classes are approved today, both on Blender 5.2.2 (`d13f752e3b9c`) with the OpenGL backend: `production-rtx5080`
+(Windows, NVIDIA GeForce RTX 5080, driver 616.56; purpose: publication) and `proof-linux-software-gl` (Linux, Mesa
+llvmpipe; purpose: proof). A driver or GPU backend change is a new class until it is approved: requalify the host
+(`npm run blender:qualify-production`, candidate evidence only) and approve it in a reviewed change
+([PUBLICATION.md](PUBLICATION.md)). The environment record is a closed schema. Every class pins the Blender build it was
+qualified on, which must equal `config/blender.json`'s pin, and the GPU backend (`src/blender/environment.ts`). Each
+pinned tolerance was set as the worst value measured on 2026-10-18 times a margin and is unchanged; none lets a drawn
+pixel appear or vanish. The worst values on the current baseline (2026-10-19: the material pass, rig v6):
 
 | Tolerance (channels beyond ±2 / mean \|Δ\| / coverage) | Measured worst | Pinned |
 |---|---|---|

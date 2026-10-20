@@ -8,6 +8,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { after, describe, test } from 'node:test';
 import { measureEquivalence, withinTolerance } from '../src/blender/equivalence.ts';
+import { classifyEnvironment, environmentsDocumentProblems } from '../src/blender/environment.ts';
 import { loadEnvironments, type RenderEnvironment } from '../src/blender/identity.ts';
 import { decideQualification, formatQualification, QUALIFICATION_SCHEMA, unlistedSteps, writeQualificationRecord, writesOutsideRecordWriter, type QualificationInputs, type ProofRun } from '../src/blender/qualification.ts';
 import { loadBlenderConfig } from '../src/blender/toolchain.ts';
@@ -146,14 +147,52 @@ describe('the qualification verdict', () => {
   });
 
   test('an approved host in the reference\'s class by name but another class id (a field the class does not pin changed) must still be byte-identical', () => {
-    const drifted = { ...structuredClone(ENVIRONMENTS['production-rtx5080']), gpu: { ...ENVIRONMENTS['production-rtx5080'].gpu, backend: 'VULKAN' } } as RenderEnvironment;
+    // The device type is the one GPU field no class pins (Blender derives it from the vendor).
+    const drifted = { ...structuredClone(ENVIRONMENTS['production-rtx5080']), gpu: { ...ENVIRONMENTS['production-rtx5080'].gpu, deviceType: 'UNKNOWN' } } as RenderEnvironment;
     // Byte-identical to the reference: the unpinned field changed nothing this proof can see.
     assert.equal(decideQualification(inputs({}, drifted)).verdict, 'QUALIFICATION_REVERIFIED');
     // Within the cross-class tolerance, but not identical: the approved class no longer reproduces its own reference.
     const versus = reference.roles.map((x, i) => ({ role: x.role, frame: x.frame, identical: i !== 0, measures: i === 0 ? { fractionOverNoise: 0.000001, meanAbsDelta: 0.00001, coverageDeltaPx: 0, maxDelta: 1 } : null }));
     const r = decideQualification(inputs({ versusReference: versus }, drifted));
     assert.equal(r.verdict, 'QUALIFICATION_FAIL');
-    assert.match(check(r, 'versus-reference').detail, /production-rtx5080.*gpu backend/);
+    assert.match(check(r, 'versus-reference').detail, /production-rtx5080.*gpu device type/);
+  });
+
+  test('another GPU backend is never re-verified, even byte-identical to the reference: a candidate at best', () => {
+    const vulkan = { ...structuredClone(ENVIRONMENTS['production-rtx5080']), gpu: { ...ENVIRONMENTS['production-rtx5080'].gpu, backend: 'VULKAN' } } as RenderEnvironment;
+    const identical = decideQualification(inputs({}, vulkan));
+    assert.equal(identical.verdict, 'QUALIFICATION_CANDIDATE_PASS');
+    assert.equal(identical.environment.status, 'UNAPPROVED');
+    assert.equal(identical.environment.approvedClass, null);
+    assert.deepEqual(identical.environment.changed, ['gpu backend']);
+    assert.match(identical.environment.diff!, /changed:\n {2}gpu backend/);
+    // Within the cross-class tolerance: still a candidate, which would also need a new reference.
+    const versus = reference.roles.map((x, i) => ({ role: x.role, frame: x.frame, identical: i !== 0, measures: i === 0 ? { fractionOverNoise: 0.000001, meanAbsDelta: 0.00001, coverageDeltaPx: 0, maxDelta: 1 } : null }));
+    assert.equal(decideQualification(inputs({ versusReference: versus }, vulkan)).verdict, 'QUALIFICATION_CANDIDATE_PASS');
+    // Over it: a failure.
+    const over = reference.roles.map((x, i) => ({ role: x.role, frame: x.frame, identical: i !== 0, measures: i === 0 ? { fractionOverNoise: 0.01, meanAbsDelta: 0.01, coverageDeltaPx: 3, maxDelta: 40 } : null }));
+    assert.equal(decideQualification(inputs({ versusReference: over }, vulkan)).verdict, 'QUALIFICATION_FAIL');
+  });
+
+  test("an invalid class name never reaches qualification's record or its text", () => {
+    const doc = structuredClone(environments) as unknown as { classes: { name: string }[] };
+    doc.classes[0]!.name = 'C:\\Users\\example\\class';
+    const r = decideQualification(inputs({ environments: doc as never }, ENVIRONMENTS['new-driver']));
+    assert.equal(r.environment.nearest, '(not a class name)');
+    assert.ok(!JSON.stringify(r).includes('example'), JSON.stringify(r.environment));
+    assert.ok(!formatQualification(r).includes('example'));
+  });
+
+  test('the candidate proposal is a class in the shape the classes document requires, pinning the backend and the Blender build', () => {
+    const r = decideQualification(inputs({}, ENVIRONMENTS['new-driver']));
+    const line = r.nextSteps.find((s) => s.startsWith('Proposal for that review'))!;
+    const proposal = JSON.parse(line.slice(line.indexOf('{'))) as { name: string; match: { blender: unknown; gpu: { backend: string } } };
+    assert.deepEqual(proposal.match.blender, { version: cfg.blender.version, buildHash: cfg.blender.buildHash });
+    assert.equal(proposal.match.gpu.backend, 'OPENGL');
+    proposal.name = 'production-rtx5080-new-driver';
+    const doc = { ...structuredClone(environments), classes: [...structuredClone(environments.classes), proposal] };
+    assert.deepEqual(environmentsDocumentProblems(doc), []);
+    assert.equal(classifyEnvironment(ENVIRONMENTS['new-driver'], cfg, doc as never).approvedClass?.name, 'production-rtx5080-new-driver');
   });
 
   test('a proof run that covers other frames than the reference, or fewer, fails rather than shrinking the comparison', () => {
@@ -172,10 +211,41 @@ describe('the qualification verdict', () => {
   test('an installed Blender that is not the pinned build blocks qualification before anything renders, and says what changed', () => {
     const r = decideQualification(inputs({ blender: { pinned: { version: cfg.blender.version, buildHash: cfg.blender.buildHash }, observed: { version: '5.2.3', buildHash: '0123456789ab' } }, runs: { a: null, b: null, problems: [] }, builds: [], versusReference: null, invariants: null }));
     assert.equal(r.verdict, 'QUALIFICATION_BLOCKED');
-    assert.deepEqual(r.environment.changed, ['blender']);
-    assert.match(r.environment.diff!, /approved:\n {2}blender: 5\.2\.2 \(d13f752e3b9c\)\nobserved:\n {2}blender: 5\.2\.3 \(0123456789ab\)\nchanged:\n {2}blender/);
+    assert.deepEqual(r.environment.changed, ['blender version', 'blender build']);
+    assert.match(r.environment.diff!, /approved:\n {2}blender version: 5\.2\.2\n {2}blender build: d13f752e3b9c\nobserved:\n {2}blender version: 5\.2\.3\n {2}blender build: 0123456789ab\nchanged:\n {2}blender version\n {2}blender build$/);
     assert.ok(r.nextSteps.some((s) => /config\/blender\.json/.test(s)));
     assert.equal(check(r, 'same-class-repeat').result, 'NOT_RUN');
+  });
+
+  test('a render that records another Blender build than the pinned one blocks, even when the installed build probes as pinned', () => {
+    const unpinned = { ...structuredClone(ENVIRONMENTS['production-rtx5080']), blenderVersion: '5.2.3 LTS', blenderBuildHash: '0123456789ab' } as RenderEnvironment;
+    const r = decideQualification(inputs({}, unpinned));
+    assert.equal(r.verdict, 'QUALIFICATION_BLOCKED');
+    assert.equal(check(r, 'blender-pinned').result, 'PASS');
+    assert.equal(check(r, 'environment').result, 'BLOCKED');
+    assert.match(check(r, 'environment').detail, /rendered with Blender 5\.2\.3 \(0123456789ab\), not the pinned 5\.2\.2 \(d13f752e3b9c\): an unpinned build is never qualified/);
+    assert.ok(r.nextSteps.some((s) => /every class's Blender pin/.test(s)));
+    // A build hash alone is enough.
+    assert.equal(decideQualification(inputs({}, { ...unpinned, blenderVersion: '5.2.2 LTS' })).verdict, 'QUALIFICATION_BLOCKED');
+  });
+
+  test('classes qualified on another Blender build than config/blender.json pins block, naming both builds; nothing is repaired', () => {
+    const doc = structuredClone(environments) as unknown as { classes: { match: { blender: { buildHash: string } } }[] };
+    doc.classes[0]!.match.blender.buildHash = '0123456789ab';
+    const r = decideQualification(inputs({ environments: doc as never }));
+    assert.equal(r.verdict, 'QUALIFICATION_BLOCKED');
+    assert.equal(check(r, 'class-blender-pins').result, 'BLOCKED');
+    assert.match(check(r, 'class-blender-pins').detail, /publication class "production-rtx5080" was qualified with Blender build 5\.2\.2 \(0123456789ab\), but the current pinned build is 5\.2\.2 \(d13f752e3b9c\)/);
+    assert.equal(r.environment.approvedClass, null, 'an incoherent class approves nothing');
+    assert.ok(r.nextSteps.some((s) => /they must agree/.test(s) && /never edits a class/.test(s)));
+    assert.equal(r.approval, 'NONE: approval is a reviewed change to config/blender-environments.json');
+    // A reviewed bump of config/blender.json without the classes (and with the new build installed): blocked as well.
+    const bumped = { ...cfg, blender: { ...cfg.blender, version: '5.2.3', buildHash: '0123456789ab' } };
+    const next = { ...structuredClone(ENVIRONMENTS['production-rtx5080']), blenderVersion: '5.2.3 LTS', blenderBuildHash: '0123456789ab' } as RenderEnvironment;
+    const b = decideQualification(inputs({ cfg: bumped, blender: { pinned: { version: '5.2.3', buildHash: '0123456789ab' }, observed: { version: '5.2.3', buildHash: '0123456789ab' } } }, next));
+    assert.equal(b.verdict, 'QUALIFICATION_BLOCKED');
+    assert.equal(check(b, 'class-blender-pins').result, 'BLOCKED');
+    assert.notEqual(b.verdict, 'QUALIFICATION_REVERIFIED');
   });
 
   test('a stale reference (another config, source, model, or plan) blocks: it cannot vouch for this checkout', () => {

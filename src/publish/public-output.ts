@@ -15,10 +15,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { buildCaptions, checkCaptions, toSrt, toWebVtt } from '../audio/captions.ts';
 import { classifyEnvironment, environmentSummary, shownClassId, shownClassName } from '../blender/environment.ts';
-import { loadEnvironments } from '../blender/identity.ts';
+import { loadEnvironments, type EnvironmentsDocument } from '../blender/identity.ts';
 import { lessonBridge, lessonBridgeFor, lessonMotionWith, type LessonMotion } from '../blender/lesson.ts';
 import { findRevealSeam } from '../blender/reveal.ts';
-import { loadBlenderConfig } from '../blender/toolchain.ts';
+import { loadBlenderConfig, type BlenderConfig } from '../blender/toolchain.ts';
 import { FIXTURE_VOICE_PROVIDER_ID, FixtureVoiceProvider } from '../audio/voice-provider.ts';
 import { DOCS_URL } from '../brand/repo-constants.ts';
 import { choreograph, layoutsFor } from '../character/walletwallaby/choreography.ts';
@@ -140,6 +140,12 @@ export interface PublicState {
   localRoots: string[];
   /** This machine's host and user names (src/core/leak-scan.ts machineNames): never in a record of the render. */
   machineNames: string[];
+  /**
+   * This checkout's Blender config (the pinned build) and approved render-environment classes: what every environment
+   * record is classified against (src/blender/environment.ts), here and by the publication proof receipt.
+   */
+  blenderConfig: BlenderConfig;
+  environments: EnvironmentsDocument;
   env: Record<string, string | undefined>;
 }
 
@@ -224,6 +230,8 @@ export async function currentPublicState(videoId: string, env: Record<string, st
       }),
     localRoots: localRoots([VIDEO_ROOT, os.homedir(), os.tmpdir(), process.cwd(), env.RUNNER_TEMP, env.GITHUB_WORKSPACE, env.RUNNER_WORKSPACE]),
     machineNames: thisMachineNames(env),
+    blenderConfig: loadBlenderConfig(),
+    environments: loadEnvironments(),
     env,
   };
 }
@@ -749,7 +757,7 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
       }
       // The closed schema, the pinned Blender build, and every field the class pins (src/blender/environment.ts); a
       // refusal carries the diff against the nearest approved class (field names and closed-schema values only).
-      const cls = classifyEnvironment(env.record, loadBlenderConfig(), loadEnvironments());
+      const cls = classifyEnvironment(env.record, state.blenderConfig, state.environments);
       const approvedAs = cls.approvedClass;
       if (cls.classId !== env.classId || (approvedAs?.name ?? null) !== env.approvedClass || (approvedAs?.purpose ?? null) !== env.purpose) {
         fail('RENDER_ENVIRONMENT_UNAPPROVED', at, `the recorded class ${shownClassId(env.classId)} (${shownClassName(env.approvedClass)}) is not what its environment record derives (${cls.classId}, ${approvedAs?.name ?? 'unapproved'}): ${environmentSummary(cls)}`);

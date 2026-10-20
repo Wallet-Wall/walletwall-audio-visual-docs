@@ -19,6 +19,7 @@ import path from 'node:path';
 import { bundle } from '@remotion/bundler';
 import { renderStill, selectComposition } from '@remotion/renderer';
 import { FixtureVoiceProvider } from '../src/audio/voice-provider.ts';
+import { referenceExportProblem } from '../src/blender/environment.ts';
 import { measureEquivalence, withinTolerance } from '../src/blender/equivalence.ts';
 import { CHARACTER, environmentClass, loadEnvironments, type PixelTolerance, type RenderEnvironment } from '../src/blender/identity.ts';
 import { lessonBridge, lessonMotion, lessonTerrain } from '../src/blender/lesson.ts';
@@ -145,7 +146,9 @@ const REFERENCE_DIR = path.join(VIDEO_ROOT, 'blender', 'proof', 'reference');
 
 function exportReference(run: string): void {
   const rec = JSON.parse(readFileSync(outFile(`proof/${run}/proof.json`), 'utf8')) as ProofRecord;
-  if (loadEnvironments().classes.find((c) => c.name === rec.approvedClass)?.purpose !== 'publication') throw new Error(`${run} was not rendered in an approved publication class`);
+  // Re-derived from the run's own record with this checkout's classes and Blender pin, never taken from its label.
+  const problem = referenceExportProblem(rec, cfg, loadEnvironments());
+  if (problem) throw new Error(`${run} cannot become the reference: ${problem}`);
   mkdirSync(REFERENCE_DIR, { recursive: true });
   const roles = rec.roles.map((r) => {
     writeFileSync(path.join(REFERENCE_DIR, `${r.role}.png`), readFileSync(outFile(r.file)));
