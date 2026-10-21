@@ -3,7 +3,9 @@
 // that departs from that derivation is refused, and over-budget narration fails closed with the numbers.
 
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, test } from 'node:test';
 import { FixtureVoiceProvider, type VoiceProvider, type VoiceRequest } from '../src/audio/voice-provider.ts';
 import { passageRequest, type CorpusPassage } from '../src/narration/corpus.ts';
@@ -232,10 +234,16 @@ describe('narration budget: no provider is reached over budget (narration layer)
       fetches++;
       return new Response('{}', { status: 500 });
     }) as unknown as typeof fetch;
-    await assert.rejects(
-      async () => elevenlabs.synthesize(passageRequest(passage(2000), config), settings, { workDir: tmpdir(), env: { ELEVENLABS_API_KEY: 'test-key-not-real-0123456789abcdef' }, fetch: fetchStub }),
-      (err: unknown) => err instanceof NarrationBudgetError && err.videoClass === 'DEEP_DIVE',
-    );
+    // A private work directory, as the other adapter tests use: never the shared temp directory itself.
+    const workDir = mkdtempSync(path.join(tmpdir(), 'ww-narration-budget-'));
+    try {
+      await assert.rejects(
+        async () => elevenlabs.synthesize(passageRequest(passage(2000), config), settings, { workDir, env: { ELEVENLABS_API_KEY: 'test-key-not-real-0123456789abcdef' }, fetch: fetchStub }),
+        (err: unknown) => err instanceof NarrationBudgetError && err.videoClass === 'DEEP_DIVE',
+      );
+    } finally {
+      rmSync(workDir, { recursive: true, force: true });
+    }
     assert.equal(fetches, 0);
   });
 
