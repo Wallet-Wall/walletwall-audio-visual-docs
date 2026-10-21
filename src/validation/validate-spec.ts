@@ -17,7 +17,7 @@
 
 import type { PipelineConfig } from '../config/types.ts';
 import { IssueCollector, type ValidationReport } from '../core/issues.ts';
-import { effectiveWpm, voiceRequestFor } from '../audio/voice-provider.ts';
+import { effectiveWpm, requestSpokenWords, voiceRequestFor } from '../audio/voice-provider.ts';
 import { PROVENANCE_CHIP } from '../layout/brand-layout.ts';
 import { CONTENT_BOTTOM, inside, intersects, TITLE_SAFE, type Point } from '../layout/geometry.ts';
 import { eyebrowOccupied, layoutScene, wallabyBounds } from '../layout/scene-layout.ts';
@@ -25,6 +25,7 @@ import { fitText } from '../layout/text-fit.ts';
 import type { PublishedPage } from '../source/docs-site.ts';
 import { findSection, MIN_QUOTE_WORDS, normalizeForMatch, quantityTokens, quoteInSection, unsafeTextReason, wordIndex } from '../source/text.ts';
 import type { NormalizedSource } from '../source/types.ts';
+import { checkNarrationBudget, describeNarrationBudget, narrationBudgetFor } from '../spec/narration-budget.ts';
 import { SPEC_SCHEMA, type Claim, type Segment, type VideoSpec, type VisualText } from '../spec/types.ts';
 import {
   ASSET_KINDS,
@@ -566,7 +567,12 @@ function checkDuration(spec: VideoSpec, ctx: ValidationContext, issues: IssueCol
   if (shortest && VIDEO_CLASS_KINDS.indexOf(shortest) < VIDEO_CLASS_KINDS.indexOf(spec.videoClass)) {
     issues.warn('DURATION_CLASS_NOT_SHORTEST', 'videoClass', `${shortest} fits ${(timeline.totalMs / 1000).toFixed(1)} s`);
   }
-  const wpm = effectiveWpm(voiceRequestFor(spec, ctx.config.voice, ctx.config.lexicon), ctx.track);
+  const request = voiceRequestFor(spec, ctx.config.voice, ctx.config.lexicon);
+  // The script must fit its class at the planning pace, whatever pace a provider later reads it at.
+  const pacing = ctx.config.voice.pacing;
+  const budget = checkNarrationBudget(spec.videoClass, requestSpokenWords(request), narrationBudgetFor(spec.videoClass, pacing), pacing);
+  if (!budget.withinBudget) issues.error('NARRATION_OVER_BUDGET', 'segments', describeNarrationBudget(budget));
+  const wpm = effectiveWpm(request, ctx.track);
   if (wpm > ctx.config.voice.pacing.maxWpm) issues.error('PACE_TOO_FAST', 'audio', `${wpm.toFixed(0)} wpm > ${ctx.config.voice.pacing.maxWpm}`);
   const end = timeline.segments.find((s) => s.role === 'END_SCREEN');
   const lim = ctx.config.youtube.limits;

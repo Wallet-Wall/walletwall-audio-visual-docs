@@ -10,6 +10,55 @@ NeMo-Speech.cpp, Chatterbox Multilingual V3). It changes nothing on the render o
 the publication binding as `NOT_CONFIGURED`. Promoting a winner is a separate, deliberate change
 (see "Integration proposal").
 
+## Production policy (2026-10-20)
+
+- **ElevenLabs Multilingual v2 is the publication narration provider**, on the voice the ElevenLabs binding in
+  `config/narration-providers.json` names (`DTLT09E2cxHF0DqjKVbc`).
+- **Qwen3-TTS is R&D and a local fallback.** Its candidate voices did not reach the publication bar in blind
+  listening against the ElevenLabs anchor (2026-10-20); it is never promoted because it is free or local.
+- **Narration length is constrained upstream by the video class** through the narration budget below, and
+  **paid synthesis is attempted only after the budget passes.**
+- **The architecture stays provider-neutral.** The VideoSpec names no provider, the budget lives in the spec and
+  validation layer rather than in any adapter, and the same gate applies to every provider, paid or local.
+- **Local voice work continues only if it genuinely matches or beats the publication anchor** in blind listening
+  on the same corpus.
+
+Wiring the publication provider into renders is still the integration step at the end of this document:
+`scripts/render.ts` uses the fixture voice and the identity's publication binding reads `NOT_CONFIGURED` until
+that change lands. The budget gate already sits in front of the route that change will use.
+
+## Narration budget (`walletwall.narration-budget/v1`)
+
+Narration length is a deterministic, validated contract, checked before any synthesis. A class's budget is
+derived by `src/spec/narration-budget.ts`; nothing authors one.
+
+| class | maxDurationSeconds | targetWordsPerMinute | maxWords | regenerationReserve |
+|---|---|---|---|---|
+| QUICK | 180 | 145 | 435 | 0.30 |
+| FOCUSED | 300 | 145 | 725 | 0.30 |
+| DEEP_DIVE | 600 | 145 | 1450 | 0.30 |
+
+- `maxDurationSeconds` is the class ceiling from `VIDEO_CLASSES` (`src/spec/vocabulary.ts`, the one table of class
+  durations) and `targetWordsPerMinute` is the voice identity's planning pace (`pacing.targetWpm` in
+  `config/voice-identity.json`). Nothing else holds a copy, so changing either moves every budget with it.
+- `maxWords = floor(maxDurationSeconds * targetWordsPerMinute / 60)`, and a check reports
+  `estimatedDurationSeconds = wordCount / targetWordsPerMinute * 60`. Words are counted on the spoken text (lexicon
+  aliases expanded, so "USDC" is four words), the same count the duration estimate and the pace gate use.
+- `regenerationReserve` is capacity planning, not script length: plan synthesis capacity for about 30 % more than
+  one full-length script, so a re-render (a fix, a pronunciation change) never needs an unplanned top-up. It never
+  raises `maxWords`, and a budget whose `maxWords` includes it is refused.
+- A budget handed to the check must equal the derivation exactly: the four fields and no other, finite and in
+  range, `maxWords` following from duration and pace, and every value the policy's. A hand-built, stale, or
+  planner-authored copy fails closed instead of widening the cap.
+- It runs, and fails closed, at every route to a provider. `validateSpec` reports `NARRATION_OVER_BUDGET`, and
+  the render command refuses a spec that fails validation. `synthesize()` in `src/pipeline/render-input.ts`, the
+  render path's one route to a `VoiceProvider`, throws `NarrationBudgetError` before the provider is called.
+  `passageRequest()` in `src/narration/corpus.ts`, where every bakeoff request is built, holds an evaluation
+  passage to the longest class (DEEP_DIVE) before any adapter sees it. The error names the class, the spoken word
+  count, the word cap, the estimated duration, and the class ceiling.
+- It is not quota tracking: no credits, balances, or spend are recorded anywhere. The contract bounds what one
+  video, or one evaluation passage, can ask a provider to speak.
+
 ## The boundary
 
 ```text

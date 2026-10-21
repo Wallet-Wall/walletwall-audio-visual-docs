@@ -6,9 +6,11 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { toSpokenText } from '../audio/pronunciation.ts';
+import { spokenWordCount } from '../audio/voice-provider.ts';
 import { VIDEO_ROOT } from '../config/load.ts';
 import type { PipelineConfig } from '../config/types.ts';
 import { contentAddress, sha256Hex } from '../core/hash.ts';
+import { assertNarrationWithinBudget, narrationBudgetFor } from '../spec/narration-budget.ts';
 import { assertPlainId, NarrationContractError, VOICE_PROFILE, type NarrationRequest } from './contract.ts';
 
 export const CORPUS_REL = 'fixtures/narration-eval/corpus.json';
@@ -91,10 +93,14 @@ export function textHashes(displayText: string, spokenText: string): { displaySh
 }
 
 export function passageRequest(passage: CorpusPassage, config: PipelineConfig): NarrationRequest {
+  const spokenText = toSpokenText(passage.text, config.lexicon);
+  // Every provider request is built here, so the budget runs before any adapter (paid or local) can see the text.
+  // An evaluation passage is at most one video's narration: it must fit the longest class.
+  assertNarrationWithinBudget('DEEP_DIVE', spokenWordCount(spokenText), narrationBudgetFor('DEEP_DIVE', config.voice.pacing), config.voice.pacing);
   return {
     passageId: passage.id,
     displayText: passage.text,
-    spokenText: toSpokenText(passage.text, config.lexicon),
+    spokenText,
     language: 'en-US',
     voiceProfile: VOICE_PROFILE,
     identity: config.voice,

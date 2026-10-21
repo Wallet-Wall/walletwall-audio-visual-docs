@@ -51,6 +51,7 @@ export const ISSUE_CODES = {
   DURATION_EXCEEDS_CLASS: 'Estimated runtime exceeds the video class ceiling; split or reclassify.',
   DURATION_CLASS_NOT_SHORTEST: 'A shorter video class would fit this runtime.',
   PACE_TOO_FAST: 'Narration pace exceeds the natural ceiling; never speed narration to fit.',
+  NARRATION_OVER_BUDGET: 'Narration has more spoken words than its video class holds at the planning pace (src/spec/narration-budget.ts); cut the script.',
   END_SCREEN_DURATION: 'End screen must last 5 to 20 seconds.',
   VIDEO_TOO_SHORT: 'Video is too short to carry a YouTube end screen (25 s minimum).',
   // Transitions and audio
