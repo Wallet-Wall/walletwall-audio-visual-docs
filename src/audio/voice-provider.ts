@@ -45,6 +45,11 @@ export function spokenWordCount(spokenText: string): number {
   return spokenText.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 }
 
+/** Spoken words across every line of a request: what the narration budget counts. */
+export function requestSpokenWords(request: VoiceRequest): number {
+  return request.lines.reduce((n, line) => n + spokenWordCount(line.spokenText), 0);
+}
+
 /**
  * Deterministic duration estimate at the identity's natural pace, including
  * punctuation pauses. Used for planning and for fixture tracks; a real voice

@@ -21,6 +21,8 @@ VoiceProvider ──▶ NarrationTrack ──▶ Timeline (integer ms) ──▶
 
 The `VideoSpec` names no renderer, voice provider, upload target, or model. Each of those sits behind an interface: `StoryboardProvider`, `VoiceProvider`, the Remotion adapter, and `UploadProvider`. The narration adapters and the voice bakeoff that evaluates them live behind the same boundary and off the render path; see [NARRATION.md](NARRATION.md).
 
+Narration length is constrained upstream by the video class. The narration budget (`src/spec/narration-budget.ts`; [NARRATION.md](NARRATION.md), "Narration budget") gives each class a spoken-word cap at the voice identity's planning pace: validation rejects a spec over it (`NARRATION_OVER_BUDGET`), and no voice provider, paid or local, is called with narration over it.
+
 ## Two trees, one namespace
 
 This repository consumes the canonical WalletWall source tree; it never becomes a second source of truth.
@@ -77,7 +79,7 @@ A rendered video traces back to: the doc blob id, normalized content hash, and n
 ## Open owner decisions
 
 1. Remotion company-license status.
-2. Voice provider. The WalletWallaby voice identity itself is decided: an Australian English expedition guide, natural and not caricatured (`config/voice-identity.json` v2, [NARRATION.md](NARRATION.md)); casting must not imitate a real person.
+2. Voice provider. Decided for now: ElevenLabs Multilingual v2 is the publication narration provider and Qwen3-TTS is R&D and a local fallback ([NARRATION.md](NARRATION.md), "Production policy"); wiring the provider into renders is the integration step there. The WalletWallaby voice identity itself is decided: an Australian English expedition guide, natural and not caricatured (`config/voice-identity.json` v2, [NARRATION.md](NARRATION.md)); casting must not imitate a real person.
 3. Freshness severity order (`MATERIALLY_STALE` is treated as more severe than `REGENERATION_REQUIRED`: wrong beats visually outdated).
 4. Release-plan weights (`config/release-plan.json`) are an initial proposal.
 5. Synthetic-media disclosure default (`containsSyntheticMedia: true`).

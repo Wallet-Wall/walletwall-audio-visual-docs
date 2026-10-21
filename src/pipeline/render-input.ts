@@ -3,7 +3,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadAttentionConfig } from '../attention/config.ts';
-import { voiceRequestFor, type VoiceProvider } from '../audio/voice-provider.ts';
+import { requestSpokenWords, voiceRequestFor, type VoiceProvider } from '../audio/voice-provider.ts';
 import { loadVisualConfig } from '../blender/visual.ts';
 import { DIST_ROOT, readJson } from '../config/load.ts';
 import { readWorkspaceFile, resolveWorkspacePath } from './context.ts';
@@ -11,6 +11,7 @@ import type { PipelineConfig } from '../config/types.ts';
 import { sha256Hex } from '../core/hash.ts';
 import type { DocsVideoProps, ReviewOverlays } from '../remotion/props.ts';
 import type { NormalizedSource } from '../source/types.ts';
+import { assertNarrationWithinBudget, narrationBudgetFor } from '../spec/narration-budget.ts';
 import type { VideoSpec } from '../spec/types.ts';
 import type { NarrationTrack } from '../timeline/timeline.ts';
 
@@ -42,8 +43,14 @@ export function loadSnapshot(spec: VideoSpec): NormalizedSource {
   return readJson<NormalizedSource>(file);
 }
 
+/**
+ * The render path's one route to a voice provider. The narration budget is checked here, before the provider
+ * is called, so a paid provider is never asked to speak a script longer than its class (fail closed, any provider).
+ */
 export async function synthesize(spec: VideoSpec, provider: VoiceProvider, config: PipelineConfig): Promise<NarrationTrack> {
-  return provider.synthesize(voiceRequestFor(spec, config.voice, config.lexicon));
+  const request = voiceRequestFor(spec, config.voice, config.lexicon);
+  assertNarrationWithinBudget(spec.videoClass, requestSpokenWords(request), narrationBudgetFor(spec.videoClass, config.voice.pacing), config.voice.pacing);
+  return provider.synthesize(request);
 }
 
 export function buildProps(spec: VideoSpec, source: NormalizedSource, track: NarrationTrack, config: PipelineConfig, overlays: ReviewOverlays): DocsVideoProps {
