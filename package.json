@@ -49,12 +49,12 @@
     "@fontsource-variable/manrope": "5.2.8",
     "@fontsource-variable/sora": "5.2.8",
     "@fontsource/ibm-plex-mono": "5.2.7",
-    "@remotion/bundler": "4.0.532",
-    "@remotion/cli": "4.0.532",
-    "@remotion/renderer": "4.0.532",
+    "@remotion/bundler": "4.0.536",
+    "@remotion/cli": "4.0.536",
+    "@remotion/renderer": "4.0.536",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "remotion": "4.0.532"
+    "remotion": "4.0.536"
   },
   "devDependencies": {
     "@types/node": "24.19.0",
