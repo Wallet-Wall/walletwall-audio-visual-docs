@@ -18,6 +18,11 @@ export interface ReviewOverlays {
   characterless: boolean;
   /** Draw title-safe, content-bottom, and end-screen reserved zones. */
   guides: boolean;
+  /**
+   * false only for the layer images Blender's depth reveal is textured with (scripts/render.ts, scripts/blender-proof.ts,
+   * scripts/review/blender-transition.ts): Blender never draws brand chrome. Absent (drawn) everywhere else.
+   */
+  footer?: boolean;
 }
 
 /** Where Blender frames were rendered: the environment class id, the approved class it matched (if any), and the record. */

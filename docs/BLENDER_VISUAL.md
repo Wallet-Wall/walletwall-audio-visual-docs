@@ -109,10 +109,10 @@ layouts are byte-for-byte main's.
 
 ```bash
 npm run blender:build && npm run blender:review                       # the character (materials v2) and the seven-pose sheet
-npm run blender:contact -- --frames=1850,1904                         # the supports in perspective, with the shadow on them
+npm run blender:contact -- --frames=1780,1834                         # the supports in perspective, with the shadow on them
 node scripts/review/blender-transition.ts --stills-only               # the depth reveal's frames (--reuse-layers skips Remotion)
 node scripts/review/narrow-perch.ts                                   # the narrow case: the review lab's perch
-npm run render:stills migration-readiness -- --frames=1850,2900,1500  # characterless backgrounds for the final sheet
+npm run render:stills migration-readiness -- --frames=1780,2830,1430  # characterless backgrounds for the final sheet
 node scripts/review/final-sheet.ts <backgrounds> <reveal sequence> <reveal frame>
 node scripts/review/white-audit.ts --before=<main stills> --after=dist/migration-readiness/stills
 node scripts/review/visual-metrics.ts <before> <after>                # white-ish pixels and shadow weight on the character

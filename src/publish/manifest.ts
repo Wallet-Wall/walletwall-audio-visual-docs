@@ -53,14 +53,12 @@ export interface PublishManifest {
   };
 }
 
-const MERGE_ROLES = new Set(['IDENT']);
 const OUTRO_ROLES = new Set(['CTA', 'DOCS_REFERENCE', 'OUTRO', 'END_SCREEN']);
 
 /** Chapters from scene headings; brand segments fold into neighbors; chapters under the minimum merge back. */
 export function buildChapters(timeline: Timeline, minSeconds: number): Chapter[] {
   const raw: Chapter[] = [];
   for (const seg of timeline.segments) {
-    if (MERGE_ROLES.has(seg.role)) continue;
     let title: string;
     if (OUTRO_ROLES.has(seg.role)) {
       if (raw.some((c) => c.title === 'Docs and next steps')) continue;

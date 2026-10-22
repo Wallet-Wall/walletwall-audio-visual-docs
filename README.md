@@ -29,7 +29,7 @@ Validation decides whether the artifact is publishable.
 - the WalletWallaby character rig
 - deterministic motion and traversal
 - Remotion rendering
-- semantic audio (narration, music bed, semantic cues, sonic ident)
+- semantic audio (narration, music bed, semantic cues, sonic identity)
 - voice-provider adapters
 - staleness detection against the canonical docs
 - provenance manifests

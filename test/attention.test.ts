@@ -92,20 +92,20 @@ describe('the attention config', () => {
 describe('the mode grammar', () => {
   test('is derived from the beats alone, at the representative frames', () => {
     const expect: [number, string, AttentionMode, string[]][] = [
-      [1500, 'tiers', 'GUIDE', ['review']],
-      [1660, 'tiers', 'INSPECT', ['vault-candidate']],
-      [1719, 'tiers', 'TRANSITION', []],
-      [1790, 'signals', 'TRANSITION', []],
-      [1820, 'signals', 'ESTABLISH', []],
-      [1850, 'signals', 'GUIDE', ['value-at-risk']],
-      [1920, 'signals', 'INSPECT', ['wallet-structure']],
-      [2150, 'signals', 'GUIDE', ['tier']],
-      [2600, 'reading', 'COMPARE', ['reading-band', 'reading-verdict']],
-      [2900, 'reading', 'ESTABLISH', []],
-      [3330, 'vault-conditional', 'INSPECT', ['vault-testnet']],
-      [3600, 'vault-conditional', 'RESOLVE', ['vault-research']],
-      [3950, 'takeaway', 'GUIDE', ['takeaway-statement']],
-      [4200, 'takeaway', 'RESOLVE', ['takeaway-statement']],
+      [1430, 'tiers', 'GUIDE', ['review']],
+      [1590, 'tiers', 'INSPECT', ['vault-candidate']],
+      [1649, 'tiers', 'TRANSITION', []],
+      [1720, 'signals', 'TRANSITION', []],
+      [1750, 'signals', 'ESTABLISH', []],
+      [1780, 'signals', 'GUIDE', ['value-at-risk']],
+      [1850, 'signals', 'INSPECT', ['wallet-structure']],
+      [2080, 'signals', 'GUIDE', ['tier']],
+      [2530, 'reading', 'COMPARE', ['reading-band', 'reading-verdict']],
+      [2830, 'reading', 'ESTABLISH', []],
+      [3260, 'vault-conditional', 'INSPECT', ['vault-testnet']],
+      [3530, 'vault-conditional', 'RESOLVE', ['vault-research']],
+      [3880, 'takeaway', 'GUIDE', ['takeaway-statement']],
+      [4130, 'takeaway', 'RESOLVE', ['takeaway-statement']],
     ];
     for (const [frame, segId, mode, primary] of expect) {
       const s = segmentAt(msOf(frame));
@@ -146,7 +146,7 @@ describe('the mode grammar', () => {
     const again = planAttention(timeline, layouts, clips, attention);
     assert.deepEqual([...again.segments.entries()], [...plan.segments.entries()]);
     assert.deepEqual(again.camera, plan.camera);
-    for (const frame of [0, 56, 1500, 1660, 1700, 1850, 1920, 2600, 3330, 3950, 4120, 4320, 5100]) {
+    for (const frame of [0, 56, 1430, 1590, 1630, 1780, 1850, 2530, 3260, 3880, 4050, 4250, 5030]) {
       const s = segmentAt(msOf(frame));
       assert.deepEqual(directionAt(plan, s.id, msOf(frame)), directionAt(again, s.id, msOf(frame)));
       assert.deepEqual(cameraAt(plan, msOf(frame)), cameraAt(again, msOf(frame)));
@@ -323,7 +323,7 @@ describe('what attention direction may never change', () => {
 
   test('the motion plan does not depend on attention direction, and direction does not read the character', () => {
     const motion = planMotion(clips, layouts);
-    const states = [1500, 1850, 3330, 3950, 4300].map((fr) => sampleWallaby(motion, msOf(fr)));
+    const states = [1430, 1780, 3260, 3880, 4230].map((fr) => sampleWallaby(motion, msOf(fr)));
     // The plan was built from the same clips and layouts; the character's feet are where the motion plan puts them, framed or not.
     for (const s of states) assert.ok(Number.isFinite(s.x) && Number.isFinite(s.y));
     const text = src('src/attention/direction.ts');
@@ -333,7 +333,7 @@ describe('what attention direction may never change', () => {
 
   test('the character and its support stay registered exactly: one transform about one origin frames the whole content world', () => {
     const motion = planMotion(clips, layouts);
-    for (const fr of [56, 100, 1920, 2000, 3330, 3600, 4200]) {
+    for (const fr of [56, 100, 1850, 1930, 3260, 3530, 4130]) {
       const c = cameraAt(plan, msOf(fr));
       const s = sampleWallaby(motion, msOf(fr));
       const feet = { x: s.x, y: s.y };

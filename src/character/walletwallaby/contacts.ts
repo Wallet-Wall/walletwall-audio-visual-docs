@@ -126,7 +126,7 @@ const offStage = (p: Point): boolean => p.x < 0 || p.x > FRAME.width || p.y < 0 
 
 /**
  * Judge every contact against the terrain on screen at its instant. `terrains`: each segment's terrain,
- * by id (segments without one, such as the ident, carry nothing). `segments`: in timeline order.
+ * by id (a segment without one carries nothing). `segments`: in timeline order.
  */
 export function judgeContacts(plan: MotionPlan, terrains: ReadonlyMap<string, Terrain>, segments: readonly SegmentWindow[], config: SupportConfig = plan.config.support): JudgedContact[] {
   const index = new Map(segments.map((s, i) => [s.id, i]));

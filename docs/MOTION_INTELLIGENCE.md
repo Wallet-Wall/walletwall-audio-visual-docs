@@ -130,7 +130,7 @@ npm run motion:check      # Linux or WSL: the committed artifact regenerates byt
 npm run motion:fixtures   # after a deliberate behaviour change: regenerate the canonical fixtures
 npm run motion:bench      # artifact size, load, solve, bind, and sampling cost
 npm run render -- migration-readiness --motion-engine=rust-wasm
-npm run render:stills -- migration-readiness --motion-engine=rust-wasm --frames=3715,3725,3731,3733
+npm run render:stills -- migration-readiness --motion-engine=rust-wasm --frames=3645,3655,3661,3663
 ```
 
 The support tests (`motion-intelligence/tests/support.rs`, `test/support.test.ts`) pin nine refusals (a 1 px decorative border, a tiny corner, a vertical card side, a text underline, a graph edge, tail-only support, an unreachable grip, feet outside the support area, a centre of mass outside the ledge) and six positive controls (a broad card top, a normal ledge, an authored narrow perch, a mantle lip, a feet-and-tail tripod, a hand brace with the feet supported), each through the typed API and the JSON boundary, and compare the two judges on more than 20,000 stances swept over every terrain the lesson draws. The tests hold the engine to the oracle three ways: every engine path of the lesson flies the TypeScript hop exactly (timing, arc, text crossings, contacts); a sweep of synthetic hops over open ground (several distances, heights, windows, scales, and text layouts, 360 in all) flies the same arc as `planHop`, bit for bit, or both refuse; and every engine frame puts the feet exactly where the oracle does.

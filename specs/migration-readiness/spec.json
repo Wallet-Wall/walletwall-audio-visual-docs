@@ -19,7 +19,7 @@
   "planner": {
     "provider": "fixture",
     "contract": "walletwall.storyboard/v1",
-    "storyboardHash": "d440d053b6634b005e446812d57fc8d478b9a3c02faafc8639d976e88e884fdb"
+    "storyboardHash": "ee789727659e29ea4a1d3e0d939b56f3183f5895473758c57da547bbfbc54129"
   },
   "claims": [
     {
@@ -338,7 +338,7 @@
       "kind": "BRAND_MARK",
       "path": "video/assets/brand/walletwall-brick-wallet.png",
       "sha256": "91926a2eebc1777194ecf491049b8a7af3cf0892b09b363c5b2a17cd17d5dbad",
-      "justification": "The WalletWall brick-wallet mark (reviewed and supplied by the maintainer), used only by the ident and outro templates."
+      "justification": "The WalletWall brick-wallet mark (reviewed and supplied by the maintainer), used only by the outro template and the brand footer."
     }
   ],
   "segments": [
@@ -417,18 +417,6 @@
           "cue": "hook.l2"
         }
       ],
-      "sonic": []
-    },
-    {
-      "id": "ident",
-      "role": "IDENT",
-      "transitionIn": {
-        "type": "CUT"
-      },
-      "narration": [],
-      "scene": null,
-      "templateId": "ident.v1",
-      "wallaby": [],
       "sonic": []
     },
     {

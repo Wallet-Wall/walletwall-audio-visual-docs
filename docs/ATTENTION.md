@@ -28,7 +28,7 @@ Every value (an element's opacity, its wash or rule strength, the camera's pose)
 `DocsVideo.tsx` draws two layers.
 
 - **The content world**: the scenes (with their transition styles), and WalletWallaby (the Rive canvas or a staged Blender sequence), inside one `AbsoluteFill` with one transform about the frame centre. The framing is applied exactly once, to this unit, so the character and its support are registered by construction: the same affine map takes both.
-- **The fixed editorial layer**: a staged Blender depth reveal (the signature transition, always at identity), the review captions, the debug guides, and the end screen's reserved zones. Never framed.
+- **The fixed editorial layer**: a staged Blender depth reveal (the signature transition, always at identity), the quiet WalletWall footer (`src/layout/footer.ts`), the review captions, the debug guides, and the end screen's reserved zones. Never framed.
 
 The provenance chip is provenance, but it shares the eyebrow row that the scene grammar lays out and that rides every transition, so it rides the content world with the eyebrow (under the character, as before) and is title-safe-checked like any text. A fixed chip over a leaning header split the row.
 
@@ -68,7 +68,7 @@ Everything is a pure function of (timeline, layouts, clips, config, time). The m
 ## Review
 
 ```bash
-npm run render:stills -- migration-readiness --frames=1500,1700,1850,2900,3950,4500,5100
+npm run render:stills -- migration-readiness --frames=1430,1630,1780,2830,3880,4430,5030
 node scripts/review/attention-review.ts --before=<main's stills> --after=dist/migration-readiness/stills --out=dist/attention-review
 ```
 

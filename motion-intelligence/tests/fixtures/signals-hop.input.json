@@ -21,9 +21,9 @@
   "startScale": 0.7,
   "targetScale": 0.7,
   "timing": {
-    "startMs": 63339,
-    "arriveByMs": 64209,
-    "endMs": 69787
+    "startMs": 60989,
+    "arriveByMs": 61859,
+    "endMs": 67437
   },
   "fps": 30,
   "stage": {
@@ -743,7 +743,7 @@
           "h": 32
         }
       ],
-      "untilMs": 60489
+      "untilMs": 58139
     },
     "figure": {
       "left": 150,

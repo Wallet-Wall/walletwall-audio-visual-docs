@@ -1,11 +1,9 @@
-// Fixed geometry for brand segments (ident, CTA, docs reference, outro, end
-// screen). These are WalletWall-owned templates; nothing here is planner input.
+// Fixed geometry for brand segments (CTA, docs reference, outro, end screen).
+// These are WalletWall-owned templates; nothing here is planner input.
 // Isomorphic.
 
 import type { Rect } from './geometry.ts';
 
-export const IDENT_MARK: Rect = { x: 840, y: 290, w: 240, h: 240 };
-export const IDENT_WORDMARK: Rect = { x: 560, y: 570, w: 800, h: 70 };
 export const CTA_TEXT: Rect = { x: 160, y: 380, w: 1040, h: 260 };
 export const DOCS_CARD: Rect = { x: 160, y: 290, w: 1220, h: 470 };
 export const OUTRO_MARK: Rect = { x: 755, y: 325, w: 190, h: 190 };
@@ -28,7 +26,7 @@ export const PROVENANCE_CHIP: Rect = { x: 1000, y: 106, w: 760, h: 24 };
 /**
  * The ground each brand template draws (at the scene ground line), as the horizontal extent of the
  * line: WalletWallaby's terrain in that segment. The end screen draws only the stretch right of the
- * subscribe zone, so the zones YouTube fills stay empty. The ident draws none (he is not on screen).
+ * subscribe zone, so the zones YouTube fills stay empty.
  */
 export const BRAND_GROUND = {
   CTA: { x0: 0, x1: 1920 },

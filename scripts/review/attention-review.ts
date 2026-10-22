@@ -101,31 +101,31 @@ const dataUri = (img: Image, name: string): string => {
 // ── What to show ────────────────────────────────────────────────────────────
 
 const SINGLES: { frame: number; title: string; note: string }[] = [
-  { frame: 1500, title: 'Review tier', note: 'GUIDE after the trace up to Review: the current tier carries the wash and rule; the tiers ahead recede a little; the climbed route stays terracotta.' },
-  { frame: 1700, title: 'Vault Candidate tier', note: 'The INSPECT of the top tier now registers (the previous renderer lost it to the exit cue); the hierarchy is already easing out, one settle before the push.' },
-  { frame: 1850, title: 'Ordinary layered teaching frame', note: 'GUIDE on Value at risk: one current idea is primary while the shared risk tier, its caption, and the slabs stay as context.' },
-  { frame: 2900, title: 'Broad reading-card support', note: 'A PERCH on the whole card: ESTABLISH, the whole surface is read, nothing is forced; the COMPARE before it has settled out.' },
-  { frame: 3950, title: 'Takeaway and the summit ledge', note: 'GUIDE on the statement while it is read; the RESOLVE that follows frames statement and ledge as one world and then holds still.' },
-  { frame: 4500, title: 'CTA', note: 'A brand segment: no direction, identity framing. Restraint: the frame is untouched.' },
-  { frame: 5100, title: 'YouTube end screen', note: 'Exempt by construction: identity framing, no direction, the reserved zones stay empty.' },
+  { frame: 1430, title: 'Review tier', note: 'GUIDE after the trace up to Review: the current tier carries the wash and rule; the tiers ahead recede a little; the climbed route stays terracotta.' },
+  { frame: 1630, title: 'Vault Candidate tier', note: 'The INSPECT of the top tier now registers (the previous renderer lost it to the exit cue); the hierarchy is already easing out, one settle before the push.' },
+  { frame: 1780, title: 'Ordinary layered teaching frame', note: 'GUIDE on Value at risk: one current idea is primary while the shared risk tier, its caption, and the slabs stay as context.' },
+  { frame: 2830, title: 'Broad reading-card support', note: 'A PERCH on the whole card: ESTABLISH, the whole surface is read, nothing is forced; the COMPARE before it has settled out.' },
+  { frame: 3880, title: 'Takeaway and the summit ledge', note: 'GUIDE on the statement while it is read; the RESOLVE that follows frames statement and ledge as one world and then holds still.' },
+  { frame: 4430, title: 'CTA', note: 'A brand segment: no direction, identity framing. Restraint: the frame is untouched.' },
+  { frame: 5030, title: 'YouTube end screen', note: 'Exempt by construction: identity framing, no direction, the reserved zones stay empty.' },
 ];
 const TRANSITION: { frame: number; label: string }[] = [
-  { frame: 1719, label: 'entry: the push begins' },
-  { frame: 1766, label: 'peak: the plane opens' },
-  { frame: 1812, label: 'exit: the depth plane resolves' },
+  { frame: 1649, label: 'entry: the push begins' },
+  { frame: 1696, label: 'peak: the plane opens' },
+  { frame: 1742, label: 'exit: the depth plane resolves' },
 ];
 const SEQUENCES: { mode: AttentionMode | 'ARRIVAL'; title: string; frames: number[]; note: string }[] = [
-  { mode: 'ESTABLISH', title: 'ESTABLISH: the depth plane opens', frames: [1815, 1821, 1827, 1850], note: 'From the flat frame to the first beat: nothing is forced; then GUIDE lands on Value at risk.' },
-  { mode: 'GUIDE', title: 'GUIDE: the trace from Monitor to Review', frames: [1405, 1420, 1435, 1450, 1465, 1480, 1500, 1520], note: 'The route draws on from its source, the guide follows it, the destination gains the wash as the trace begins; no camera.' },
-  { mode: 'INSPECT', title: 'INSPECT: the testnet caveat', frames: [3300, 3312, 3324, 3336, 3350, 3380, 3420, 3480], note: 'The subject changes from the placeholder to the testnet line: the wash moves, the rest recedes a little; the lean was already taken at the first INSPECT and does not move again.' },
-  { mode: 'INSPECT', title: 'INSPECT: Wallet structure, in depth', frames: [1896, 1908, 1920, 1932, 1950, 1990, 2040], note: 'One settle into the lean toward the far node; the other signals and the upper plane recede; then still.' },
-  { mode: 'COMPARE', title: 'COMPARE: band versus verdict', frames: [2545, 2557, 2569, 2581, 2600, 2650, 2700, 2720], note: 'Both alternatives share the same hierarchy for the whole beat; no framing; the PERCH on the whole card settles it out.' },
-  { mode: 'RESOLVE', title: 'RESOLVE: the takeaway', frames: [4100, 4112, 4124, 4136, 4160, 4220, 4300, 4326], note: 'One settle: the rule hardens, the support lines recede, the world leans in; then a genuine still hold, and one settle back before the cut.' },
-  { mode: 'ARRIVAL', title: 'The CTA arrives', frames: [4326, 4330, 4340, 4350, 4365], note: 'The takeaway returned to identity before the cut; the CTA is a brand segment and is never framed.' },
-  { mode: 'TRANSITION', title: 'TRANSITION: the signature depth reveal', frames: [1690, 1705, 1719, 1742, 1766, 1790, 1812, 1815], note: 'The INSPECT hierarchy eases out before the push; from the push to the flat frame nothing competes: identity, no wash, no attenuation.' },
-  { mode: 'GUIDE', title: 'GUIDE: the statement is read', frames: [3935, 3945, 3957, 3969, 3990, 4050], note: 'The statement reveals with its laid-brick settle and gains the wash; the support line recedes to 0.9; no camera until the RESOLVE.' },
+  { mode: 'ESTABLISH', title: 'ESTABLISH: the depth plane opens', frames: [1745, 1751, 1757, 1780], note: 'From the flat frame to the first beat: nothing is forced; then GUIDE lands on Value at risk.' },
+  { mode: 'GUIDE', title: 'GUIDE: the trace from Monitor to Review', frames: [1335, 1350, 1365, 1380, 1395, 1410, 1430, 1450], note: 'The route draws on from its source, the guide follows it, the destination gains the wash as the trace begins; no camera.' },
+  { mode: 'INSPECT', title: 'INSPECT: the testnet caveat', frames: [3230, 3242, 3254, 3266, 3280, 3310, 3350, 3410], note: 'The subject changes from the placeholder to the testnet line: the wash moves, the rest recedes a little; the lean was already taken at the first INSPECT and does not move again.' },
+  { mode: 'INSPECT', title: 'INSPECT: Wallet structure, in depth', frames: [1826, 1838, 1850, 1862, 1880, 1920, 1970], note: 'One settle into the lean toward the far node; the other signals and the upper plane recede; then still.' },
+  { mode: 'COMPARE', title: 'COMPARE: band versus verdict', frames: [2475, 2487, 2499, 2511, 2530, 2580, 2630, 2650], note: 'Both alternatives share the same hierarchy for the whole beat; no framing; the PERCH on the whole card settles it out.' },
+  { mode: 'RESOLVE', title: 'RESOLVE: the takeaway', frames: [4030, 4042, 4054, 4066, 4090, 4150, 4230, 4256], note: 'One settle: the rule hardens, the support lines recede, the world leans in; then a genuine still hold, and one settle back before the cut.' },
+  { mode: 'ARRIVAL', title: 'The CTA arrives', frames: [4256, 4260, 4270, 4280, 4295], note: 'The takeaway returned to identity before the cut; the CTA is a brand segment and is never framed.' },
+  { mode: 'TRANSITION', title: 'TRANSITION: the signature depth reveal', frames: [1620, 1635, 1649, 1672, 1696, 1720, 1742, 1745], note: 'The INSPECT hierarchy eases out before the push; from the push to the flat frame nothing competes: identity, no wash, no attenuation.' },
+  { mode: 'GUIDE', title: 'GUIDE: the statement is read', frames: [3865, 3875, 3887, 3899, 3920, 3980], note: 'The statement reveals with its laid-brick settle and gains the wash; the support line recedes to 0.9; no camera until the RESOLVE.' },
 ];
-const CHARACTERLESS = [1850, 3330, 3950];
+const CHARACTERLESS = [1780, 3260, 3880];
 
 // Every frame the page needs must exist on both sides before any image work starts.
 {

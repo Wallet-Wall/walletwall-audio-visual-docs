@@ -89,7 +89,7 @@ async function prepare(run: string, blend: string): Promise<void> {
   const track = await synthesize(spec, new FixtureVoiceProvider(), config);
   stageDeclaredAssets(spec);
   const serveUrl = await bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'index.ts'), publicDir: PUBLIC_DIR });
-  const bare = buildProps(spec, source, track, config, { captions: false, characterless: true, guides: false });
+  const bare = buildProps(spec, source, track, config, { captions: false, characterless: true, guides: false, footer: false });
   const comp = await selectComposition({ serveUrl, id: 'WalletWallDocsVideo', inputProps: bare });
   mkdirSync(path.join(BLENDER_JOBS, p.dirs.jobs), { recursive: true });
   for (const [i, frame] of [p.seam.first, p.seam.flatAgain].entries()) await renderStill({ composition: comp, serveUrl, output: path.join(BLENDER_JOBS, p.dirs.jobs, `layer-${i}.png`), frame, inputProps: bare });

@@ -251,9 +251,9 @@ export async function currentPublicState(videoId: string, env: Record<string, st
   };
 }
 
-/** Every string the composition draws besides narration: scene text, eyebrows, brand copy, the doc title, the provenance chip. */
+/** Every string the composition draws besides narration: scene text, eyebrows, brand copy, the doc title, the provenance chip, the footer. */
 function onScreenCopy(spec: VideoSpec, source: NormalizedSource, templates: CopyTemplates): { path: string; text: string }[] {
-  const out: { path: string; text: string }[] = [{ path: 'spec:title.topic', text: spec.title.topic }, { path: 'snapshot:title', text: source.title }, { path: 'spec:source.docPath', text: spec.source.docPath }];
+  const out: { path: string; text: string }[] = [{ path: 'spec:title.topic', text: spec.title.topic }, { path: 'snapshot:title', text: source.title }, { path: 'spec:source.docPath', text: spec.source.docPath }, { path: 'config:copy-templates.footer.onScreen', text: templates.footer.onScreen }];
   const headings = new Map(source.sections.map((s) => [s.id, s.heading]));
   spec.segments.forEach((seg, i) => {
     if (seg.templateId) {
@@ -594,7 +594,7 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
     durationMs?: unknown;
     output?: { path?: string; sha256?: string };
     narration?: { providerId?: unknown; publication?: unknown };
-    overlays?: { captions?: unknown; characterless?: unknown; guides?: unknown };
+    overlays?: { captions?: unknown; characterless?: unknown; guides?: unknown; footer?: unknown };
     identity?: unknown;
     motionEngine?: MotionEngineIdentity;
     character?: CharacterRecord;
@@ -616,6 +616,7 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
     else {
       if (o.guides) fail('DEBUG_OUTPUT', where('overlays.guides'), 'the layout guides are drawn into the frames');
       if (o.characterless) fail('DEBUG_OUTPUT', where('overlays.characterless'), 'the characterless design test is not the publication render');
+      if (o.footer === false) fail('DEBUG_OUTPUT', where('overlays.footer'), 'the WalletWall footer is switched off, which only the layer images of the depth reveal may do');
     }
     if (render.narration?.providerId !== narrationProvider) fail('RENDER_INCONSISTENT', where('narration.providerId'), 'the render and the manifest name different narration');
     if (!same(render.narration?.publication ?? null, state.narrationPublication?.ref ?? null)) fail('NARRATION_INVALID', where('narration.publication'), 'the render carries other narration than the verified set this checkout replays');

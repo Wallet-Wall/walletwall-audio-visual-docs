@@ -32,7 +32,7 @@ const opt = (n: string): string | undefined => args.find((a) => a.startsWith(`--
 const context = opt('context');
 const stillsOnly = args.includes('--stills-only'); // skip the Remotion clip: Blender's reveal frames are the evidence
 const reuseLayers = args.includes('--reuse-layers'); // reuse the two characterless surfaces from an earlier run
-const clip = (opt('clip') ?? '1690..1840').split('..').map(Number) as [number, number];
+const clip = (opt('clip') ?? '1620..1770').split('..').map(Number) as [number, number];
 const NAME = 'reveal-tiers-signals';
 const videoId = 'migration-readiness';
 const cfg = loadBlenderConfig();
@@ -58,7 +58,7 @@ mkdirSync(layerDir, { recursive: true });
 if (!(reuseLayers && existsSync(path.join(layerDir, 'layer-0.png')) && existsSync(path.join(layerDir, 'layer-1.png')))) {
   stageDeclaredAssets(spec);
   const serveUrl = await bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'index.ts'), publicDir: PUBLIC_DIR });
-  const bare = buildProps(spec, source, track, config, { captions: false, characterless: true, guides: false });
+  const bare = buildProps(spec, source, track, config, { captions: false, characterless: true, guides: false, footer: false });
   const bareComp = await selectComposition({ serveUrl, id: 'WalletWallDocsVideo', inputProps: bare });
   await renderStill({ composition: bareComp, serveUrl, output: path.join(layerDir, 'layer-0.png'), frame: first, inputProps: bare });
   await renderStill({ composition: bareComp, serveUrl, output: path.join(layerDir, 'layer-1.png'), frame: flatAgain, inputProps: bare });

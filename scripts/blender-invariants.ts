@@ -274,8 +274,8 @@ for (const row of rows) {
   }
 }
 
-// Coverage, as the Rive tests required it (scaled to the stride).
-for (const [k, n] of Object.entries(coverageMinimums(every, labEvery))) if ((counts[k] ?? 0) < n) failures.push({ check: 'coverage', run: k.split('.')[0]!, frame: -1, detail: `${k}: ${counts[k] ?? 0} frames checked, at least ${n} needed` });
+// Coverage: the lesson floors are fractions of the lesson frames checked, the lab floors counts (src/blender/invariants-policy.ts).
+for (const [k, n] of Object.entries(coverageMinimums((measuredFrames.lesson ?? []).length, labEvery))) if ((counts[k] ?? 0) < n) failures.push({ check: 'coverage', run: k.split('.')[0]!, frame: -1, detail: `${k}: ${counts[k] ?? 0} frames checked, at least ${n} needed` });
 const supported = counts['lesson.supportedHolds'] ?? 0;
 if (supported > 0 && (counts['lesson.heldClear'] ?? 0) / supported >= MAX_TAIL_RELEASE) failures.push({ check: 'tail rest', run: 'lesson', frame: -1, detail: `the tail is released on ${counts['lesson.heldClear']} of ${supported} supported holds` });
 

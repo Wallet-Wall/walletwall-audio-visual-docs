@@ -193,7 +193,7 @@ if (!overlays.characterless) {
   const revealFrames = seam ? (wanted ? wanted.filter(inReveal) : undefined) : [];
   if (seam && (!revealFrames || revealFrames.length > 0)) {
     // The reveal's only imagery: the two teaching surfaces, as Remotion draws them, characterless.
-    const bare = withEngine(buildProps(spec, source, track, config, { captions: false, characterless: true, guides: false }));
+    const bare = withEngine(buildProps(spec, source, track, config, { captions: false, characterless: true, guides: false, footer: false }));
     const bareComp = await selectComposition({ serveUrl, id: COMPOSITION_ID, inputProps: bare });
     const layerDir = path.join(BLENDER_JOBS, `${videoId}-surfaces`);
     mkdirSync(layerDir, { recursive: true });

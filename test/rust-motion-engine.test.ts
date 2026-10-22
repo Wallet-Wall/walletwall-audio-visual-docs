@@ -56,9 +56,9 @@ const readFixture = (name: string): { input: MotionInput; plan: Uint8Array } => 
 const fixtureInput = readFixture('takeaway-hop').input;
 const fixturePlan = readFixture('takeaway-hop').plan;
 /** Every TRAVEL clip of the committed lesson that the transitional solver performs as a hop from a stance ending in a perch. */
-const HOPS_TO_PERCHES = [1, 4, 7, 28, 33, 40, 42, 44, 48, 50, 52, 54];
+const HOPS_TO_PERCHES = [1, 4, 6, 27, 32, 39, 41, 43, 47, 49, 51, 53];
 /** The tiers arrival: the fall that continues the previous scene's exit leap (no takeoff), which stays TypeScript. */
-const FALL = 14;
+const FALL = 13;
 const terrains = terrainsFor(timeline.segments, layouts);
 /** Two level tops spanning (and overhanging) the frame at the two heights of a synthetic hop: open terrain under both ends. */
 const openTerrain = (a: { y: number }, b: { y: number }): TerrainSurface[] => [
@@ -306,8 +306,8 @@ describe('the engine performs every hop that ends in a perch, in the composition
     }
     const fall = ts.motions[FALL]!;
     assert.ok(fall.kind === 'HOP' && fall.airborneStart && ts.clips[FALL]!.segmentId === 'tiers', 'control: the tiers arrival is a fall that continues the exit leap, and stays TypeScript');
-    assert.equal(ts.motions[37]!.kind, 'TRACE', 'control: a chained skip stays TypeScript');
-    assert.equal(ts.clips[31]!.kind, 'TRAVERSE', 'control: the hop at clip 30 runs straight into a trace and stays TypeScript');
+    assert.equal(ts.motions[36]!.kind, 'TRACE', 'control: a chained skip stays TypeScript');
+    assert.equal(ts.clips[30]!.kind, 'TRAVERSE', 'control: the hop at clip 29 runs straight into a trace and stays TypeScript');
     assert.deepEqual(bindMotionEngine(undefined, ts, fps, spec.id), { engine: 'typescript', transitional: ts, paths: [], contacts: ts.events, muted: new Set() });
   });
 
@@ -335,7 +335,15 @@ describe('the engine performs every hop that ends in a perch, in the composition
       assert.equal(a.motion.rotation, s.bodyPitch);
       if (Math.abs(a.motion.tail.swing - b.motion.tail.swing) > 0.5) tailDiffers++;
     }
-    assert.equal(inside, bound.paths.reduce((n, p) => n + p.plan.frames.count, 0));
+    // The paths plan exactly the frames the video renders, with one bounded exception: totalFrames rounds the duration
+    // (the lesson's 174,937 ms is 5,248.11 frames, of which 0..5247 render), so the LAST path may plan past the last
+    // rendered frame, by at most the rounding gap, and only at instants still inside the video's duration.
+    const last = bound.paths.length - 1;
+    for (const p of bound.paths.slice(0, last)) assert.ok(p.end <= frames, `${p.travel.segmentId} clip ${p.travelIndex} plans past the video (${p.end} > ${frames})`);
+    const overrun = Math.max(0, bound.paths[last]!.end - frames);
+    assert.ok(overrun <= Math.ceil((timeline.totalMs * fps) / 1000) - frames, `the last path runs ${overrun} frames past the video`);
+    for (let f = frames; f < bound.paths[last]!.end; f++) assert.ok(frameMs(f) < timeline.totalMs, `frame ${f} lies past the video's duration`);
+    assert.equal(inside, bound.paths.reduce((n, p) => n + Math.min(p.end, frames) - p.first, 0), 'paths never overlap on a rendered frame');
     assert.ok(tailDiffers > 300, `positive control: the engine, not the transitional solver, drives the tail (${tailDiffers} frames differ)`);
     // Only where the transitional solver would still be settling an engine landing past its path's
     // end (the hook's short perch): the engine settled it inside its own window.
@@ -520,26 +528,26 @@ describe('the engine performs every hop that ends in a perch, in the composition
   test('a path the engine cannot perform exactly is refused, never silently left to TypeScript', () => {
     const sel = (segmentId: string, clip: number, action: RustPathSelection['action'] = 'HOP'): RustPathSelection => ({ videoId: spec.id, segmentId, clip, action });
     assert.equal(refusal(() => findRustPath(ts, sel('nowhere', 999))), 'INELIGIBLE_PATH');
-    assert.equal(refusal(() => findRustPath(ts, sel('vault-conditional', 37, 'LAND'))), 'INELIGIBLE_PATH', 'a chained skip, not a hop');
-    assert.equal(refusal(() => findRustPath(ts, sel('signals', 30))), 'INELIGIBLE_PATH', 'a hop that runs straight into a trace');
+    assert.equal(refusal(() => findRustPath(ts, sel('vault-conditional', 36, 'LAND'))), 'INELIGIBLE_PATH', 'a chained skip, not a hop');
+    assert.equal(refusal(() => findRustPath(ts, sel('signals', 29))), 'INELIGIBLE_PATH', 'a hop that runs straight into a trace');
     assert.equal(refusal(() => findRustPath(ts, sel('tiers', FALL))), 'INELIGIBLE_PATH', 'a fall that continues a flight (no takeoff)');
-    assert.equal(refusal(() => findRustPath(ts, sel('takeaway', 44, 'LAND'))), 'INELIGIBLE_PATH', 'the lesson asks for a HOP there');
-    assert.doesNotThrow(() => findRustPath(ts, sel('takeaway', 44)), 'control: the takeaway hop is eligible');
+    assert.equal(refusal(() => findRustPath(ts, sel('takeaway', 43, 'LAND'))), 'INELIGIBLE_PATH', 'the lesson asks for a HOP there');
+    assert.doesNotThrow(() => findRustPath(ts, sel('takeaway', 43)), 'control: the takeaway hop is eligible');
     // Variations of the takeaway path, each refused for one reason.
-    const travel = ts.clips[44]!;
+    const travel = ts.clips[43]!;
     const edited = (edit: (t: TsMotionPlan) => void): TsMotionPlan => {
       const t = { ...ts, clips: [...ts.clips], surfaces: [...ts.surfaces], events: [...ts.events] };
       edit(t);
       t.events.sort((a, b) => a.atMs - b.atMs);
       return t;
     };
-    const comparing = edited((t) => (t.clips[45] = { ...t.clips[45]!, lookAlt: { x: 400, y: 400 } }));
-    assert.equal(refusal(() => findRustPath(comparing, sel('takeaway', 44))), 'INELIGIBLE_PATH', 'a comparing perch');
-    const narrow = edited((t) => (t.surfaces[44] = { ...t.surfaces[44]!, to: { ...t.surfaces[44]!.to!, x1: t.surfaces[44]!.to!.x0 + 60 } }));
-    assert.equal(refusal(() => findRustPath(narrow, sel('takeaway', 44))), 'INELIGIBLE_PATH', 'a narrow perch');
+    const comparing = edited((t) => (t.clips[44] = { ...t.clips[44]!, lookAlt: { x: 400, y: 400 } }));
+    assert.equal(refusal(() => findRustPath(comparing, sel('takeaway', 43))), 'INELIGIBLE_PATH', 'a comparing perch');
+    const narrow = edited((t) => (t.surfaces[43] = { ...t.surfaces[43]!, to: { ...t.surfaces[43]!.to!, x1: t.surfaces[43]!.to!.x0 + 60 } }));
+    assert.equal(refusal(() => findRustPath(narrow, sel('takeaway', 43))), 'INELIGIBLE_PATH', 'a narrow perch');
     const event = (kind: MotionEvent['kind']): MotionEvent => ({ kind, atMs: travel.startMs - 100, impulse: 0.5, scale: travel.fromScale, at: travel.from, segmentId: 'takeaway', surface: null });
-    assert.equal(refusal(() => findRustPath(edited((t) => t.events.push(event('LANDING'))), sel('takeaway', 44))), 'INELIGIBLE_PATH', 'another landing still settling');
-    assert.doesNotThrow(() => findRustPath(edited((t) => t.events.push(event('TAKEOFF'))), sel('takeaway', 44)), 'control: a takeoff\'s follow-through may run on');
+    assert.equal(refusal(() => findRustPath(edited((t) => t.events.push(event('LANDING'))), sel('takeaway', 43))), 'INELIGIBLE_PATH', 'another landing still settling');
+    assert.doesNotThrow(() => findRustPath(edited((t) => t.events.push(event('TAKEOFF'))), sel('takeaway', 43)), 'control: a takeoff\'s follow-through may run on');
     assert.doesNotThrow(() => findRustPaths(ts, spec.id), 'every hop to a perch in the lesson is eligible');
     assert.deepEqual(selectRustPaths(ts, 'some-other-video'), [], 'a video the engine does not perform selects nothing');
   });

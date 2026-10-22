@@ -193,11 +193,6 @@ export function choreograph(timeline: Timeline, layouts: Map<string, SceneLayout
 
   for (const seg of timeline.segments) {
     holdUntil(seg.id, seg.startMs);
-    if (seg.role === 'IDENT') {
-      push(base(seg.id, 'HIDDEN', seg.startMs, seg.endMs));
-      pos = null;
-      continue;
-    }
 
     const brand = BRAND_MARKS[seg.role];
     if (brand) {

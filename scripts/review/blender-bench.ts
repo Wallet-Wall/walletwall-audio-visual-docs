@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { outFile } from '../../src/blender/toolchain.ts';
 
-const LESSON_FRAMES = 5319;
+const LESSON_FRAMES = 5248;
 const rows = process.argv.slice(2).map((arg) => {
   const [label, dir] = arg.split('=');
   const r = JSON.parse(readFileSync(outFile(`${dir}/render.json`), 'utf8')) as { seconds: number; shots: { ms: number }[]; environment?: { os: string; gpu: { renderer?: string } } };

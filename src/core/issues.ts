@@ -43,7 +43,7 @@ export const ISSUE_CODES = {
   GRAPH_LAYER_INVALID: 'LAYERED graphs need UPPER and LOWER nodes; other layouts must not set layers.',
   EYEBROW_SECTION_UNKNOWN: 'Scene eyebrow cites a source section that does not exist.',
   // Structure
-  STRUCTURE_SEGMENT_MISSING: 'A required segment (hook, ident, CTA, docs reference, outro, end screen) is missing.',
+  STRUCTURE_SEGMENT_MISSING: 'A required segment (hook, CTA, docs reference, outro, end screen) is missing.',
   STRUCTURE_ORDER: 'Segments are out of the required order.',
   STRUCTURE_SEGMENT_REPEATED: 'A segment role that must appear once appears more than once.',
   TEMPLATE_UNKNOWN: 'A brand segment names a template that does not exist or has the wrong role.',

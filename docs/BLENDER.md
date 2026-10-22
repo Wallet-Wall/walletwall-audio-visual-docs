@@ -88,13 +88,16 @@ are its frames) and, per frame, records:
 `validateBridge()` refuses anything that is not exactly v1: unknown fields at any level,
 frames that are not strictly ascending frames of the range (a subset is allowed: stills, the proof set, some frames of a
 reveal), non-finite or out-of-range values, unknown clips, weights that do not sum to 1, a target across the frame, a path-like
-segment id, and **a grounded on-stage frame with no declared supporting top under it**. A test bridges all 5,319
+segment id, and **a grounded on-stage frame with no declared supporting top under it**. A test bridges all 5,248
 frames of the committed lesson: every grounded frame stands on a declared `SUPPORTED_SURFACE`/`LEDGE`/`NARROW_LEDGE`
 top, except the few whose feet are outside the frame, which the contact audit also treats as off stage.
 
 Until the cutover, a test ran the pinned Rive runtime on ~230 lesson frames and proved the bridge's resolved pose was
 the Rive player's own pose before IK (every bone, the hip, every IK target); the content hash of those resolved poses,
-captured in the same run, is now pinned, with a positive control that a 0.01° change is caught.
+captured in the same run, is now pinned, with a positive control that a 0.01° change is caught. The rig-control inputs
+of that run, re-derived on main 011b39c5 where the pin held, are kept as a fixture (`fixtures/rive-parity/resolved-pose-inputs.json`, every 23rd frame of the lesson as it
+then was) and the hash is pinned over them, so the proof holds whatever the lesson becomes; today's lesson poses carry
+their own regression pin (re-derived when the standalone ident left the lesson, 2026-10-21).
 
 ## The character (blender/walletwallaby/)
 
@@ -211,12 +214,17 @@ projected position recorded by `render.py` on request, and checks:
 | Brand colours on pixels | every opaque pixel a mix of palette colours in linear light (at most 0.01% not); at least 30% exactly one | 0 of 11,084,922 off; 72.2% exact (worst frame 44.6%) |
 | Shuffled-frame purity | frames rendered in a shuffled order equal the in-order frames, byte for byte | 12 / 12 |
 
-Coverage minimums are Rive's (400 grounded frames, 300 supported holds, 300 scene holds at every 9th frame), scaled to
-the stride. The motion lab's two MANTLE/PULL frames the support judge refuses to bridge are excluded and listed. Not
+Coverage minimums (`src/blender/invariants-policy.ts`): the lesson's are fractions of the lesson frames a run checked
+(grounded 0.65, scene holds 0.5, supported holds 0.5; the publication proof receipt re-derives those frames from the
+plan), so a video's own length sets them; the lab's stay counts (10 unsupported perches, 2 hangs). They replaced Rive's
+absolute counts (400 grounded frames, 300 supported holds, 300 scene holds at every 9th frame) on 2026-10-22, by the
+owner's decision: calibrated on the 145 wpm fixture lesson, those refused the qualified publication narration (153.6
+wpm; 287 supported holds of 540 checked frames), whose holds are shorter. Every threshold is unchanged. The motion lab's two MANTLE/PULL frames the support judge refuses to bridge are excluded and listed. Not
 ported, because they describe the 2D shapes Rive drew: the belly polygon inside the torso polygon, the underlay draw
 order, and per-shape area retention; the Blender body is pinned instead and passed the owner's visual gate. The pose
-the Rive runtime evaluated is pinned too: `test/blender-lane.test.ts` holds the content hash of the resolved pose on
-every 23rd lesson frame and of the rig document, captured while the runtime parity test still passed.
+the Rive runtime evaluated is pinned too: `test/blender-lane.test.ts` holds the content hash of the resolved pose over
+the inputs the runtime proved (every 23rd frame of the lesson as it then was, kept as a fixture) and of the rig
+document, captured while the runtime parity test still passed.
 
 ## The 2D → 3D signature transition (depth reveal)
 
@@ -275,13 +283,19 @@ pixel appear or vanish. The worst values on the current baseline (2026-10-19: th
 | Crop composite vs full-frame composite (whole lesson) | 2.46e-5 / 2.0e-4 / 0 | 1e-4 / 1e-3 / 0 |
 
 **The proof set** (`src/blender/proof-set.ts`) is ten lesson frames chosen by fixed rules from the lesson's own bridge:
-idle (39), crouch (196), airborne (20), landing (30), perch (2721), inspect (64), tail brace (2341; a hard landing,
-impulse 0.95), and the reveal's entry (1719), peak depth (1760), and exit (1814). `npm run blender:proof` renders it,
+idle (39), crouch (196), airborne (20), landing (30), perch (2651), inspect (64), tail brace (925; a hard landing on the
+Monitor node, impulse 1.0, with the tail solved onto its support), and the reveal's entry (1649), peak depth (1690), and
+exit (1744). The frames moved on 2026-10-21 when the standalone ident left the lesson: every later moment came 2,350 ms
+(70.5 frames) earlier, so every later state is sampled half a frame later. The rules re-chose the frames; the tail
+brace's rule now also requires the tail at full IK strength (the half-frame sampling had made a drop-in landing with a
+free tail the hardest landing); and the reference was re-exported from the production class. `npm run blender:proof` renders it,
 records the environment and class, and compares two runs: same class, every PNG byte-identical; approved classes, the
 pinned tolerance. The production class's run is kept as the cross-class reference (`blender/proof/reference/`, 10
 lossless PNGs, 900 KB).
 
-Measured 2026-10-19 on the final code (the material pass, rig v6):
+Measured 2026-10-19 on the final code (the material pass, rig v6). That reference was replaced on 2026-10-22 by one
+re-exported from the lesson without the ident (two fresh production-class runs, 10 / 10 byte-identical, and
+`npm run blender:qualify-production` REVERIFIED against it); the rows below are the 2026-10-19 record:
 
 | Test | Result |
 |---|---|
@@ -365,8 +379,8 @@ Blender is a native program with its own Python: a new execution boundary.
 
 ## CI
 
-Every PR: `npm test` includes `test/blender-lane.test.ts`, with no Blender needed: the resolved pose and rig document
-pinned as the Rive runtime proved them, the full-lesson support check, the closed v1 schema, crop bounds (integer, in frame, holding the envelope,
+Every PR: `npm test` includes `test/blender-lane.test.ts`, with no Blender needed: the resolved pose (over the inputs
+the Rive runtime proved) and rig document pinned as it proved them, today's lesson poses, the full-lesson support check, the closed v1 schema, crop bounds (integer, in frame, holding the envelope,
 recomputed identically), the proof set's selection rules, environment-class matching and tolerance pins, the pinned
 toolchain and its confinement, the pinned character, the palette check's controls, and the Python rules.
 

@@ -33,7 +33,8 @@ export function characterProofFrames(bridge: BlenderMotionDocument, padPx: numbe
     landing: pick('landing', (f) => f.semantic.phase === 'CONTACT' && f.semantic.landingImpulse > 0.15 && f.semantic.landingImpulse < 0.6, (f) => w(f, 'land_soft')),
     perch: pick('perch', (f) => f.semantic.phase === 'HOLD' && w(f, 'perch') > 0.99),
     inspect: pick('inspect', (f) => f.semantic.action === 'INSPECT' && f.semantic.phase === 'HOLD' && w(f, 'inspect') > 0.99),
-    'tail-brace': pick('tail-brace', (f) => f.semantic.contact !== 'NONE' && f.semantic.landingImpulse > 0.9, (f) => w(f, 'land_hard')),
+    // A hard landing whose tail is solved onto its support (tail IK at full strength): the brace itself, not only the impact.
+    'tail-brace': pick('tail-brace', (f) => f.semantic.contact !== 'NONE' && f.semantic.landingImpulse > 0.9 && f.pose.ik.tail >= 0.999, (f) => w(f, 'land_hard')),
   };
 }
 

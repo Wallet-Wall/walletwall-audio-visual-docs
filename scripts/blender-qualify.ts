@@ -29,6 +29,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { measureEquivalence } from '../src/blender/equivalence.ts';
 import { loadEnvironments } from '../src/blender/identity.ts';
+import { PUBLICATION_STRIDE } from '../src/blender/invariants-policy.ts';
+import { lessonMotion, strideFrames } from '../src/blender/lesson.ts';
 import { decideQualification, formatQualification, QUALIFICATION_RUN, writeQualificationRecord, type BuildEvidence, type PinsSnapshot, type ProofRun, type QualificationInputs, type RoleComparison } from '../src/blender/qualification.ts';
 import { loadBlenderConfig, outFile, probeBlender } from '../src/blender/toolchain.ts';
 import { BLENDER_CHARACTER } from '../src/character/walletwallaby/versions.ts';
@@ -117,6 +119,7 @@ const inputs: QualificationInputs = {
   runs: { a: null, b: null, problems: [] },
   versusReference: null,
   invariants: null,
+  lessonStrideFrames: null,
 };
 
 // 1. Which Blender is installed (only `--version` runs here).
@@ -169,8 +172,11 @@ if (blenderOk) {
 
   // The ported invariants, at the publication stride. A report counts only if this run wrote it: a pass needs exit 0.
   const ok = step('the ported invariants at the publication stride (contacts, IK, envelope, palette)', STEPS.invariants());
-  const inv = readJson<{ schema: string; pass: boolean; every: number; labEvery: number; failureCount: number; thresholds: unknown; counts: unknown; environment?: { record?: unknown } }>(outFile('invariants/report.json'));
-  if (inv && inv.schema === 'walletwall.blender-invariants/v2' && (ok || inv.pass === false)) inputs.invariants = { pass: ok && inv.pass, every: inv.every, labEvery: inv.labEvery, failureCount: inv.failureCount, thresholds: inv.thresholds, counts: inv.counts, environment: inv.environment?.record };
+  const inv = readJson<{ schema: string; pass: boolean; every: number; labEvery: number; failureCount: number; thresholds: unknown; counts: unknown; lessonFrames?: unknown; environment?: { record?: unknown } }>(outFile('invariants/report.json'));
+  if (inv && inv.schema === 'walletwall.blender-invariants/v2' && (ok || inv.pass === false)) inputs.invariants = { pass: ok && inv.pass, every: inv.every, labEvery: inv.labEvery, failureCount: inv.failureCount, thresholds: inv.thresholds, counts: inv.counts, lessonFrames: inv.lessonFrames, environment: inv.environment?.record };
+  // The frames the invariants step must have checked: every visible frame of this checkout's lesson (the step's fixed
+  // video, fixture voice, and default engine) at the publication stride. The coverage floors are fractions of them.
+  inputs.lessonStrideFrames = strideFrames(await lessonMotion('migration-readiness'), PUBLICATION_STRIDE.every);
 }
 
 inputs.pins.after = pins();

@@ -25,6 +25,7 @@ import { BLENDER_LANE_DIR, blenderSourceSha256, loadBlenderConfig, REQUIRED_ARGS
 import { environmentClass, loadEnvironments } from '../src/blender/identity.ts';
 import { characterProofFrames } from '../src/blender/proof-set.ts';
 import { contentAddress } from '../src/core/hash.ts';
+import { VIDEO_ROOT } from '../src/config/load.ts';
 import { assertPinnedCharacter, BlenderProductionError } from '../src/blender/production.ts';
 import { hexRgb, paletteCheck } from '../src/blender/palette-check.ts';
 import { BLENDER_CHARACTER } from '../src/character/walletwallaby/versions.ts';
@@ -34,8 +35,21 @@ import { terrainsFor } from '../src/layout/terrain.ts';
 import { buildTimeline } from '../src/timeline/timeline.ts';
 import { committedSnapshot, committedSpec, config } from './helpers.ts';
 
-/** Captured 2026-10-18 while the Rive runtime parity test passed in the same run (see below). */
-const RESOLVED_POSES_PIN = 'f8e79d0b1c2cbc3588d6f09a5e0273537624a2a009970ac0730988f783d7467a';
+/**
+ * Captured 2026-10-18 while the Rive runtime parity test passed in the same run: the resolved poses of every 23rd frame
+ * of the lesson as it was then. When the standalone ident left the lesson (2026-10-21) every later state came to be
+ * sampled at other instants, so the rig-control inputs of that run are kept as a fixture
+ * (fixtures/rive-parity/resolved-pose-inputs.json, captured on main 011b39c5, where this pin held) and resolvePose is
+ * pinned over them: the Rive-proven function, on the inputs the Rive runtime proved, whatever the lesson becomes.
+ */
+const RIVE_PROVEN_POSES_PIN = 'f8e79d0b1c2cbc3588d6f09a5e0273537624a2a009970ac0730988f783d7467a';
+/**
+ * Self-derived regression pins of today's lesson (not Rive-proven): its resolved poses of every 23rd frame
+ * (re-derived 2026-10-21), and those of the hook alone, which precedes the removed ident and so resolves exactly as on
+ * main 011b39c5.
+ */
+const RESOLVED_POSES_PIN = '26ea6d8c5def98a4edf6a1265f229954425e6b5f12ebd041b496492026978a63';
+const HOOK_POSES_PIN = 'e690444d9312c20140897b7ec2c4741ea55a1cd124ed46db8d21a2b395e701d7';
 const RIG_DOCUMENT_PIN = 'cd49bd326c3fe914e57f7f5123ba65489282357fc022d2ea90e411d6d9e4cc38';
 
 const spec = committedSpec();
@@ -69,22 +83,28 @@ const doc = (first: number, last: number): BlenderMotionDocument => ({
 
 describe('the Blender bridge carries the decisions, not new ones', () => {
   // The Rive runtime was retired after it proved, frame for frame, that resolvePose is the pose its player would have
-  // drawn (a parity test on the real runtime, until the cutover; these pins were captured in the same run, in the commit
-  // before the runtime was removed). These pins freeze what it proved: the resolved pose of every 23rd frame
-  // of the lesson, and the rig document Blender builds the character from. A change to either is a declared rig change.
-  test('the resolved pose and the rig document are the ones the Rive runtime proved (pinned)', () => {
+  // drawn (a parity test on the real runtime, until the cutover; the pin was captured in the same run, in the commit
+  // before the runtime was removed). RIVE_PROVEN_POSES_PIN freezes what it proved, over the very inputs it proved; the
+  // lesson pins and the rig document Blender builds the character from guard today's lesson. A change to resolvePose
+  // or the rig document is a declared rig change.
+  test('resolvePose is the function the Rive runtime proved, on its inputs; today\'s lesson poses and the rig document are pinned', () => {
     const round = (v: unknown): unknown => (typeof v === 'number' ? Math.round(v * 1e9) / 1e9 : Array.isArray(v) ? v.map(round) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, round(x)])) : v);
+    const proven = JSON.parse(readFileSync(path.join(VIDEO_ROOT, 'fixtures', 'rive-parity', 'resolved-pose-inputs.json'), 'utf8')) as { inputs: { frame: number; controls: Parameters<typeof resolvePose>[1] }[] };
+    assert.equal(proven.inputs.length, 226);
+    assert.equal(contentAddress(proven.inputs.map((x) => ({ frame: x.frame, pose: round(resolvePose(model, x.controls)) }))), RIVE_PROVEN_POSES_PIN, 'the Rive-proven poses, on the inputs the Rive runtime proved');
     const poses = [];
     for (let f = 0; f < frames; f += 23) {
       const { state } = at(f);
       if (state.visible) poses.push({ frame: f, pose: round(resolvePose(model, rigControls(state))) });
     }
     assert.equal(contentAddress(poses), RESOLVED_POSES_PIN, `${poses.length} resolved poses`);
+    const hookEnd = Math.round((timeline.segments[0]!.endMs * timeline.fps) / 1000);
+    assert.equal(contentAddress(poses.filter((p) => p.frame < hookEnd)), HOOK_POSES_PIN, 'the hook resolves exactly as on main 011b39c5');
     assert.equal(contentAddress(blenderRigDocument(model)), RIG_DOCUMENT_PIN);
   });
 
   test('positive control: a 0.01 degree change in one bone is caught', () => {
-    const { state } = at(1850);
+    const { state } = at(1780);
     const controls = rigControls(state);
     const a = resolvePose(model, controls);
     const b = resolvePose(model, { ...controls, head: { deg: controls.head.deg + 0.01 } });
@@ -104,13 +124,13 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
   });
 
   test('a grounded frame with no declared top under it is refused (positive control: the real terrain passes)', () => {
-    const { state, segment, onScreen } = at(1850);
-    assert.doesNotThrow(() => bridgeFrame(model, 1850, segment, state, onScreen));
-    assert.throws(() => bridgeFrame(model, 1850, segment, state, [{ surfaces: [], protectedText: [] }]), BlenderBridgeError);
+    const { state, segment, onScreen } = at(1780);
+    assert.doesNotThrow(() => bridgeFrame(model, 1780, segment, state, onScreen));
+    assert.throws(() => bridgeFrame(model, 1780, segment, state, [{ surfaces: [], protectedText: [] }]), BlenderBridgeError);
   });
 
   test('the bridge refuses anything that is not exactly v1', () => {
-    const good = doc(1840, 1845);
+    const good = doc(1770, 1775);
     assert.doesNotThrow(() => validateBridge(JSON.parse(JSON.stringify(good))));
     // A subset of the range (review stills, the proof set, some frames of a reveal) is a bridge too.
     const subset = JSON.parse(JSON.stringify(good));
@@ -122,8 +142,8 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
       ['no frames', (d) => (d.frames = [])],
       ['a repeated frame', (d) => (d.frames[2] = JSON.parse(JSON.stringify(d.frames[1])))],
       ['frames out of order', (d) => d.frames.reverse()],
-      ['a frame outside the range', (d) => (d.range.last = 1844)],
-      ['more frames than the range holds', (d) => (d.range.first = 1841)],
+      ['a frame outside the range', (d) => (d.range.last = 1774)],
+      ['more frames than the range holds', (d) => (d.range.first = 1771)],
       ['non-finite rotation', (d) => (d.frames[1].pose.rot.head = Number.NaN)],
       ['an unknown clip', (d) => (d.frames[1].pose.clips = { dance: 1 })],
       ['clip weights not summing to 1', (d) => (d.frames[1].pose.clips = { idle_alert: 0.5 })],
@@ -204,15 +224,15 @@ describe('character crops and the proof set', () => {
   });
 
   test('a crop needs a visible frame and a non-negative pad; a frame wholly outside the picture has none', () => {
-    const f = lesson.frames[1850]!;
+    const f = lesson.frames[1780]!;
     assert.throws(() => characterCrop(f, RIG_ENVELOPE, -1, frameSize));
     assert.equal(characterCrop({ ...f, place: { ...f.place, x: 5000 } }, RIG_ENVELOPE, 40, frameSize), null);
     assert.equal(characterCrop({ ...f, visible: false }, RIG_ENVELOPE, 40, frameSize), null);
   });
 
   test('the proof set is chosen by fixed rules from the lesson, the same every time', () => {
-    const a = characterProofFrames(lesson, 40, { first: 1719, last: 1814 });
-    const b = characterProofFrames(JSON.parse(JSON.stringify(lesson)), 40, { first: 1719, last: 1814 });
+    const a = characterProofFrames(lesson, 40, { first: 1649, last: 1744 });
+    const b = characterProofFrames(JSON.parse(JSON.stringify(lesson)), 40, { first: 1649, last: 1744 });
     assert.deepEqual(a, b);
     const at = (n: number) => lesson.frames[n]!.semantic;
     assert.equal(at(a.idle).action, 'IDLE');
@@ -220,8 +240,9 @@ describe('character crops and the proof set', () => {
     assert.equal(at(a.airborne).contact, 'NONE');
     assert.equal(at(a.landing).phase, 'CONTACT');
     assert.ok(at(a['tail-brace']).landingImpulse > 0.9);
+    assert.ok(lesson.frames[a['tail-brace']]!.pose.ik.tail >= 0.999, `the tail brace's tail is solved onto its support (frame ${a['tail-brace']}: tail IK ${lesson.frames[a['tail-brace']]!.pose.ik.tail})`);
     assert.equal(at(a.inspect).action, 'INSPECT');
-    for (const n of Object.values(a)) assert.ok(n < 1719 || n > 1814, 'character roles stay outside the reveal');
+    for (const n of Object.values(a)) assert.ok(n < 1649 || n > 1744, 'character roles stay outside the reveal');
   });
 });
 

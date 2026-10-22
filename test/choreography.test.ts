@@ -21,9 +21,15 @@ describe('WalletWallaby choreography', () => {
     assert.equal(clips[clips.length - 1]!.endMs, timeline.totalMs);
   });
 
-  test('the guide is absent during the ident', () => {
-    const ident = timeline.segments.find((s) => s.role === 'IDENT')!;
-    for (let ms = ident.startMs; ms < ident.endMs; ms += 100) assert.equal(wallabyStateAt(clips, ms).visible, false);
+  test('after the hook the guide stays on stage: he hops on from where the hook left him, never re-entering from off-stage', () => {
+    const hook = timeline.segments[0]!;
+    const question = timeline.segments.find((s) => s.role === 'QUESTION')!;
+    assert.equal(question.startMs, hook.endMs, 'nothing sits between the hook and the question');
+    assert.ok(!clips.some((c) => c.kind === 'HIDDEN' && c.endMs > hook.endMs && c.startMs < question.contentStartMs), 'no hidden stretch between the hook and the question');
+    const lastInHook = [...clips].reverse().find((c) => c.segmentId === hook.id && c.kind !== 'HIDDEN')!;
+    const firstMove = clips.find((c) => c.segmentId === question.id && c.kind === 'TRAVEL')!;
+    assert.deepEqual(firstMove.from, lastInHook.to, 'the first move in the question starts where the hook left him');
+    for (let ms = hook.endMs; ms < question.contentStartMs; ms += 50) assert.equal(wallabyStateAt(clips, ms).visible, true, `on stage at ${ms} ms`);
   });
 
   test('PUSH_THROUGH ends exactly as its segment ends, fading into the plane', () => {
