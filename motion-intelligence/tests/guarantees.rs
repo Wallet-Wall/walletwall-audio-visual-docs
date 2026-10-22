@@ -194,9 +194,9 @@ fn phases_run_in_order_and_the_landing_comes_before_the_settle_and_the_perch() {
 fn the_hop_is_the_transitional_typescript_solver_s_hop_exactly() {
     // Values from planHop (src/character/walletwallaby/motion.ts) for this clip, at full precision.
     let p = plan();
-    assert_eq!(p.timing.orient_end_ms, 123706.0);
-    assert_eq!(p.timing.liftoff_ms, 123904.0);
-    assert_eq!(p.timing.contact_ms, 124360.92321588083);
+    assert_eq!(p.timing.orient_end_ms, 121356.0);
+    assert_eq!(p.timing.liftoff_ms, 121554.0);
+    assert_eq!(p.timing.contact_ms, 122010.92321588083);
     assert_eq!(p.trajectory.depth_px, 403.5360645205965);
     assert_eq!(p.trajectory.gravity_px_per_s2, 3865.6800000000007);
     assert_eq!(p.trajectory.apex_above_px, 18.656799439396536);

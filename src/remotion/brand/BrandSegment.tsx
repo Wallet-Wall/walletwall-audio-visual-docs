@@ -1,11 +1,11 @@
 // WalletWall-owned brand segments. Copy comes only from config/copy-templates.json
 // and the spec's source binding; branding stays short so content dominates. The
-// ident wordmark and the outro address are set in WalletWall terracotta.
+// outro address is set in WalletWall terracotta.
 
 import React from 'react';
 import { AbsoluteFill, Img, staticFile } from 'remotion';
 import { TOKENS } from '../../brand/tokens.ts';
-import { BRAND_GROUND, CTA_TEXT, DOCS_CARD, END_SCREEN_LABEL, END_SCREEN_ZONES, IDENT_MARK, IDENT_WORDMARK, OUTRO_MARK, OUTRO_TEXT } from '../../layout/brand-layout.ts';
+import { BRAND_GROUND, CTA_TEXT, DOCS_CARD, END_SCREEN_LABEL, END_SCREEN_ZONES, OUTRO_MARK, OUTRO_TEXT } from '../../layout/brand-layout.ts';
 import type { CopyTemplate } from '../../config/types.ts';
 import type { VideoSpec } from '../../spec/types.ts';
 import type { TimedSegment } from '../../timeline/timeline.ts';
@@ -23,7 +23,8 @@ interface BrandProps {
   provenance: { blob: string; contentHash: string };
 }
 
-function brandMark(spec: VideoSpec): string | null {
+/** The spec's declared, hash-verified BRAND_MARK asset as staged in the bundle, or null when it declares none. */
+export function brandMark(spec: VideoSpec): string | null {
   const mark = spec.assets.find((a) => a.kind === 'BRAND_MARK');
   return mark ? staticFile(`${spec.id}/${mark.id}${mark.path.slice(mark.path.lastIndexOf('.'))}`) : null;
 }
@@ -34,16 +35,6 @@ export const BrandSegment: React.FC<BrandProps> = ({ seg, ms, spec, template, do
   const m = useMaterial();
   const ink = m.flat.text.ink;
   switch (seg.role) {
-    case 'IDENT':
-      // Multiple possibilities -> brief interference -> resolution -> tactile set: visually, the mark settles like a laid brick.
-      return (
-        <AbsoluteFill>
-          {mark ? <Img src={mark} style={{ ...rectStyle(IDENT_MARK), objectFit: 'contain', ...settle(ms, t0, 520) }} /> : null}
-          <div style={{ ...rectStyle(IDENT_WORDMARK), ...textStyle('cardHeading', false, ink), textAlign: 'center', color: TOKENS.terracotta, ...settle(ms, t0 + 380, 420) }}>
-            {template.onScreen}
-          </div>
-        </AbsoluteFill>
-      );
     case 'CTA':
       return (
         <AbsoluteFill>

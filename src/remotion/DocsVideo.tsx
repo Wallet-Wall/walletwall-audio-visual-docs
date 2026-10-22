@@ -8,7 +8,7 @@
 // bounded camera: a single transform about the frame centre, so the character
 // stays registered with its support exactly. The provenance chip shares the eyebrow
 // row the scene lays out, so it rides the world with it. The FIXED EDITORIAL LAYER
-// (a staged depth reveal, review captions, debug guides, the
+// (a staged depth reveal, the quiet WalletWall footer, review captions, debug guides, the
 // end screen's reserved zones) is never framed.
 
 import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
@@ -20,10 +20,12 @@ import { choreograph, layoutsFor, mouthAt, type Clip } from '../character/wallet
 import { planMotion, platformOffsets, traverseProgress, type MotionPlan } from '../character/walletwallaby/motion.ts';
 import { CONTENT_BOTTOM, easeInOut, TITLE_SAFE } from '../layout/geometry.ts';
 import { END_SCREEN_ZONES, PROVENANCE_CHIP } from '../layout/brand-layout.ts';
+import { CAPTION_BAND, footerOpacityAt, planFooter, type FooterPlan } from '../layout/footer.ts';
 import type { SceneLayout } from '../layout/scene-layout.ts';
 import { bindMotionEngine, sampleWithEngine, type BoundMotionEngine } from '../motion/rust-path.ts';
 import { buildTimeline, narrationAudio, type NarrationAudioCue, type TimedSegment, type Timeline } from '../timeline/timeline.ts';
-import { BrandSegment } from './brand/BrandSegment.tsx';
+import { BrandSegment, brandMark } from './brand/BrandSegment.tsx';
+import { Footer } from './brand/Footer.tsx';
 import { loadBrandFonts } from './fonts.ts';
 import type { DocsVideoProps } from './props.ts';
 import { SceneView } from './scenes/SceneView.tsx';
@@ -44,6 +46,8 @@ interface Model {
   captions: ReturnType<typeof buildCaptions>;
   /** Publication narration's line WAVs, where the timeline places them (none for the silent fixture voice). */
   audio: NarrationAudioCue[];
+  /** Where the quiet WalletWall footer steps aside (src/layout/footer.ts): from the timeline and the clip windows. */
+  footer: FooterPlan;
 }
 
 export function buildModel(props: DocsVideoProps): Model {
@@ -54,7 +58,7 @@ export function buildModel(props: DocsVideoProps): Model {
   // Fails closed: an engine plan that does not answer exactly these clips stops the render.
   const engine = bindMotionEngine(props.motionEngine, motion, timeline.fps, props.spec.id);
   const attention = planAttention(timeline, layouts, clips, props.direction);
-  return { timeline, layouts, clips, motion, engine, attention, captions: buildCaptions(timeline), audio: narrationAudio(timeline, props.track, props.spec.id) };
+  return { timeline, layouts, clips, motion, engine, attention, captions: buildCaptions(timeline), audio: narrationAudio(timeline, props.track, props.spec.id), footer: planFooter(timeline, clips) };
 }
 
 /** `contacts`: what the platforms react to (the TypeScript plan's contacts, or the engine's on the paths it performs). */
@@ -167,8 +171,12 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
         </AbsoluteFill>
       ) : null}
 
+      {/* The quiet WalletWall footer: right of the captions, below every scene's ground, stepping aside for depth moves and the sign-off.
+          Only the layer images Blender's depth reveal is textured with switch it off (overlays.footer false); its timing already keeps it out of those frames. */}
+      <Footer opacity={props.overlays.footer === false ? 0 : footerOpacityAt(model.footer, ms)} mark={brandMark(props.spec)} wordmark={props.templates.footer.onScreen} />
+
       {cue ? (
-        <div style={{ position: 'absolute', left: 260, width: 1400, top: 948, display: 'flex', justifyContent: 'center' }}>
+        <div style={{ position: 'absolute', left: CAPTION_BAND.x, width: CAPTION_BAND.w, top: CAPTION_BAND.y, display: 'flex', justifyContent: 'center' }}>
           <div style={{ ...textStyle('cardBody'), background: withAlpha(TOKENS.charcoal, 0.86), color: TOKENS.cream, padding: '8px 18px', borderRadius: 2, fontSize: 30, lineHeight: 1.3, textAlign: 'center' }}>
             {cue.rows.map((r) => (
               <div key={r}>{r}</div>

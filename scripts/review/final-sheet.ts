@@ -29,13 +29,13 @@ const pad = (f: number): string => `f${String(f).padStart(5, '0')}`;
 
 /** The flat scenes: the lesson frame, and what it shows. */
 const CELLS = [
-  { name: 'flat-teaching', frame: 1850, title: 'Ordinary flat teaching frame', note: 'On a node card, layered slabs behind' },
-  { name: 'broad-support', frame: 2900, title: 'Broad support', note: 'A reading card, perched' },
-  { name: 'tier-support', frame: 1500, title: 'Tier support', note: 'Review node on its pillar' },
-  { name: 'vault-candidate', frame: 1700, title: 'Vault Candidate support', note: 'The top tier on its pillar' },
-  { name: 'summit-ledge', frame: 3950, title: 'Summit ledge', note: 'The takeaway ledge, perched' },
-  { name: 'cta', frame: 4500, title: 'CTA frame', note: 'On the ground, strata under the line' },
-  { name: 'end-screen', frame: 5100, title: 'End screen', note: 'Ground clear of the reserved zones' },
+  { name: 'flat-teaching', frame: 1780, title: 'Ordinary flat teaching frame', note: 'On a node card, layered slabs behind' },
+  { name: 'broad-support', frame: 2830, title: 'Broad support', note: 'A reading card, perched' },
+  { name: 'tier-support', frame: 1430, title: 'Tier support', note: 'Review node on its pillar' },
+  { name: 'vault-candidate', frame: 1630, title: 'Vault Candidate support', note: 'The top tier on its pillar' },
+  { name: 'summit-ledge', frame: 3880, title: 'Summit ledge', note: 'The takeaway ledge, perched' },
+  { name: 'cta', frame: 4430, title: 'CTA frame', note: 'On the ground, strata under the line' },
+  { name: 'end-screen', frame: 5030, title: 'End screen', note: 'Ground clear of the reserved zones' },
 ] as const;
 
 const paper = hexRgba(TOKENS.paper);
@@ -67,8 +67,8 @@ writePng(path.join(out, 'narrow-perch.png'), full['narrow-perch']);
     const cy = ink.y + ink.h - 46;
     return resize(crop(img, Math.max(0, cx), Math.max(0, cy), 260, 64), 1040, 256);
   };
-  const a = close(full['flat-teaching']!, 1850);
-  const b = close(full['cta']!, 4500);
+  const a = close(full['flat-teaching']!, 1780);
+  const b = close(full['cta']!, 4430);
   const sheet = blank(a.width, a.height + 12 + b.height, gap);
   over(sheet, a, 0, 0);
   over(sheet, b, 0, a.height + 12);
@@ -76,9 +76,9 @@ writePng(path.join(out, 'narrow-perch.png'), full['narrow-perch']);
   writePng(path.join(out, 'shadow-closeup.png'), sheet);
 }
 
-// A depth view of the same terrain (the contact view under the stand at frame 1850), over the canvas.
+// A depth view of the same terrain (the contact view under the stand at frame 1780), over the canvas.
 {
-  const r = readPng(outFile('renders/after-contact/close-f01850.png'));
+  const r = readPng(outFile('renders/after-contact/close-f01780.png'));
   const bg = blank(r.width, r.height, paper);
   over(bg, r, 0, 0);
   full['depth-contact'] = bg;

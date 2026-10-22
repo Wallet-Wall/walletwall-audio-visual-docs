@@ -499,6 +499,9 @@ describe('public output: renders', () => {
   test('a characterless design-test render is refused as a publication render', () => {
     refuses(withRender('render-characterless', { overlays: { captions: true, characterless: true, guides: false } }), 'DEBUG_OUTPUT');
   });
+  test('a render with the WalletWall footer switched off (the reveal layer images\' setting) is refused as a publication render', () => {
+    refuses(withRender('render-no-footer', { overlays: { captions: true, characterless: false, guides: false, footer: false } }), 'DEBUG_OUTPUT');
+  });
   test('provenance naming a different render is refused', () => {
     refuses(withRender('render-prov', {}, (d) => editJson<{ render: { sha256: string } }>(path.join(d, 'provenance.json'), (p) => (p.render.sha256 = 'c'.repeat(64)))), 'PROVENANCE_INCONSISTENT');
   });
@@ -623,7 +626,7 @@ describe('public output: review stills', () => {
   test('two stills sets from the same engine are refused as ambiguous', () => {
     refuses(clean, 'STILLS_INCONSISTENT', { stills: [writeStills(freshDir('stills-a')), writeStills(freshDir('stills-b'))] });
   });
-  test('the real visibility predicate: WalletWallaby is on canvas in the hook and hidden for the ident', async () => {
+  test('the real visibility predicate: WalletWallaby is on canvas in the hook and the question, and off it while the plane opens into depth', async () => {
     const real = await currentPublicState(VIDEO_ID, {});
     const spec = loadCommittedSpec(VIDEO_ID);
     const config = loadPipelineConfig();
@@ -633,7 +636,9 @@ describe('public output: review stills', () => {
       return msToFrame(s.contentStartMs + (s.endMs - s.contentStartMs) * 0.72, timeline.fps);
     };
     assert.equal(real.onCanvas(settled('HOOK')), true);
-    assert.equal(real.onCanvas(settled('IDENT')), false);
+    assert.equal(real.onCanvas(settled('QUESTION')), true);
+    const depth = timeline.segments.find((x) => x.transitionIn.type === 'DEPTH_ENTER')!;
+    assert.equal(real.onCanvas(msToFrame((depth.startMs + depth.contentStartMs) / 2, timeline.fps)), false);
   });
 });
 

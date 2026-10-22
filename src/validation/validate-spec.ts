@@ -7,7 +7,7 @@
 //   provenance   every claim resolves to a verbatim doc span or a hashed artifact;
 //                every spoken and on-screen statement cites claims; numbers and
 //                graph labels must appear in their evidence (no fabricated data)
-//   structure    hook, ident, content, takeaway, CTA, docs reference, outro, end screen
+//   structure    hook, content, takeaway, CTA, docs reference, outro, end screen
 //   character    targets exist in the scene layout; exit actions drive transitions
 //   depth        2D -> 3D transitions are earned, budgeted, and balanced
 //   duration     class ceiling, natural pace, end-screen window
@@ -64,7 +64,7 @@ export interface ValidationContext {
 }
 
 const ROLE_RANK: Record<SegmentRole, number> = Object.fromEntries(SEGMENT_ROLES.map((r, i) => [r, i])) as Record<SegmentRole, number>;
-const REQUIRED_ONCE: SegmentRole[] = ['HOOK', 'IDENT', 'TAKEAWAY', 'CTA', 'DOCS_REFERENCE', 'OUTRO', 'END_SCREEN'];
+const REQUIRED_ONCE: SegmentRole[] = ['HOOK', 'TAKEAWAY', 'CTA', 'DOCS_REFERENCE', 'OUTRO', 'END_SCREEN'];
 
 export function validateSpec(spec: VideoSpec, ctx: ValidationContext): ValidationReport {
   const issues = new IssueCollector();

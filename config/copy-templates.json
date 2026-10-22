@@ -1,13 +1,7 @@
 {
-  "schema": "walletwall.copy-templates/v1",
-  "note": "Brand copy is version-controlled. A planner may choose a template id; it can never write ident, CTA, docs-reference, outro, or end-screen copy itself.",
+  "schema": "walletwall.copy-templates/v2",
+  "note": "Brand copy is version-controlled. A planner may choose a template id; it can never write CTA, docs-reference, outro, end-screen, or footer copy itself.",
   "templates": {
-    "ident.v1": {
-      "role": "IDENT",
-      "narration": null,
-      "onScreen": "WalletWall",
-      "durationMs": 2000
-    },
     "cta.like-subscribe.v1": {
       "role": "CTA",
       "narration": "If this was useful, like the video and subscribe for more WalletWall architecture and data deep dives.",
@@ -32,5 +26,10 @@
       "onScreen": "Next on the route",
       "durationMs": 12000
     }
+  },
+  "footer": {
+    "id": "footer.v1",
+    "note": "The quiet fixed WalletWall footer (src/layout/footer.ts): the brick-wallet mark and this wordmark, bottom right, on every teaching and brand segment but the outro and end screen.",
+    "onScreen": "WalletWall"
   }
 }

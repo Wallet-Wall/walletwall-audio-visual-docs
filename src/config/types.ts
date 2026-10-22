@@ -12,8 +12,10 @@ export interface CopyTemplate {
 }
 
 export interface CopyTemplates {
-  schema: 'walletwall.copy-templates/v1';
+  schema: 'walletwall.copy-templates/v2';
   templates: Record<string, CopyTemplate>;
+  /** The quiet fixed footer's wordmark (src/layout/footer.ts): drawn on every frame the footer shows, never by a segment. */
+  footer: { id: string; note?: string; onScreen: string };
 }
 
 export interface CopyPolicy {

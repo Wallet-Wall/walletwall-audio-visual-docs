@@ -99,7 +99,7 @@ describe('the qualification verdict', () => {
     const versus = reference.roles.map((x) => ({ role: x.role, frame: x.frame, identical: x !== peak, measures: x === peak ? { fractionOverNoise: 0.0057, meanAbsDelta: 0.05, coverageDeltaPx: 0, maxDelta: 15 } : null }));
     const r = decideQualification(inputs({ versusReference: versus }, ENVIRONMENTS['new-driver']));
     assert.equal(r.verdict, 'QUALIFICATION_FAIL');
-    assert.match(check(r, 'versus-reference').detail, /transition-peak \(frame 1760\): changed fraction 0\.570% > approved maximum 0\.500%/);
+    assert.match(check(r, 'versus-reference').detail, /transition-peak \(frame 1690\): changed fraction 0\.570% > approved maximum 0\.500%/);
     assert.ok(r.nextSteps.some((s) => /Do not raise a tolerance/.test(s)));
   });
 

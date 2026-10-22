@@ -19,7 +19,9 @@ export const TITLE_SAFE: Rect = { x: 96, y: 54, w: 1728, h: 972 };
 
 /**
  * Teaching content stays above this line so YouTube's player chrome and its own
- * caption overlay never cover it. The band below holds only the provenance chip.
+ * caption overlay never cover it. The band below holds no teaching content: only the
+ * review caption pill and the quiet WalletWall footer (./footer.ts), which the player's
+ * controls may briefly cover.
  */
 export const CONTENT_BOTTOM = 900;
 

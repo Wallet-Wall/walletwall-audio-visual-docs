@@ -364,6 +364,13 @@ describe('contact sound', () => {
     const sheet = buildCueSheet(timeline, config.sonic, spec.audio.musicBedId);
     assert.ok(sheet.cues.every((c) => c.reason !== 'CONTACT'));
   });
+
+  test('the sonic ident has no cue since the ident scene was retired: an assigned ident asset is refused, never named in provenance unplayed', () => {
+    assert.equal(config.sonic.ident.asset, null);
+    assert.equal(buildCueSheet(timeline, config.sonic, spec.audio.musicBedId).identAsset, null, 'control: unassigned, it is silence');
+    const assigned = { ...config.sonic, ident: { ...config.sonic.ident, asset: 'walletwall-ident-v1.wav' } };
+    assert.throws(() => buildCueSheet(timeline, assigned, spec.audio.musicBedId), /sonic ident .* has no cue/);
+  });
 });
 
 void (null as unknown as Clip);

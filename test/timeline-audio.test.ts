@@ -30,8 +30,14 @@ describe('timeline', () => {
     const end = timeline.segments.find((s) => s.role === 'END_SCREEN')!;
     const d = end.endMs - end.contentStartMs;
     assert.ok(d >= 5000 && d <= 20000);
-    const ident = timeline.segments.find((s) => s.role === 'IDENT')!;
-    assert.ok(ident.endMs - ident.contentStartMs >= 1000 && ident.endMs - ident.contentStartMs <= 2000, 'ident stays 1-2 s');
+  });
+
+  test('the lesson opens with the hook and goes straight to the question: no standalone logo interlude', () => {
+    assert.deepEqual(timeline.segments.slice(0, 2).map((s) => s.role), ['HOOK', 'QUESTION']);
+    const hook = timeline.segments[0]!;
+    const question = timeline.segments[1]!;
+    assert.equal(question.startMs, hook.endMs);
+    assert.equal(question.transitionIn.type, 'CUT');
   });
 
   test('is deterministic', () => {

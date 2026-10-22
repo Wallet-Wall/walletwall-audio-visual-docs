@@ -30,10 +30,14 @@ describe('committed spec', () => {
     assert.equal(spec.videoClass, 'QUICK');
     assert.deepEqual(
       spec.segments.map((s) => s.role),
-      ['HOOK', 'IDENT', 'QUESTION', 'EXPLANATION', 'EXPLANATION', 'IMPLICATION', 'IMPLICATION', 'TAKEAWAY', 'CTA', 'DOCS_REFERENCE', 'OUTRO', 'END_SCREEN'],
+      ['HOOK', 'QUESTION', 'EXPLANATION', 'EXPLANATION', 'IMPLICATION', 'IMPLICATION', 'TAKEAWAY', 'CTA', 'DOCS_REFERENCE', 'OUTRO', 'END_SCREEN'],
     );
     assert.equal(spec.segments.filter((s) => s.transitionIn.type === 'DEPTH_ENTER').length, 1, 'one earned 2D -> 3D transition');
   });
+
+  // The video teaches from its first frame: WalletWall's brand is a quiet fixed footer, never a standalone logo scene.
+  test('a standalone ident segment is refused: the role does not exist', () =>
+    expectCode((s) => s.segments.splice(1, 0, { id: 'ident', role: 'IDENT' as never, transitionIn: { type: 'CUT' }, narration: [], scene: null, templateId: 'ident.v1', wallaby: [], sonic: [] }), 'SPEC_SCHEMA_INVALID'));
 });
 
 describe('shape and vocabulary (no generative or styling channel exists)', () => {

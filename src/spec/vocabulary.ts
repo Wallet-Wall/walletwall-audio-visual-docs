@@ -71,9 +71,10 @@ export const VIDEO_CLASSES: Readonly<Record<VideoClassKind, { maxSeconds: number
   DEEP_DIVE: { maxSeconds: 600 },
 };
 
+// No IDENT: the lesson teaches from its first frame, and WalletWall's brand rides a quiet fixed footer
+// (src/layout/footer.ts), never a standalone logo scene.
 export const SEGMENT_ROLES = [
   'HOOK',
-  'IDENT',
   'QUESTION',
   'EXPLANATION',
   'IMPLICATION',
@@ -96,7 +97,6 @@ export const CONTENT_ROLES: ReadonlySet<SegmentRole> = new Set<SegmentRole>([
 
 /** Roles rendered from version-controlled brand templates; the planner only picks the template id. */
 export const BRAND_ROLES: ReadonlySet<SegmentRole> = new Set<SegmentRole>([
-  'IDENT',
   'CTA',
   'DOCS_REFERENCE',
   'OUTRO',

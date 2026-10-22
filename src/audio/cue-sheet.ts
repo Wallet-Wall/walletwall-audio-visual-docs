@@ -13,7 +13,7 @@ import type { Timeline } from '../timeline/timeline.ts';
 export interface SonicCueEntry {
   event: string;
   atMs: number;
-  reason: 'ACTION' | 'TRANSITION' | 'EXPLICIT' | 'IDENT' | 'CONTACT';
+  reason: 'ACTION' | 'TRANSITION' | 'EXPLICIT' | 'CONTACT';
   segmentId: string;
   /** Versioned asset id, or null = silence (not yet produced). */
   asset: string | null;
@@ -21,6 +21,7 @@ export interface SonicCueEntry {
 }
 
 export interface CueSheet {
+  /** The sonic identity's ident asset (config/sonic-identity.json). No segment schedules it since the ident scene was retired. */
   identAsset: string | null;
   musicBed: { id: string | null; asset: string | null; duckUnderNarrationDb: number | null };
   cues: SonicCueEntry[];
@@ -51,9 +52,11 @@ export const CONTACT_SONICS: Partial<Record<MotionEvent['kind'], string>> = {
 };
 
 export function buildCueSheet(timeline: Timeline, sonic: SonicIdentityConfig, musicBedId: string | null, contacts?: readonly MotionEvent[]): CueSheet {
+  // The sonic ident sounded with the ident scene, which the lesson no longer has: an assigned ident asset would be named in
+  // provenance yet never play, so it is refused until the owner decides where it sounds.
+  if (sonic.ident.asset !== null) throw new Error(`the sonic ident ${JSON.stringify(sonic.ident.asset)} has no cue to play it since the ident scene was retired: decide where it sounds before assigning its asset`);
   const raw: Omit<SonicCueEntry, 'asset' | 'gainDb'>[] = [];
   for (const seg of timeline.segments) {
-    if (seg.role === 'IDENT') raw.push({ event: 'IDENT', atMs: seg.contentStartMs, reason: 'IDENT', segmentId: seg.id });
     for (const b of seg.beats) {
       const event = ACTION_SONICS[b.beat.action];
       // With a motion plan, landings are placed at the real contact instead of the beat start.
@@ -72,10 +75,10 @@ export function buildCueSheet(timeline: Timeline, sonic: SonicIdentityConfig, mu
   const cues: SonicCueEntry[] = [];
   const suppressed: SonicCueEntry[] = [];
   for (const r of raw) {
-    const cfg = r.event === 'IDENT' ? null : sonic.events[r.event];
+    const cfg = sonic.events[r.event];
     const entry: SonicCueEntry = {
       ...r,
-      asset: r.event === 'IDENT' ? sonic.ident.asset : (cfg?.asset ?? null),
+      asset: cfg?.asset ?? null,
       gainDb: cfg?.maxGainDb ?? -18,
     };
     const prev = lastAt.get(r.event);

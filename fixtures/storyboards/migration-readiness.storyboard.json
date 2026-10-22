@@ -322,7 +322,7 @@
       "kind": "BRAND_MARK",
       "path": "video/assets/brand/walletwall-brick-wallet.png",
       "sha256": "91926a2eebc1777194ecf491049b8a7af3cf0892b09b363c5b2a17cd17d5dbad",
-      "justification": "The WalletWall brick-wallet mark (reviewed and supplied by the maintainer), used only by the ident and outro templates."
+      "justification": "The WalletWall brick-wallet mark (reviewed and supplied by the maintainer), used only by the outro template and the brand footer."
     }
   ],
   "segments": [
@@ -402,14 +402,6 @@
         }
       ],
       "sonic": []
-    },
-    {
-      "id": "ident",
-      "role": "IDENT",
-      "transitionIn": {
-        "type": "CUT"
-      },
-      "templateId": "ident.v1"
     },
     {
       "id": "question",
