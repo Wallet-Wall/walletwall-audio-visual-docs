@@ -93,7 +93,9 @@ export interface QualificationInputs {
   runs: { a: ProofRun | null; b: ProofRun | null; problems: string[] };
   versusReference: RoleComparison[] | null;
   /** The ported invariants' report (walletwall.blender-invariants/v2), as far as the decision reads it. */
-  invariants: { pass: boolean; every: number; labEvery: number; failureCount: number; thresholds: unknown; counts: unknown; environment: unknown } | null;
+  invariants: { pass: boolean; every: number; labEvery: number; failureCount: number; thresholds: unknown; counts: unknown; lessonFrames: unknown; environment: unknown } | null;
+  /** Every visible lesson frame at the publication stride, re-derived from this checkout's plan (null when it could not be). */
+  lessonStrideFrames: number[] | null;
 }
 
 export interface QualificationCheck {
@@ -253,6 +255,8 @@ export function decideQualification(inp: QualificationInputs): QualificationReco
   if (!inv) add('contacts-and-invariants', 'NOT_RUN', 'the invariants did not run');
   else {
     const problems = invariantsBarProblems(inv);
+    // The coverage floors are fractions of the frames checked, so the frames must be the plan's own (as the receipt requires).
+    if (!inp.lessonStrideFrames || !same(inv.lessonFrames, inp.lessonStrideFrames)) problems.push("its lesson frames are not every visible frame at the stride of this checkout's plan");
     if (!a || !same(inv.environment, a.environment)) problems.push('measured in another environment than the proof runs');
     add('contacts-and-invariants', problems.length > 0 ? 'FAIL' : 'PASS', problems.length > 0 ? problems.join('; ') : `feet, paws, and tail on their targets and supports, the envelope, protected text, title-safe, and the palette, on every ${PUBLICATION_STRIDE.every}th lesson frame and every lab frame`);
   }

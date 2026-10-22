@@ -214,8 +214,12 @@ projected position recorded by `render.py` on request, and checks:
 | Brand colours on pixels | every opaque pixel a mix of palette colours in linear light (at most 0.01% not); at least 30% exactly one | 0 of 11,084,922 off; 72.2% exact (worst frame 44.6%) |
 | Shuffled-frame purity | frames rendered in a shuffled order equal the in-order frames, byte for byte | 12 / 12 |
 
-Coverage minimums are Rive's (400 grounded frames, 300 supported holds, 300 scene holds at every 9th frame), scaled to
-the stride. The motion lab's two MANTLE/PULL frames the support judge refuses to bridge are excluded and listed. Not
+Coverage minimums (`src/blender/invariants-policy.ts`): the lesson's are fractions of the lesson frames a run checked
+(grounded 0.65, scene holds 0.5, supported holds 0.5; the publication proof receipt re-derives those frames from the
+plan), so a video's own length sets them; the lab's stay counts (10 unsupported perches, 2 hangs). They replaced Rive's
+absolute counts (400 grounded frames, 300 supported holds, 300 scene holds at every 9th frame) on 2026-10-22, by the
+owner's decision: calibrated on the 145 wpm fixture lesson, those refused the qualified publication narration (153.6
+wpm; 287 supported holds of 540 checked frames), whose holds are shorter. Every threshold is unchanged. The motion lab's two MANTLE/PULL frames the support judge refuses to bridge are excluded and listed. Not
 ported, because they describe the 2D shapes Rive drew: the belly polygon inside the torso polygon, the underlay draw
 order, and per-shape area retention; the Blender body is pinned instead and passed the owner's visual gate. The pose
 the Rive runtime evaluated is pinned too: `test/blender-lane.test.ts` holds the content hash of the resolved pose over

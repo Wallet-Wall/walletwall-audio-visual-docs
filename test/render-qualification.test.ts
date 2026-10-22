@@ -42,8 +42,8 @@ const run = (environment: RenderEnvironment, sha: (role: string, refSha: string)
 
 const PINS = { environmentsSha256: 'a'.repeat(64), referenceSha256: 'b'.repeat(64), blenderConfigSha256: 'c'.repeat(64), characterPinsSha256: 'd'.repeat(64) };
 
-/** The invariants report of a passing publication-stride run in `env`, as qualification reads it. */
-const invariantsOf = (env: unknown) => ({ pass: true, every: 9, labEvery: 1, failureCount: 0, thresholds: { ...INVARIANT_THRESHOLDS }, counts: { ...PASSING_COUNTS }, environment: structuredClone(env) });
+/** The invariants report of a passing publication-stride run in `env`, as qualification reads it (PASSING_COUNTS' 786 frames: 575 lesson frames at the stride and 211 lab frames). */
+const invariantsOf = (env: unknown) => ({ pass: true, every: 9, labEvery: 1, failureCount: 0, thresholds: { ...INVARIANT_THRESHOLDS }, counts: { ...PASSING_COUNTS }, lessonFrames: Array.from({ length: 575 }, (_, i) => i * 9), environment: structuredClone(env) });
 
 /** The evidence of a clean qualification on the production host itself (nothing changed). */
 function inputs(over: Partial<QualificationInputs> = {}, env: RenderEnvironment = ENVIRONMENTS['production-rtx5080']): QualificationInputs {
@@ -59,6 +59,7 @@ function inputs(over: Partial<QualificationInputs> = {}, env: RenderEnvironment 
     runs: { a: run(env), b: run(env), problems: [] },
     versusReference: reference.roles.map((r) => ({ role: r.role, frame: r.frame, identical: true, measures: null })),
     invariants: invariantsOf(env),
+    lessonStrideFrames: Array.from({ length: 575 }, (_, i) => i * 9),
     ...over,
   }) as QualificationInputs;
 }
@@ -139,6 +140,10 @@ describe('the qualification verdict', () => {
       ['environment', invariantsOf(ENVIRONMENTS['new-driver'])],
       ['looser threshold', { ...invariantsOf(rtx), thresholds: { ...INVARIANT_THRESHOLDS, footPx: 0.5 } }],
       ['too little coverage', { ...invariantsOf(rtx), counts: { ...PASSING_COUNTS, 'lab.hang': 0 } }],
+      ['no lesson frames named', { ...invariantsOf(rtx), lessonFrames: undefined }],
+      ['fewer lesson frames named than it counts', { ...invariantsOf(rtx), lessonFrames: Array.from({ length: 300 }, (_, i) => i * 9) }],
+      // Self-consistent counts that clear the fractions on their own: only the plan's own stride frames refuse them.
+      ['lesson frames other than the stride frames of the plan', { ...invariantsOf(rtx), lessonFrames: Array.from({ length: 400 }, (_, i) => i * 9), counts: { ...PASSING_COUNTS, 'lesson.grounded': 300, 'lesson.sceneHolds': 220, 'lesson.supportedHolds': 210 } }],
     ] as const) {
       const r = decideQualification(inputs({ invariants }));
       assert.equal(r.verdict, 'QUALIFICATION_FAIL', label);
