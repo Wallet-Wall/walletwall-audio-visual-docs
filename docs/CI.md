@@ -6,7 +6,7 @@ This repository produces public-facing WalletWall videos, so CI checks two thing
 
 | Workflow | Check | Runs on | Required to merge |
 |---|---|---|---|
-| CI (`ci.yml`) | `Verify pipeline` | pull requests, pushes to `main` | yes |
+| CI (`ci.yml`) | `Verify pipeline` (typecheck, tests, plan, validation, contracts, licenses and release rights, audit) | pull requests, pushes to `main` | yes |
 | CI (`ci.yml`) | `Motion Intelligence (Rust/WASM)` | pull requests, pushes to `main` | yes |
 | CodeQL (`codeql.yml`) | `Analyze (actions)`, `Analyze (javascript-typescript)` | pull requests to `main`, pushes to `main`, weekly | yes |
 | CodeQL (code scanning) | `CodeQL` (the alert verdict on a pull request) | pull requests to `main` | yes |
@@ -87,7 +87,19 @@ Every action is pinned to a full commit SHA, and the comment names the release t
 
 `Dependency review` blocks a pull request that adds a dependency (npm, Cargo, or GitHub Actions) with a known vulnerability of moderate severity or worse in any scope: the same bar as `npm audit --audit-level=moderate`, which also covers development dependencies.
 
-It sets no license policy. The repository is MIT, and the installed tree is mostly MIT, ISC, BSD, and Apache-2.0, but the renderer is not: nine Remotion packages carry Remotion's own source-available license (not an SPDX identifier), eight Remotion packages declare no license field, and the tree also includes MPL-2.0 (`mediabunny`), OFL-1.1 (the bundled fonts), and CC-BY-4.0 (`caniuse-lite`). An SPDX allowlist would either block the renderer or admit everything, and Remotion's company license is an owner decision (see the README), not a CI rule.
+It sets no license policy of its own. The repository is MIT and the locked tree is mostly MIT, ISC, BSD, and Apache-2.0, but the renderer is not: nine Remotion packages carry Remotion's own source-available license (not an SPDX identifier), eight Remotion packages declare no license field, and the tree also includes MPL-2.0 (`mediabunny`), OFL-1.1 (the bundled fonts), and CC-BY-4.0 (`caniuse-lite`). A plain SPDX allowlist would either block the renderer or admit everything, so the license policy is `npm run rights:check` instead (below), which admits a permissive license without a record and fails on any other until a rule and a component cover it. Remotion's company license is an owner decision, recorded as `OWNER_CONFIRMATION_PENDING` in [config/release-rights.json](../config/release-rights.json) ([LICENSING.md](LICENSING.md#remotion)), not a CI rule.
+
+## Licenses and release rights
+
+`npm run rights:check` runs in the required `Verify pipeline` job ([LICENSING.md](LICENSING.md), [RELEASE_RIGHTS.md](RELEASE_RIGHTS.md)). It reads only the committed files (no network, no environment, no credential) and fails when:
+
+- a Python file that reaches the Blender API (directly, or through a sibling it imports) lacks `SPDX-License-Identifier: GPL-3.0-or-later`, or a Python file has no classification in `config/release-rights.json`;
+- a license text is missing or is not the pinned bytes, or the top-level `LICENSE` stops being MIT;
+- a locked npm package or Cargo crate has a license nobody has recorded, or an assessment pinned to a version (Remotion's) no longer matches the lockfile;
+- a spec asset, sonic asset, narration, font, or source page of a video has no rights entry against its exact bytes;
+- a release state claims more than the rights support.
+
+Owner decisions that are still open (Remotion's eligibility, the narration provider's plan, the brand mark's provenance, the attributed signed-distance primitives) are recorded as pending and pass, listed, because they are not falsely cleared. The job then runs `npm run rights:check -- --public-release` informationally, like the freshness report: the strict check lists every item the owner has not cleared in the step summary and never fails the build. Passing it is the precondition for a video to leave `LOCAL_PROOF`, and CI cannot clear anything.
 
 ## Branch protection
 

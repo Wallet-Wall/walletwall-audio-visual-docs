@@ -1,0 +1,1086 @@
+{
+  "schema": "walletwall.release-rights/v1",
+  "project": "walletwall-audio-visual-docs",
+  "verifiedOn": "2026-10-22",
+  "documents": {
+    "notices": "THIRD_PARTY_NOTICES.md",
+    "licensing": "docs/LICENSING.md",
+    "policy": "docs/RELEASE_RIGHTS.md"
+  },
+  "sourceCode": {
+    "defaultLicense": "MIT",
+    "copyright": "2026 WalletWall",
+    "licenseFiles": [
+      {
+        "license": "MIT",
+        "path": "LICENSE",
+        "sha256": "03c641a85bb7ee19629c727e1b8d16069ad7a5102278b73185a8434c725249ce"
+      },
+      {
+        "license": "MIT",
+        "path": "LICENSES/MIT.txt",
+        "sha256": "03c641a85bb7ee19629c727e1b8d16069ad7a5102278b73185a8434c725249ce"
+      },
+      {
+        "license": "GPL-3.0-or-later",
+        "path": "LICENSES/GPL-3.0-or-later.txt",
+        "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+      }
+    ],
+    "python": [
+      {
+        "path": "blender/walletwallaby/build.py",
+        "classification": "BLENDER_API_COUPLED",
+        "license": "GPL-3.0-or-later",
+        "reason": "Imports bpy and mathutils; builds the character inside Blender."
+      },
+      {
+        "path": "blender/walletwallaby/common.py",
+        "classification": "BLENDER_INDEPENDENT",
+        "license": "MIT",
+        "reason": "Imports only the standard library. The eight GPL-3.0-or-later files load it inside Blender; MIT is GPL-compatible, so it keeps the repository license."
+      },
+      {
+        "path": "blender/walletwallaby/controls.py",
+        "classification": "BLENDER_API_COUPLED",
+        "license": "GPL-3.0-or-later",
+        "reason": "Imports mathutils and rig.py. The lane README calls it a pure mapping, but it reaches the Blender API."
+      },
+      {
+        "path": "blender/walletwallaby/geometry.py",
+        "classification": "BLENDER_INDEPENDENT",
+        "license": "MIT",
+        "reason": "Imports only math and numpy. Loaded inside Blender by GPL-3.0-or-later files; MIT is GPL-compatible. See quilez-sdf-forms for its attributed primitives."
+      },
+      {
+        "path": "blender/walletwallaby/materials.py",
+        "classification": "BLENDER_API_COUPLED",
+        "license": "GPL-3.0-or-later",
+        "reason": "Imports bpy; builds the shader node trees."
+      },
+      {
+        "path": "blender/walletwallaby/render.py",
+        "classification": "BLENDER_API_COUPLED",
+        "license": "GPL-3.0-or-later",
+        "reason": "Imports bpy and mathutils, and gpu inside a function; renders the shots inside Blender."
+      },
+      {
+        "path": "blender/walletwallaby/rig.py",
+        "classification": "BLENDER_API_COUPLED",
+        "license": "GPL-3.0-or-later",
+        "reason": "Imports bpy and mathutils; builds the armature and its IK constraints."
+      },
+      {
+        "path": "blender/walletwallaby/scene.py",
+        "classification": "BLENDER_API_COUPLED",
+        "license": "GPL-3.0-or-later",
+        "reason": "Imports bpy and mathutils; render settings, light, and cameras."
+      },
+      {
+        "path": "blender/walletwallaby/terrain.py",
+        "classification": "BLENDER_API_COUPLED",
+        "license": "GPL-3.0-or-later",
+        "reason": "Imports bpy and mathutils; the declared terrain as geometry."
+      },
+      {
+        "path": "blender/walletwallaby/transition.py",
+        "classification": "BLENDER_API_COUPLED",
+        "license": "GPL-3.0-or-later",
+        "reason": "Imports bpy and mathutils; the 2D to 3D depth reveal."
+      },
+      {
+        "path": "tools/chatterbox/synthesize.py",
+        "classification": "BLENDER_INDEPENDENT",
+        "license": "MIT",
+        "reason": "Evaluation narration adapter: standard library, numpy, torch, and chatterbox. Runs outside Blender and uses no Blender API."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "blender-runtime",
+      "layer": "TOOL_RUNTIME",
+      "kind": "rendering-tool",
+      "distribution": "NOT_DISTRIBUTED",
+      "scope": "RELEASE_PATH",
+      "rightsBasis": "OPEN_SOURCE_LICENSE",
+      "status": "CLEARED",
+      "licenseExpression": "GPL-3.0-or-later",
+      "summary": "Blender 5.2.2 renders WalletWallaby. Blender's source is GNU GPL v2 or later, and GPL v3 or later is the license to use for any distribution of its binaries; it may be used commercially and for any purpose. This repository installs the official build, verified by the SHA-256 pinned in config/blender.json, and never redistributes it.",
+      "evidence": [
+        {
+          "type": "URL",
+          "ref": "https://www.blender.org/about/license/",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "URL",
+          "ref": "https://www.blender.org/support/faq/",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "FILE",
+          "ref": "config/blender.json"
+        }
+      ]
+    },
+    {
+      "id": "remotion",
+      "layer": "TOOL_RUNTIME",
+      "kind": "rendering-tool",
+      "distribution": "NOT_DISTRIBUTED",
+      "scope": "RELEASE_PATH",
+      "rightsBasis": "VENDOR_LICENSE",
+      "status": "OWNER_CONFIRMATION_PENDING",
+      "licenseExpression": null,
+      "summary": "Remotion renders the video. Its license is the vendor's own source-available license, not an SPDX one: free for an individual, a for-profit organization with up to 3 employees (the installed 4.0.532 text), a non-profit, or evaluation; a company license otherwise. The vendor's Terms (labelled 5.0, not yet in effect) count the headcount of all personnel among the involved parties. This repository lives in a GitHub organization with several members; the project is currently developed and operated by the owner. Whether that qualifies for the Free License is an owner and vendor question. No paid license is claimed.",
+      "evidence": [
+        {
+          "type": "PACKAGE",
+          "ref": "remotion@4.0.532"
+        },
+        {
+          "type": "URL",
+          "ref": "https://www.remotion.pro/license",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "URL",
+          "ref": "https://www.remotion.dev/docs/license/faq",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "URL",
+          "ref": "https://www.remotion.dev/docs/terms",
+          "retrievedOn": "2026-10-22"
+        }
+      ],
+      "resolution": {
+        "ownerAction": "Confirm with the vendor, or obtain a company license, whether this project qualifies for the Free License (see the vendor's license FAQ); then record the outcome as this item's clearance. A GitHub organization member count is not a headcount and decides nothing by itself.",
+        "reassessmentTrigger": "Any change to the pinned Remotion version (this check enforces it), Remotion 5.0 taking effect, a change in who develops or operates the project or in its team size, or a change to the vendor's terms."
+      },
+      "assessedVersions": [
+        {
+          "package": "@remotion/bundler",
+          "version": "4.0.532"
+        },
+        {
+          "package": "@remotion/canvas",
+          "version": "4.0.532"
+        },
+        {
+          "package": "@remotion/cli",
+          "version": "4.0.532"
+        },
+        {
+          "package": "@remotion/media-parser",
+          "version": "4.0.532"
+        },
+        {
+          "package": "@remotion/player",
+          "version": "4.0.532"
+        },
+        {
+          "package": "@remotion/renderer",
+          "version": "4.0.532"
+        },
+        {
+          "package": "@remotion/studio-protocol",
+          "version": "4.0.532"
+        },
+        {
+          "package": "@remotion/web-renderer",
+          "version": "4.0.532"
+        },
+        {
+          "package": "remotion",
+          "version": "4.0.532"
+        }
+      ]
+    },
+    {
+      "id": "npm-permissive-dependencies",
+      "layer": "TOOL_RUNTIME",
+      "kind": "dependency-set",
+      "distribution": "NOT_DISTRIBUTED",
+      "scope": "RELEASE_PATH",
+      "rightsBasis": "OPEN_SOURCE_LICENSE",
+      "status": "CLEARED",
+      "licenseExpression": "MIT AND ISC AND BSD-2-Clause AND BSD-3-Clause AND Apache-2.0 AND 0BSD AND Unlicense AND Python-2.0",
+      "summary": "Every other locked npm package (React and ReactDOM included) declares a permissive license. They are installed by npm and neither committed nor part of any release artifact, so the notice conditions that attach to redistribution are not triggered. The check admits a package without a record only when its license is in the permissive set in src/rights/vocabulary.ts; anything else fails until a rule and a component cover it.",
+      "evidence": [
+        {
+          "type": "FILE",
+          "ref": "package-lock.json"
+        }
+      ]
+    },
+    {
+      "id": "mediabunny",
+      "layer": "TOOL_RUNTIME",
+      "kind": "dependency-set",
+      "distribution": "NOT_DISTRIBUTED",
+      "scope": "RELEASE_PATH",
+      "rightsBasis": "OPEN_SOURCE_LICENSE",
+      "status": "CLEARED",
+      "licenseExpression": "MPL-2.0",
+      "summary": "Mediabunny and its AAC, FLAC, and MP3 encoder extensions arrive through Remotion Studio's packages (the encoders only through @remotion/web-renderer). MPL-2.0 is file-level copyleft: it covers the licensed files and changes to them when that code is distributed, not the rest of a program. This repository modifies and redistributes none of it. The encoders embed WebAssembly builds of FFmpeg's AAC encoder, libFLAC, and LAME (LGPL), which carry their own terms; none is part of a release artifact.",
+      "evidence": [
+        {
+          "type": "PACKAGE",
+          "ref": "mediabunny@1.56.1"
+        },
+        {
+          "type": "PACKAGE",
+          "ref": "@mediabunny/mp3-encoder@1.56.1"
+        }
+      ]
+    },
+    {
+      "id": "font-sora",
+      "layer": "TOOL_RUNTIME",
+      "kind": "font-package",
+      "distribution": "NOT_DISTRIBUTED",
+      "scope": "RELEASE_PATH",
+      "rightsBasis": "OPEN_SOURCE_LICENSE",
+      "status": "CLEARED",
+      "licenseExpression": "OFL-1.1",
+      "summary": "Sora (variable) from @fontsource-variable/sora 5.2.8, copyright The Sora Project Authors, under the SIL Open Font License 1.1; the package's license file names no Reserved Font Name. The font files stay in node_modules and are not committed; the rendered video carries glyph images only. Redistributing the font files themselves would require shipping the OFL text and the copyright notice with them and not selling them by themselves.",
+      "evidence": [
+        {
+          "type": "PACKAGE",
+          "ref": "@fontsource-variable/sora@5.2.8"
+        }
+      ]
+    },
+    {
+      "id": "font-manrope",
+      "layer": "TOOL_RUNTIME",
+      "kind": "font-package",
+      "distribution": "NOT_DISTRIBUTED",
+      "scope": "RELEASE_PATH",
+      "rightsBasis": "OPEN_SOURCE_LICENSE",
+      "status": "CLEARED",
+      "licenseExpression": "OFL-1.1",
+      "summary": "Manrope (variable) from @fontsource-variable/manrope 5.2.8, copyright The Manrope Project Authors, under the SIL Open Font License 1.1; the package's license file names no Reserved Font Name. The font files stay in node_modules and are not committed; the rendered video carries glyph images only. Redistributing the font files themselves would require shipping the OFL text and the copyright notice with them and not selling them by themselves.",
+      "evidence": [
+        {
+          "type": "PACKAGE",
+          "ref": "@fontsource-variable/manrope@5.2.8"
+        }
+      ]
+    },
+    {
+      "id": "font-ibm-plex-mono",
+      "layer": "TOOL_RUNTIME",
+      "kind": "font-package",
+      "distribution": "NOT_DISTRIBUTED",
+      "scope": "RELEASE_PATH",
+      "rightsBasis": "OPEN_SOURCE_LICENSE",
+      "status": "CLEARED",
+      "licenseExpression": "OFL-1.1",
+      "summary": "IBM Plex Mono from @fontsource/ibm-plex-mono 5.2.7, copyright IBM Corp., under the SIL Open Font License 1.1; the package's license file names no Reserved Font Name. The font files stay in node_modules and are not committed; the rendered video carries glyph images only. Redistributing the font files themselves would require shipping the OFL text and the copyright notice with them and not selling them by themselves.",
+      "evidence": [
+        {
+          "type": "PACKAGE",
+          "ref": "@fontsource/ibm-plex-mono@5.2.7"
+        }
+      ]
+    },
+    {
+      "id": "caniuse-lite",
+      "layer": "TOOL_RUNTIME",
+      "kind": "data-package",
+      "distribution": "NOT_DISTRIBUTED",
+      "scope": "RELEASE_PATH",
+      "rightsBasis": "OPEN_SOURCE_LICENSE",
+      "status": "CLEARED",
+      "licenseExpression": "CC-BY-4.0",
+      "summary": "Browser-support data that browserslist loads for the Remotion bundler's build tooling. The package describes itself as a smaller version of caniuse-db and names Ben Briggs as its author; its LICENSE is the CC BY 4.0 legal code and names no other creator. CC BY 4.0 asks for attribution when the data is shared; this repository neither commits nor redistributes it and no release artifact contains it. Attribution is given in THIRD_PARTY_NOTICES.md so it is already in place if that changes.",
+      "evidence": [
+        {
+          "type": "PACKAGE",
+          "ref": "caniuse-lite@1.0.30001816"
+        }
+      ]
+    },
+    {
+      "id": "rust-crates-in-wasm",
+      "layer": "SOURCE_CODE",
+      "kind": "third-party-derived-source",
+      "scope": "RELEASE_PATH",
+      "distribution": "IN_REPOSITORY",
+      "rightsBasis": "OPEN_SOURCE_LICENSE",
+      "status": "CLEARED",
+      "licenseExpression": "(MIT OR Apache-2.0) AND MIT AND (Unlicense OR MIT)",
+      "summary": "Seven Rust crates (libm, serde, serde_core, serde_json, itoa, memchr, zmij) are compiled into the committed motion-intelligence/wasm/motion_intelligence.wasm, which this repository distributes. Each is MIT, MIT or Apache-2.0, or Unlicense or MIT; MIT is elected throughout, and the copyright and permission notices ship in THIRD_PARTY_NOTICES.md. libm carries extra notices (musl, Sun Microsystems, and others), and Rust's own core and alloc libraries (MIT or Apache-2.0) are compiled in too. The proc-macro crates (serde_derive, syn, quote, proc-macro2, unicode-ident) run at build time and are not linked into the artifact.",
+      "evidence": [
+        {
+          "type": "FILE",
+          "ref": "motion-intelligence/Cargo.lock"
+        },
+        {
+          "type": "FILE",
+          "ref": "motion-intelligence/wasm/artifact.json"
+        }
+      ]
+    },
+    {
+      "id": "quilez-sdf-forms",
+      "layer": "SOURCE_CODE",
+      "kind": "third-party-derived-source",
+      "scope": "RELEASE_PATH",
+      "distribution": "IN_REPOSITORY",
+      "rightsBasis": "THIRD_PARTY_ATTRIBUTION_ONLY",
+      "status": "OWNER_CONFIRMATION_PENDING",
+      "licenseExpression": null,
+      "summary": "blender/walletwallaby/geometry.py credits Inigo Quilez's forms for its signed-distance primitives (sd_ellipsoid and sd_round_cone, vectorised in numpy). The source article (iquilezles.org/articles/distfunctions) states no license, copyright, or reuse terms, and its reference implementations live on Shadertoy, whose per-shader licenses were not reviewed. The functions are short mathematical formulas re-expressed in numpy; whether anything further is owed is not decided here.",
+      "evidence": [
+        {
+          "type": "FILE",
+          "ref": "blender/walletwallaby/geometry.py"
+        },
+        {
+          "type": "URL",
+          "ref": "https://iquilezles.org/articles/distfunctions/",
+          "retrievedOn": "2026-10-22"
+        }
+      ],
+      "resolution": {
+        "ownerAction": "Decide whether the attribution comment is enough, obtain the author's license statement, or replace the two primitives with independently derived formulas; then record the outcome as this item's clearance or replace the code.",
+        "reassessmentTrigger": "A license statement is found for the source, or the primitives in geometry.py change."
+      }
+    },
+    {
+      "id": "elevenlabs-service",
+      "layer": "TOOL_RUNTIME",
+      "kind": "provider-service",
+      "distribution": "NOT_DISTRIBUTED",
+      "scope": "RELEASE_PATH",
+      "rightsBasis": "PROVIDER_TERMS",
+      "status": "OWNER_CONFIRMATION_PENDING",
+      "licenseExpression": null,
+      "summary": "ElevenLabs synthesizes the narration (the publication binding in config/narration-providers.json). It is an external proprietary service under its Terms of Use, not an open-source dependency. Those Terms (last updated 09 October 2026) restrict free plans to non-commercial use and let paid plans use the service commercially, so commercial-use eligibility comes from the owner's plan and terms at the time of each synthesis. WalletWall policy prohibits cloning a real person's voice and using reference audio. The Terms refer to supplemental documents (a Prohibited Use Policy and others) that this record did not read. Output and provenance evidence belong to the narration receipt path.",
+      "evidence": [
+        {
+          "type": "URL",
+          "ref": "https://elevenlabs.io/terms-of-use",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "FILE",
+          "ref": "config/narration-providers.json"
+        },
+        {
+          "type": "FILE",
+          "ref": "docs/NARRATION.md"
+        }
+      ],
+      "resolution": {
+        "ownerAction": "Read the supplemental terms the Terms refer to, confirm that the plan in force at each synthesis permits commercial use of the output, and record that confirmation as the clearance. Keep no account, plan, or credential details in this repository.",
+        "reassessmentTrigger": "Before each synthesis run, on any change of plan, and on any change to the provider's Terms (read 2026-10-22; last updated 09 October 2026)."
+      }
+    },
+    {
+      "id": "narration-research-providers",
+      "layer": "TOOL_RUNTIME",
+      "kind": "research-tool",
+      "scope": "RESEARCH_ONLY",
+      "distribution": "NOT_DISTRIBUTED",
+      "rightsBasis": "UNDETERMINED",
+      "status": "UNVERIFIED",
+      "licenseExpression": null,
+      "summary": "The local narration adapters under src/narration/providers (Magpie through NeMo-Speech.cpp, Chatterbox) exist for the evaluation bakeoff. test/guards.test.ts proves that no render or publish path imports them, so no output of theirs reaches a release. Their model and runtime licenses were not assessed.",
+      "evidence": [
+        {
+          "type": "FILE",
+          "ref": "src/narration/providers/index.ts"
+        },
+        {
+          "type": "FILE",
+          "ref": "config/narration-providers.json"
+        }
+      ],
+      "resolution": {
+        "ownerAction": "Assess the model and runtime licenses before any output of these adapters is proposed for a release, and add a release-path component for it.",
+        "reassessmentTrigger": "Any proposal to use output of a local adapter in a release, or to import an adapter from a render or publish path."
+      }
+    },
+    {
+      "id": "blender-render-output",
+      "layer": "GENERATED_MEDIA",
+      "kind": "generated-render",
+      "scope": "RELEASE_PATH",
+      "distribution": "IN_REPOSITORY_AND_RELEASE_OUTPUT",
+      "rightsBasis": "GENERATED_FROM_OWNER_INPUTS",
+      "status": "OWNER_CONFIRMATION_PENDING",
+      "licenseExpression": null,
+      "summary": "The PNG frames Blender renders from this repository's code: the committed proof reference frames and the character frames inside a release. Blender's FAQ treats a .blend and the other output of Blender as program output and the sole copyright of the user, and its license page says what you create with Blender is your sole property. The GPL covers the scripts that call Blender's Python API, not the images they produce. The frames show the character model, so they are not cleared before it is.",
+      "evidence": [
+        {
+          "type": "URL",
+          "ref": "https://www.blender.org/support/faq/",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "URL",
+          "ref": "https://www.blender.org/about/license/",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "FILE",
+          "ref": "blender/proof/reference/proof.json"
+        }
+      ],
+      "producedBy": [
+        "blender-runtime"
+      ],
+      "dependsOn": [
+        "walletwallaby-character-model"
+      ],
+      "resolution": {
+        "ownerAction": "Clear the walletwallaby-character-model item; the Blender side of these frames raises no question.",
+        "reassessmentTrigger": "That item changes status."
+      }
+    },
+    {
+      "id": "walletwallaby-character-model",
+      "layer": "GENERATED_MEDIA",
+      "kind": "generated-model",
+      "scope": "RELEASE_PATH",
+      "distribution": "IN_RELEASE_OUTPUT",
+      "rightsBasis": "GENERATED_FROM_OWNER_INPUTS",
+      "status": "OWNER_CONFIRMATION_PENDING",
+      "licenseExpression": null,
+      "summary": "The WalletWallaby .blend and its canonical model, generated by blender/walletwallaby/build.py from code. The .blend is data only: it embeds no scripts and is always reopened with scripts disabled. The geometry code includes signed-distance primitives credited to Inigo Quilez (the quilez-sdf-forms item), so this item is not cleared before that one.",
+      "evidence": [
+        {
+          "type": "FILE",
+          "ref": "blender/walletwallaby/build.py"
+        },
+        {
+          "type": "URL",
+          "ref": "https://www.blender.org/support/faq/",
+          "retrievedOn": "2026-10-22"
+        }
+      ],
+      "producedBy": [
+        "blender-runtime"
+      ],
+      "dependsOn": [
+        "quilez-sdf-forms"
+      ],
+      "resolution": {
+        "ownerAction": "Resolve the quilez-sdf-forms item, then clear this one.",
+        "reassessmentTrigger": "The quilez-sdf-forms item changes status, or the primitives in geometry.py change."
+      }
+    },
+    {
+      "id": "remotion-render-output",
+      "layer": "GENERATED_MEDIA",
+      "kind": "generated-render",
+      "scope": "RELEASE_PATH",
+      "distribution": "IN_RELEASE_OUTPUT",
+      "rightsBasis": "VENDOR_LICENSE",
+      "status": "OWNER_CONFIRMATION_PENDING",
+      "licenseExpression": null,
+      "summary": "The MP4, stills, captions, and package Remotion renders from this repository's spec and components. The vendor's Terms (labelled 5.0) say users hold the rights in media they generate and that the vendor places no restriction on it; the installed 4.0.532 license text does not address output. The output follows the eligibility question in the remotion item and is not treated as cleared before it.",
+      "evidence": [
+        {
+          "type": "URL",
+          "ref": "https://www.remotion.dev/docs/terms",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "PACKAGE",
+          "ref": "remotion@4.0.532"
+        }
+      ],
+      "producedBy": [
+        "remotion"
+      ],
+      "resolution": {
+        "ownerAction": "Resolve the remotion item, and confirm output ownership under the terms version in force.",
+        "reassessmentTrigger": "The remotion item changes, or Remotion 5.0 takes effect."
+      }
+    },
+    {
+      "id": "elevenlabs-narration-audio",
+      "layer": "GENERATED_MEDIA",
+      "kind": "generated-audio",
+      "scope": "RELEASE_PATH",
+      "distribution": "IN_RELEASE_OUTPUT",
+      "rightsBasis": "PROVIDER_TERMS",
+      "status": "OWNER_CONFIRMATION_PENDING",
+      "licenseExpression": null,
+      "summary": "Synthetic narration audio sets the provider generates and the publication receipt binds. The provider's Terms leave the user's rights in Output with the user, subject to the Terms, and allow commercial use only on a plan that permits it. The audio lives in the ignored dist directory, not in git; its identity is bound by the narration receipt, not by this record.",
+      "evidence": [
+        {
+          "type": "URL",
+          "ref": "https://elevenlabs.io/terms-of-use",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "FILE",
+          "ref": "docs/NARRATION.md"
+        }
+      ],
+      "producedBy": [
+        "elevenlabs-service"
+      ],
+      "resolution": {
+        "ownerAction": "Resolve the elevenlabs-service item for the synthesis run that produced the set that ships.",
+        "reassessmentTrigger": "Each new synthesis run, or a change of plan or terms."
+      }
+    }
+  ],
+  "dependencies": {
+    "npm": {
+      "lockfile": "package-lock.json",
+      "rules": [
+        {
+          "id": "remotion-license-file",
+          "match": {
+            "packages": [
+              "@remotion/bundler",
+              "@remotion/cli",
+              "@remotion/player",
+              "@remotion/renderer",
+              "@remotion/web-renderer",
+              "remotion"
+            ]
+          },
+          "version": null,
+          "lockLicense": "SEE LICENSE IN LICENSE.md",
+          "resolvedLicense": null,
+          "component": "remotion",
+          "evidence": [
+            {
+              "type": "PACKAGE",
+              "ref": "remotion@4.0.532"
+            }
+          ]
+        },
+        {
+          "id": "remotion-license-name",
+          "match": {
+            "packages": [
+              "@remotion/canvas",
+              "@remotion/studio-protocol"
+            ]
+          },
+          "version": null,
+          "lockLicense": "Remotion License",
+          "resolvedLicense": null,
+          "component": "remotion",
+          "evidence": [
+            {
+              "type": "PACKAGE",
+              "ref": "@remotion/canvas@4.0.532"
+            }
+          ]
+        },
+        {
+          "id": "remotion-license-url",
+          "match": {
+            "package": "@remotion/media-parser"
+          },
+          "version": null,
+          "lockLicense": "Remotion License https://remotion.dev/license",
+          "resolvedLicense": null,
+          "component": "remotion",
+          "evidence": [
+            {
+              "type": "PACKAGE",
+              "ref": "@remotion/media-parser@4.0.532"
+            }
+          ]
+        },
+        {
+          "id": "remotion-no-license-field",
+          "match": {
+            "packages": [
+              "@remotion/compositor-darwin-arm64",
+              "@remotion/compositor-darwin-x64",
+              "@remotion/compositor-linux-arm64-gnu",
+              "@remotion/compositor-linux-arm64-musl",
+              "@remotion/compositor-linux-x64-gnu",
+              "@remotion/compositor-linux-x64-musl",
+              "@remotion/compositor-win32-x64-msvc",
+              "@remotion/media"
+            ]
+          },
+          "version": "4.0.532",
+          "lockLicense": null,
+          "resolvedLicense": null,
+          "component": "remotion",
+          "evidence": [
+            {
+              "type": "URL",
+              "ref": "https://registry.npmjs.org/@remotion%2Fmedia/4.0.532",
+              "retrievedOn": "2026-10-22"
+            }
+          ]
+        },
+        {
+          "id": "mediabunny-mpl",
+          "match": {
+            "packages": [
+              "mediabunny",
+              "@mediabunny/aac-encoder",
+              "@mediabunny/flac-encoder",
+              "@mediabunny/mp3-encoder"
+            ]
+          },
+          "version": null,
+          "lockLicense": "MPL-2.0",
+          "resolvedLicense": null,
+          "component": "mediabunny",
+          "evidence": [
+            {
+              "type": "PACKAGE",
+              "ref": "mediabunny@1.56.1"
+            }
+          ]
+        },
+        {
+          "id": "font-sora",
+          "match": {
+            "package": "@fontsource-variable/sora"
+          },
+          "version": null,
+          "lockLicense": "OFL-1.1",
+          "resolvedLicense": null,
+          "component": "font-sora",
+          "evidence": [
+            {
+              "type": "PACKAGE",
+              "ref": "@fontsource-variable/sora@5.2.8"
+            }
+          ]
+        },
+        {
+          "id": "font-manrope",
+          "match": {
+            "package": "@fontsource-variable/manrope"
+          },
+          "version": null,
+          "lockLicense": "OFL-1.1",
+          "resolvedLicense": null,
+          "component": "font-manrope",
+          "evidence": [
+            {
+              "type": "PACKAGE",
+              "ref": "@fontsource-variable/manrope@5.2.8"
+            }
+          ]
+        },
+        {
+          "id": "font-ibm-plex-mono",
+          "match": {
+            "package": "@fontsource/ibm-plex-mono"
+          },
+          "version": null,
+          "lockLicense": "OFL-1.1",
+          "resolvedLicense": null,
+          "component": "font-ibm-plex-mono",
+          "evidence": [
+            {
+              "type": "PACKAGE",
+              "ref": "@fontsource/ibm-plex-mono@5.2.7"
+            }
+          ]
+        },
+        {
+          "id": "caniuse-lite-cc-by",
+          "match": {
+            "package": "caniuse-lite"
+          },
+          "version": null,
+          "lockLicense": "CC-BY-4.0",
+          "resolvedLicense": null,
+          "component": "caniuse-lite",
+          "evidence": [
+            {
+              "type": "PACKAGE",
+              "ref": "caniuse-lite@1.0.30001816"
+            }
+          ]
+        }
+      ]
+    },
+    "cargo": {
+      "lockfile": "motion-intelligence/Cargo.lock",
+      "crates": [
+        {
+          "name": "itoa",
+          "version": "1.0.18",
+          "checksum": "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682",
+          "license": "MIT OR Apache-2.0",
+          "linkage": "COMPILED_INTO_COMMITTED_ARTIFACT",
+          "evidence": [
+            {
+              "type": "URL",
+              "ref": "https://crates.io/api/v1/crates/itoa/1.0.18",
+              "retrievedOn": "2026-10-22"
+            }
+          ]
+        },
+        {
+          "name": "libm",
+          "version": "0.2.16",
+          "checksum": "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981",
+          "license": "MIT",
+          "linkage": "COMPILED_INTO_COMMITTED_ARTIFACT",
+          "evidence": [
+            {
+              "type": "URL",
+              "ref": "https://crates.io/api/v1/crates/libm/0.2.16",
+              "retrievedOn": "2026-10-22"
+            }
+          ]
+        },
+        {
+          "name": "memchr",
+          "version": "2.8.3",
+          "checksum": "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98",
+          "license": "Unlicense OR MIT",
+          "linkage": "COMPILED_INTO_COMMITTED_ARTIFACT",
+          "evidence": [
+            {
+              "type": "URL",
+              "ref": "https://crates.io/api/v1/crates/memchr/2.8.3",
+              "retrievedOn": "2026-10-22"
+            }
+          ]
+        },
+        {
+          "name": "proc-macro2",
+          "version": "1.0.107",
+          "checksum": "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9",
+          "license": "MIT OR Apache-2.0",
+          "linkage": "BUILD_TIME_ONLY",
+          "evidence": [
+            {
+              "type": "URL",
+              "ref": "https://crates.io/api/v1/crates/proc-macro2/1.0.107",
+              "retrievedOn": "2026-10-22"
+            }
+          ]
+        },
+        {
+          "name": "quote",
+          "version": "1.0.47",
+          "checksum": "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001",
+          "license": "MIT OR Apache-2.0",
+          "linkage": "BUILD_TIME_ONLY",
+          "evidence": [
+            {
+              "type": "URL",
+              "ref": "https://crates.io/api/v1/crates/quote/1.0.47",
+              "retrievedOn": "2026-10-22"
+            }
+          ]
+        },
+        {
+          "name": "serde",
+          "version": "1.0.229",
+          "checksum": "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba",
+          "license": "MIT OR Apache-2.0",
+          "linkage": "COMPILED_INTO_COMMITTED_ARTIFACT",
+          "evidence": [
+            {
+              "type": "URL",
+              "ref": "https://crates.io/api/v1/crates/serde/1.0.229",
+              "retrievedOn": "2026-10-22"
+            }
+          ]
+        },
+        {
+          "name": "serde_core",
+          "version": "1.0.229",
+          "checksum": "67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48",
+          "license": "MIT OR Apache-2.0",
+          "linkage": "COMPILED_INTO_COMMITTED_ARTIFACT",
+          "evidence": [
+            {
+              "type": "URL",
+              "ref": "https://crates.io/api/v1/crates/serde_core/1.0.229",
+              "retrievedOn": "2026-10-22"
+            }
+          ]
+        },
+        {
+          "name": "serde_derive",
+          "version": "1.0.229",
+          "checksum": "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348",
+          "license": "MIT OR Apache-2.0",
+          "linkage": "BUILD_TIME_ONLY",
+          "evidence": [
+            {
+              "type": "URL",
+              "ref": "https://crates.io/api/v1/crates/serde_derive/1.0.229",
+              "retrievedOn": "2026-10-22"
+            }
+          ]
+        },
+        {
+          "name": "serde_json",
+          "version": "1.0.154",
+          "checksum": "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6",
+          "license": "MIT OR Apache-2.0",
+          "linkage": "COMPILED_INTO_COMMITTED_ARTIFACT",
+          "evidence": [
+            {
+              "type": "URL",
+              "ref": "https://crates.io/api/v1/crates/serde_json/1.0.154",
+              "retrievedOn": "2026-10-22"
+            }
+          ]
+        },
+        {
+          "name": "syn",
+          "version": "3.0.9",
+          "checksum": "d78c8dee4c7bf0e14673097256fed6142ce9d3b85a408189d07482442145823b",
+          "license": "MIT OR Apache-2.0",
+          "linkage": "BUILD_TIME_ONLY",
+          "evidence": [
+            {
+              "type": "URL",
+              "ref": "https://crates.io/api/v1/crates/syn/3.0.9",
+              "retrievedOn": "2026-10-22"
+            }
+          ]
+        },
+        {
+          "name": "unicode-ident",
+          "version": "1.0.27",
+          "checksum": "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563",
+          "license": "(MIT OR Apache-2.0) AND Unicode-3.0",
+          "linkage": "BUILD_TIME_ONLY",
+          "evidence": [
+            {
+              "type": "URL",
+              "ref": "https://crates.io/api/v1/crates/unicode-ident/1.0.27",
+              "retrievedOn": "2026-10-22"
+            }
+          ]
+        },
+        {
+          "name": "zmij",
+          "version": "1.0.23",
+          "checksum": "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b",
+          "license": "MIT",
+          "linkage": "COMPILED_INTO_COMMITTED_ARTIFACT",
+          "evidence": [
+            {
+              "type": "URL",
+              "ref": "https://crates.io/api/v1/crates/zmij/1.0.23",
+              "retrievedOn": "2026-10-22"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "mediaFiles": [
+    {
+      "id": "brand-mark-png",
+      "match": {
+        "path": "assets/brand/walletwall-brick-wallet.png"
+      },
+      "covers": {
+        "asset": "migration-readiness/brand-mark"
+      }
+    },
+    {
+      "id": "blender-proof-reference",
+      "match": {
+        "paths": [
+          "blender/proof/reference/airborne.png",
+          "blender/proof/reference/crouch.png",
+          "blender/proof/reference/idle.png",
+          "blender/proof/reference/inspect.png",
+          "blender/proof/reference/landing.png",
+          "blender/proof/reference/perch.png",
+          "blender/proof/reference/tail-brace.png",
+          "blender/proof/reference/transition-entry.png",
+          "blender/proof/reference/transition-exit.png",
+          "blender/proof/reference/transition-peak.png"
+        ]
+      },
+      "covers": {
+        "component": "blender-render-output"
+      }
+    },
+    {
+      "id": "motion-intelligence-wasm",
+      "match": {
+        "path": "motion-intelligence/wasm/motion_intelligence.wasm"
+      },
+      "covers": {
+        "component": "rust-crates-in-wasm"
+      }
+    }
+  ],
+  "videos": [
+    {
+      "videoId": "migration-readiness",
+      "release": {
+        "state": "LOCAL_PROOF"
+      },
+      "assets": [
+        {
+          "id": "brand-mark",
+          "category": "logo-trademark",
+          "binding": {
+            "type": "SPEC_ASSET",
+            "specAssetId": "brand-mark",
+            "sha256": "91926a2eebc1777194ecf491049b8a7af3cf0892b09b363c5b2a17cd17d5dbad"
+          },
+          "rightsBasis": "OWNER_AUTHORED",
+          "status": "OWNER_CONFIRMATION_PENDING",
+          "licenseExpression": null,
+          "evidence": [
+            {
+              "type": "FILE",
+              "ref": "assets/brand/README.md"
+            }
+          ],
+          "resolution": {
+            "ownerAction": "Record how the WalletWall brick-wallet mark was made (own work, commissioned, or generated with a tool), that WalletWall holds the rights, and that no third-party terms attach to it. The repository records only that the maintainer supplied it and how it was edge-polished.",
+            "reassessmentTrigger": "A new or edited brand mark, or a claim from a third party."
+          }
+        },
+        {
+          "id": "docs-page",
+          "category": "authored-content",
+          "binding": {
+            "type": "CANONICAL_DOCS",
+            "docPath": "docs/concepts/migration-readiness.mdx",
+            "blob": "f8c294eecaef6142ab947ce16d8664a8bec743c0"
+          },
+          "rightsBasis": "OWNER_AUTHORED",
+          "status": "CLEARED",
+          "licenseExpression": null,
+          "evidence": [
+            {
+              "type": "FILE",
+              "ref": "fixtures/canonical/MANIFEST.json"
+            },
+            {
+              "type": "FILE",
+              "ref": "specs/migration-readiness/spec.json"
+            }
+          ]
+        },
+        {
+          "id": "font-sora",
+          "category": "font",
+          "binding": {
+            "type": "COMPONENT",
+            "componentId": "font-sora"
+          },
+          "rightsBasis": "OPEN_SOURCE_LICENSE",
+          "status": "CLEARED",
+          "licenseExpression": "OFL-1.1",
+          "evidence": [
+            {
+              "type": "PACKAGE",
+              "ref": "@fontsource-variable/sora@5.2.8"
+            }
+          ]
+        },
+        {
+          "id": "font-manrope",
+          "category": "font",
+          "binding": {
+            "type": "COMPONENT",
+            "componentId": "font-manrope"
+          },
+          "rightsBasis": "OPEN_SOURCE_LICENSE",
+          "status": "CLEARED",
+          "licenseExpression": "OFL-1.1",
+          "evidence": [
+            {
+              "type": "PACKAGE",
+              "ref": "@fontsource-variable/manrope@5.2.8"
+            }
+          ]
+        },
+        {
+          "id": "font-ibm-plex-mono",
+          "category": "font",
+          "binding": {
+            "type": "COMPONENT",
+            "componentId": "font-ibm-plex-mono"
+          },
+          "rightsBasis": "OPEN_SOURCE_LICENSE",
+          "status": "CLEARED",
+          "licenseExpression": "OFL-1.1",
+          "evidence": [
+            {
+              "type": "PACKAGE",
+              "ref": "@fontsource/ibm-plex-mono@5.2.7"
+            }
+          ]
+        },
+        {
+          "id": "character",
+          "category": "three-d-asset",
+          "binding": {
+            "type": "COMPONENT",
+            "componentId": "walletwallaby-character-model"
+          },
+          "rightsBasis": "GENERATED_FROM_OWNER_INPUTS",
+          "status": "OWNER_CONFIRMATION_PENDING",
+          "licenseExpression": null,
+          "evidence": [
+            {
+              "type": "FILE",
+              "ref": "blender/walletwallaby/build.py"
+            }
+          ],
+          "resolution": {
+            "ownerAction": "Clear the walletwallaby-character-model item.",
+            "reassessmentTrigger": "That item changes status."
+          }
+        },
+        {
+          "id": "narration",
+          "category": "narration",
+          "binding": {
+            "type": "COMPONENT",
+            "componentId": "elevenlabs-service"
+          },
+          "rightsBasis": "PROVIDER_TERMS",
+          "status": "OWNER_CONFIRMATION_PENDING",
+          "licenseExpression": null,
+          "evidence": [
+            {
+              "type": "FILE",
+              "ref": "docs/NARRATION.md"
+            },
+            {
+              "type": "URL",
+              "ref": "https://elevenlabs.io/terms-of-use",
+              "retrievedOn": "2026-10-22"
+            }
+          ],
+          "resolution": {
+            "ownerAction": "Confirm that the plan in force when this video's narration set was synthesized permits commercial use, and record it as the clearance.",
+            "reassessmentTrigger": "Each new synthesis run for this video."
+          }
+        }
+      ],
+      "absent": [
+        "music",
+        "sfx",
+        "screenshot",
+        "ui-capture",
+        "illustration",
+        "third-party-media"
+      ]
+    }
+  ]
+}

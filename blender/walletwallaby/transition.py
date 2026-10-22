@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 WalletWall
+#
+# This file uses the Blender Python API, so it is licensed GPL-3.0-or-later.
+# The rest of this repository is MIT; see docs/LICENSING.md.
 """The 2D -> 3D signature transition: the diagram reveals that it always had depth.
 
 A reusable primitive (`depth-reveal`). Its inputs are two teaching surfaces as

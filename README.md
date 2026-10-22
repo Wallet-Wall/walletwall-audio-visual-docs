@@ -84,7 +84,7 @@ WalletWallrus remains WalletWall's engineering and repository identity; WalletWa
 - The LLM planner, voice, renderer, and upload target each sit behind an interface, so any of them can be replaced without changing the spec format. Today the planner is a hand-authored fixture storyboard; narration is the silent fixture voice (estimated timing) unless a render replays the video's verified publication narration set (`--narration=publication`, [docs/NARRATION.md](docs/NARRATION.md)).
 - **YouTube publishing is unlisted and manual-review-first.** The v1 upload type cannot express `public`; a human reviews every upload before it goes public. A materially updated video is a new upload with lineage, never an overwrite.
 
-Remotion is licensed separately from this repository: free for individuals and companies of up to three people; larger organizations need a [company license](https://www.remotion.dev/license).
+Remotion is licensed separately from this repository, under the vendor's own terms rather than an open-source license; whether this project qualifies for the Free License is an owner decision recorded in [docs/LICENSING.md](docs/LICENSING.md), and a company license is needed if it does not.
 
 ## Run it
 
@@ -157,4 +157,6 @@ v1, extracted from the WalletWall application repository with behaviour preserve
 
 ## License
 
-[MIT](./LICENSE). Remotion, fonts, and other dependencies keep their own licenses.
+The repository is [MIT](./LICENSE), with one explicit exception: a Python file that uses the Blender Python API (the eight Blender-side scripts under `blender/walletwallaby/`) is `GPL-3.0-or-later`, as Blender's FAQ requires of published scripts that call its API. Every file states its license in an SPDX header, the license texts are in [LICENSES/](./LICENSES), and `npm run rights:check` derives the boundary from the imports and fails if a file disagrees. Generated frames, `.blend` files, MP4s, WalletWall artwork, and narration are not made GPL by being produced with Blender.
+
+Third-party software keeps its own license, and not everything is MIT: Remotion is source-available under the vendor's own terms (whether this project qualifies for its Free License is an open owner question), the bundled fonts are OFL-1.1, Mediabunny is MPL-2.0, and `caniuse-lite` is CC-BY-4.0. Notices are in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md), the reasoning in [docs/LICENSING.md](docs/LICENSING.md), and the rule that nothing is public until its rights are cleared in [docs/RELEASE_RIGHTS.md](docs/RELEASE_RIGHTS.md).

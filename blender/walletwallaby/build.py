@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 WalletWall
+#
+# This file uses the Blender Python API, so it is licensed GPL-3.0-or-later.
+# The rest of this repository is MIT; see docs/LICENSING.md.
 """Build WalletWallaby's Blender character from code: `npm run blender:build`.
 
 Input (the job, written by scripts/blender.ts): the rig contract export

@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 WalletWall
+#
+# This file uses no Blender API and keeps the repository license (MIT). GPL-3.0-or-later
+# files in this directory load it inside Blender; see docs/LICENSING.md.
 """Shared guards for the WalletWallaby Blender lane.
 
 Blender runs these scripts as a subprocess of scripts/blender.ts with fixed

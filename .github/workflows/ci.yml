@@ -59,6 +59,24 @@ jobs:
       - name: Contracts and fixture mirror
         run: npm run contracts:check
 
+      # Licenses and release rights (docs/LICENSING.md, docs/RELEASE_RIGHTS.md): the Blender license boundary, every
+      # locked package and crate, and the media assets must agree with config/release-rights.json. Owner decisions
+      # recorded as pending pass, listed; a falsely cleared or drifted record fails.
+      - name: Licenses and release rights
+        run: npm run rights:check
+
+      # The strict check a public release needs. Informational here, like the freshness report: it lists what the
+      # owner has not yet cleared and never fails the build (a usage error still would).
+      - name: Public-release readiness (informational)
+        run: |
+          set +e
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          node scripts/rights-check.ts --public-release | tee -a "$GITHUB_STEP_SUMMARY"
+          code=${PIPESTATUS[0]}
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" = "1" ]; then echo "::notice::Not ready for a public release: open rights items are listed in the step summary."; exit 0; fi
+          exit "$code"
+
       - name: Freshness report (informational)
         run: |
           set +e

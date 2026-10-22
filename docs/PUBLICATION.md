@@ -46,6 +46,16 @@ npm run publication:verify-receipt -- dist/publication-proof/publication-proof-r
 The proof package is deleted at the start of every run, so a failed run never leaves a receipt behind. Human review
 of the package remains mandatory before any publication. Nothing here uploads anything.
 
+## Release rights
+
+A proven video is not a releasable one. Before it leaves the machine every material item (tools, dependencies, generated media, and the video's own assets: narration, music, fonts, marks, captures) must be `CLEARED` in `config/release-rights.json`, and only the owner moves a video from `UNLISTED` to `PUBLIC`. The states, statuses, and the strict check are in [RELEASE_RIGHTS.md](RELEASE_RIGHTS.md); the licenses behind them in [LICENSING.md](LICENSING.md).
+
+```text
+LOCAL_PROOF → RIGHTS_CLEARED → UNLISTED → OWNER_REVIEWED → PUBLIC
+```
+
+`npm run rights:check -- --public-release` is the check a person runs before a video moves to `RIGHTS_CLEARED`: it fails while any item is not `CLEARED`. No script enforces the transition yet: the publication proof, its receipt, and the upload step neither run it nor carry its result. Binding the rights manifest's identity into the receipt (a v2 to v3 schema change) is the immediate follow-up and is described in [RELEASE_RIGHTS.md](RELEASE_RIGHTS.md#the-follow-up-binding-the-rights-manifest-into-the-receipt). Until then the link runs the other way: the manifest's `PUBLIC` record names the `receiptSha256` the owner authorized.
+
 ## When the production environment changes
 
 ```text
@@ -396,6 +406,7 @@ everything that does not need the package's bytes (the MP4 included), and says t
   `npm run render`) may come from another approved environment than the one the invariants just ran in. The receipt
   requires one environment, so such a proof stops at its last step, after the encode. Delete
   `dist/blender/out/renders` (or render with `--fresh-blender`) and run the proof again.
+- **The receipt does not bind release rights.** It proves what rendered and which gates passed; whether the project may publish it (Remotion's eligibility, the narration provider's plan, the brand mark's provenance) is recorded in `config/release-rights.json` and checked by `npm run rights:check`, not by the receipt ([RELEASE_RIGHTS.md](RELEASE_RIGHTS.md)).
 - **MP4 bytes are not run-to-run stable.** A receipt identifies one artifact; determinism is proven on lossless frames.
 - **The invariants evidence proves which frames, plan, character, environment, and bar were measured.** Only a
   re-render can re-measure the values.

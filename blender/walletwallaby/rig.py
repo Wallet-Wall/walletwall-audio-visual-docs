@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 WalletWall
+#
+# This file uses the Blender Python API, so it is licensed GPL-3.0-or-later.
+# The rest of this repository is MIT; see docs/LICENSING.md.
 """WalletWallaby's armature: the rig contract's skeleton, given depth.
 
 The 22 bones are the Rive rig's own (names, parents, rest positions), placed on
