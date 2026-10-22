@@ -128,6 +128,97 @@ export const CATEGORY_OF_COMPONENT_KIND: Readonly<Record<string, AssetCategory>>
 /** The license files the source-code license map may name, with the SPDX identifier each one holds. */
 export const KNOWN_LICENSE_FILES: Readonly<Record<string, string>> = Object.freeze({ MIT: 'LICENSES/MIT.txt', 'GPL-3.0-or-later': 'LICENSES/GPL-3.0-or-later.txt' });
 
+// ── Voice rights ────────────────────────────────────────────────────────────────────────────────────────────────────────
+// A narration voice is used on a rights-and-consent basis (docs/RELEASE_RIGHTS.md, "Voice rights"), not on a blanket ban
+// of every human-derived voice. It is allowed only when its rights are established: a synthetic or designed voice; a
+// Professional Voice Clone its verified owner intentionally made available to others through the provider; or another
+// voice its speaker authorized in writing with the commercial scope documented. It is never allowed when it is cloned
+// or conditioned on reference audio without the speaker's authorization, when it impersonates or is attributed
+// deceptively, when it is used outside the scope the provider or rights holder granted, when a provider control is
+// bypassed or ignored, or when its rights basis cannot be established. WalletWall owns its authored script, composition
+// and audiovisual work, never the speaker's voice or likeness.
+
+/** Where a narration voice comes from. UNDETERMINED is a placeholder and never admits CLEARED. */
+export const VOICE_SOURCES = ['ELEVENLABS_VOICE_LIBRARY', 'PROVIDER_DESIGNED_SYNTHETIC', 'SPEAKER_LICENSED_DIRECT', 'UNDETERMINED'] as const;
+export type VoiceSource = (typeof VOICE_SOURCES)[number];
+
+export const VOICE_TYPES = ['PROFESSIONAL_VOICE_CLONE', 'VOICE_DESIGN', 'REFERENCE_AUDIO_CLONE', 'RECORDED_SPEAKER', 'UNDETERMINED'] as const;
+export type VoiceType = (typeof VOICE_TYPES)[number];
+
+/** How the speaker's consent is established. NOT_ESTABLISHED is a voice nobody authorized: it is BLOCKED, never pending. */
+export const VOICE_AUTHORIZATION_BASES = ['VERIFIED_OWNER_PUBLISHED', 'SPEAKER_WRITTEN_AUTHORIZATION', 'NO_HUMAN_SPEAKER', 'NOT_ESTABLISHED', 'UNDETERMINED'] as const;
+export type VoiceAuthorizationBasis = (typeof VOICE_AUTHORIZATION_BASES)[number];
+
+/** Who lets WalletWall use the voice. Separate from the right to use what it says (COMMERCIAL_OUTPUT_BASES). */
+export const VOICE_USE_BASES = ['PROVIDER_AUTHORIZED', 'SPEAKER_LICENSED', 'NOT_ESTABLISHED', 'UNDETERMINED'] as const;
+export type VoiceUseBasis = (typeof VOICE_USE_BASES)[number];
+
+/** What lets the audio the voice produces be used commercially. Separate from the right to use the voice itself. */
+export const COMMERCIAL_OUTPUT_BASES = ['PAID_PLAN_TERMS', 'SPEAKER_LICENSE', 'NOT_ESTABLISHED', 'UNDETERMINED'] as const;
+export type CommercialOutputBasis = (typeof COMMERCIAL_OUTPUT_BASES)[number];
+
+/** The only things WalletWall may record as its own in a narrated work. The speaker's voice and likeness are not on this list. */
+export const WALLETWALL_OWNABLE = ['AUTHORED_SCRIPT', 'COMPOSITION', 'AUDIOVISUAL_WORK'] as const;
+export type WalletwallOwnable = (typeof WALLETWALL_OWNABLE)[number];
+
+export const SPEAKER_OWNERSHIP = ['SPEAKER_RETAINS', 'NO_HUMAN_SPEAKER'] as const;
+export type SpeakerOwnership = (typeof SPEAKER_OWNERSHIP)[number];
+
+/** The provider controls a Voice Library voice can carry. Each is recorded as found, or as undetermined with the exact uncertainty. */
+export const PROVIDER_CONTROL_KINDS = ['NOTICE_PERIOD', 'LIVE_MODERATION', 'CUSTOM_RESTRICTION', 'LIBRARY_REMOVAL'] as const;
+export type ProviderControlKind = (typeof PROVIDER_CONTROL_KINDS)[number];
+export const PROVIDER_CONTROL_STATES = ['IN_FORCE', 'NOT_IN_FORCE', 'UNDETERMINED'] as const;
+
+/**
+ * The controls that restrict use, as against conditions of availability: a notice period says how long a withdrawn voice
+ * stays usable and live moderation screens requests, but a custom restriction limits how the voice may be used and a
+ * removal ends the right to synthesize with it. One in force is never ignored: the owner records whether it is satisfied.
+ */
+export const USE_RESTRICTING_CONTROLS: readonly ProviderControlKind[] = ['CUSTOM_RESTRICTION', 'LIBRARY_REMOVAL'];
+
+export const MAX_NOTICE_PERIOD_DAYS = 730;
+
+/**
+ * The owner's assessment of a use-restricting control in force. EXISTING_OUTPUT_ONLY is for a withdrawal: it ends new
+ * synthesis with the voice and leaves the output already generated while the voice was available, so a later withdrawal
+ * is not read back into authorized history. It is not a way to wave a restriction through: the owner records that no
+ * further synthesis is run.
+ */
+export const PROVIDER_CONTROL_COMPLIANCE = ['SATISFIED', 'NOT_SATISFIED', 'EXISTING_OUTPUT_ONLY'] as const;
+export const COMPLIANCE_THAT_CLEARS: readonly string[] = ['SATISFIED', 'EXISTING_OUTPUT_ONLY'];
+
+/** What a speaker's written authorization can cover, and what it must cover for the voice to be CLEARED. */
+export const SPEAKER_AUTHORIZATION_SCOPES = ['VOICE_CLONING', 'COMMERCIAL_USE', 'PUBLIC_DISTRIBUTION'] as const;
+export const SPEAKER_SCOPE_NEEDED: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  REFERENCE_AUDIO_CLONE: ['VOICE_CLONING', 'COMMERCIAL_USE', 'PUBLIC_DISTRIBUTION'],
+  RECORDED_SPEAKER: ['COMMERCIAL_USE', 'PUBLIC_DISTRIBUTION'],
+});
+
+/** What each part of a voice's rights requires of the next, so no part can be borrowed from a different route. */
+export const VOICE_SOURCE_TYPES: Readonly<Record<string, readonly VoiceType[]>> = Object.freeze({
+  ELEVENLABS_VOICE_LIBRARY: ['PROFESSIONAL_VOICE_CLONE'],
+  PROVIDER_DESIGNED_SYNTHETIC: ['VOICE_DESIGN'],
+  SPEAKER_LICENSED_DIRECT: ['REFERENCE_AUDIO_CLONE', 'RECORDED_SPEAKER'],
+});
+export const VOICE_TYPE_AUTHORIZATION: Readonly<Record<string, VoiceAuthorizationBasis>> = Object.freeze({
+  PROFESSIONAL_VOICE_CLONE: 'VERIFIED_OWNER_PUBLISHED',
+  VOICE_DESIGN: 'NO_HUMAN_SPEAKER',
+  REFERENCE_AUDIO_CLONE: 'SPEAKER_WRITTEN_AUTHORIZATION',
+  RECORDED_SPEAKER: 'SPEAKER_WRITTEN_AUTHORIZATION',
+});
+export const VOICE_SOURCE_USE: Readonly<Record<string, VoiceUseBasis>> = Object.freeze({
+  ELEVENLABS_VOICE_LIBRARY: 'PROVIDER_AUTHORIZED',
+  PROVIDER_DESIGNED_SYNTHETIC: 'PROVIDER_AUTHORIZED',
+  SPEAKER_LICENSED_DIRECT: 'SPEAKER_LICENSED',
+});
+export const VOICE_USE_OUTPUT: Readonly<Record<string, CommercialOutputBasis>> = Object.freeze({ PROVIDER_AUTHORIZED: 'PAID_PLAN_TERMS', SPEAKER_LICENSED: 'SPEAKER_LICENSE' });
+
+/** A source that belongs to one provider names it; the narration binding must use that provider. */
+export const VOICE_SOURCE_PROVIDER: Readonly<Record<string, string>> = Object.freeze({ ELEVENLABS_VOICE_LIBRARY: 'elevenlabs' });
+
+/** A voice basis is established when someone has looked and found it; UNDETERMINED (nobody looked) and NOT_ESTABLISHED (looked, and it does not hold) are not. */
+export const voiceFactEstablished = (v: string | null): boolean => v !== null && v !== 'UNDETERMINED' && v !== 'NOT_ESTABLISHED';
+
 export const LINKAGES = ['COMPILED_INTO_COMMITTED_ARTIFACT', 'BUILD_TIME_ONLY'] as const;
 
 export const EVIDENCE_TYPES = ['FILE', 'URL', 'PACKAGE'] as const;

@@ -18,7 +18,7 @@ import { rightsManifestSha256, validateManifest, type Asset, type Component, typ
 import type { RepoView } from './repo.ts';
 import { classifyPython, embeddedBlenderPython, hasPythonShebang, isPythonPath, scanPython, type PythonClassification } from './python-boundary.ts';
 import { parseSpdx, spdxIds } from './spdx.ts';
-import { BLENDER_COUPLED_LICENSE, CATEGORY_OF_COMPONENT_KIND, CATEGORY_OF_SPEC_ASSET_KIND, KNOWN_LICENSE_FILES, MEDIA_EXTENSIONS, STATUSES_PERMITTED_IN, type AssetCategory } from './vocabulary.ts';
+import { BLENDER_COUPLED_LICENSE, CATEGORY_OF_COMPONENT_KIND, CATEGORY_OF_SPEC_ASSET_KIND, KNOWN_LICENSE_FILES, MEDIA_EXTENSIONS, STATUSES_PERMITTED_IN, VOICE_SOURCE_PROVIDER, type AssetCategory } from './vocabulary.ts';
 
 export const MANIFEST_PATH = 'config/release-rights.json';
 export const REPORT_SCHEMA = 'walletwall.rights-check-report/v1';
@@ -188,6 +188,9 @@ export function checkRights(repo: RepoView, options: { mode: RightsMode }): Righ
 
   // 7. Components the detected tooling requires.
   checkRequiredComponents(m, repo, componentById, add);
+
+  // 7b. The narration voice: its rights record exists and is about the voice the publication binding names.
+  checkVoiceRights(m, repo, componentById, add);
 
   // 8. Notices.
   const notices = repo.read(m.documents.notices);
@@ -399,6 +402,35 @@ function checkRequiredComponents(m: RightsManifest, repo: RepoView, byId: Map<st
   if (pkg.ok && isRec(own(pkg.value, 'dependencies')) && Object.hasOwn(own(pkg.value, 'dependencies') as Rec, 'remotion')) need('remotion', 'package.json depends on remotion');
   const provider = narrationProvider(repo);
   if (provider !== null) need(`${provider}-service`, `config/narration-providers.json binds the publication narration to ${provider}`);
+}
+
+/**
+ * The voice the publication binding speaks with has a rights record (docs/RELEASE_RIGHTS.md, "Voice rights"), and the
+ * record is about that voice: the binding id and the sha256 of the configured voice id must match, so a swapped voice or a
+ * renamed binding cannot inherit a clearance. The record's shape and what its status may be are the manifest's rules.
+ */
+function checkVoiceRights(m: RightsManifest, repo: RepoView, byId: Map<string, Component>, add: (code: string, path: string, message: string) => void): void {
+  const provider = narrationProvider(repo);
+  const config = readJson(repo, 'config/narration-providers.json');
+  const service = provider === null ? undefined : byId.get(`${provider}-service`);
+  for (const c of m.components) {
+    if (c.voiceRights !== undefined && c !== service) add('VOICE_RIGHTS_UNBOUND', c.id, `${c.id} records a narration voice, but the publication narration binding in config/narration-providers.json does not use it${provider === null ? ' (it names no provider)' : ` (it uses ${provider}-service)`}; remove the record or bind the narration to it`);
+  }
+  if (provider === null || service === undefined) return; // REQUIRED_COMPONENT_MISSING says a missing service.
+  const voice = service.voiceRights;
+  if (voice === undefined) {
+    add('VOICE_RIGHTS_MISSING', service.id, `${service.id} is the provider the publication narration is made with, and the manifest records no voiceRights for it: a voice whose source, authorization, use basis, and commercial-output basis are not recorded cannot be used`);
+    return;
+  }
+  const publication = config.ok ? own(config.value, 'publication') : undefined;
+  const bindingId = own(publication, 'id');
+  const voiceId = config.ok ? own(own(own(config.value, 'providers'), provider), 'voiceId') : undefined;
+  if (bindingId !== voice.binding.id) add('VOICE_BINDING_STALE', service.id, `${service.id} records the voice for the binding ${JSON.stringify(voice.binding.id)}, and config/narration-providers.json binds ${typeof bindingId === 'string' ? JSON.stringify(bindingId) : 'no binding id'}; re-establish the voice's rights for the new binding`);
+  if (typeof voiceId !== 'string' || sha256Hex(voiceId) !== voice.binding.voiceIdSha256) {
+    add('VOICE_BINDING_STALE', service.id, `${service.id} records the rights of a voice whose id hashes to ${voice.binding.voiceIdSha256.slice(0, 12)}…, which is not the voice config/narration-providers.json names for ${provider}; a different voice needs its own rights record`);
+  }
+  const owner = VOICE_SOURCE_PROVIDER[voice.source];
+  if (owner !== undefined && owner !== provider) add('VOICE_SOURCE_PROVIDER_MISMATCH', service.id, `${service.id} records a ${voice.source} voice, which belongs to ${owner}, but the publication narration is made with ${provider}`);
 }
 
 /** Every `asset` string anywhere in the sonic identity (any section, any depth), with the category its section implies. */

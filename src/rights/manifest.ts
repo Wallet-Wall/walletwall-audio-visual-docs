@@ -9,8 +9,10 @@
 // The schema is closed: an unknown or missing field, an unknown status, basis, layer, kind, state or classification is a
 // problem, never a default. Members are read as own keys only, so a parsed `__proto__` member is an unknown field like
 // any other and cannot ride along. A status cannot claim more than its basis supports: UNKNOWN never becomes CLEARED,
-// and a vendor's, provider's, or third party's terms are cleared only by a record the owner makes. The manifest is a
-// public file, so it may hold no local path, secret, or personal address. No I/O, no environment.
+// and a vendor's, provider's, or third party's terms are cleared only by a record the owner makes. The provider service
+// a narration is made with also records its voice (`voiceRights`): a rights-and-consent record that keeps the right to
+// the voice apart from the right to its output and from anything WalletWall owns. The manifest is a public file, so it
+// may hold no local path, secret, or personal address. No I/O, no environment.
 
 import { canonicalJson } from '../core/canonical-json.ts';
 import { contentAddress } from '../core/hash.ts';
@@ -21,6 +23,7 @@ import {
   BASES_NEEDING_OWNER_CLEARANCE,
   BLENDER_CLASSIFICATIONS,
   BLENDER_COUPLED_LICENSE,
+  COMMERCIAL_OUTPUT_BASES,
   COMPONENT_KINDS,
   COMPONENT_LAYERS,
   COMPONENT_SCOPES,
@@ -29,18 +32,45 @@ import {
   GPL_COMPATIBLE_LICENSES,
   KINDS_BY_LAYER,
   LINKAGES,
+  COMPLIANCE_THAT_CLEARS,
+  MAX_NOTICE_PERIOD_DAYS,
+  PROVIDER_CONTROL_COMPLIANCE,
+  PROVIDER_CONTROL_KINDS,
+  PROVIDER_CONTROL_STATES,
   RECOGNISED_SPDX_IDS,
   RELEASE_STATES,
   RESTRICTED_SPDX_IDS,
   RIGHTS_BASES,
   RIGHTS_SCHEMA,
   RIGHTS_STATUSES,
+  SPEAKER_AUTHORIZATION_SCOPES,
+  SPEAKER_OWNERSHIP,
+  SPEAKER_SCOPE_NEEDED,
+  USE_RESTRICTING_CONTROLS,
+  VOICE_AUTHORIZATION_BASES,
+  VOICE_SOURCE_TYPES,
+  VOICE_SOURCE_USE,
+  VOICE_SOURCES,
+  VOICE_TYPE_AUTHORIZATION,
+  VOICE_TYPES,
+  VOICE_USE_BASES,
+  VOICE_USE_OUTPUT,
+  voiceFactEstablished,
+  WALLETWALL_OWNABLE,
   type AssetCategory,
+  type CommercialOutputBasis,
   type ComponentLayer,
   type ComponentScope,
+  type ProviderControlKind,
   type ReleaseState,
   type RightsBasis,
   type RightsStatus,
+  type SpeakerOwnership,
+  type VoiceAuthorizationBasis,
+  type VoiceSource,
+  type VoiceType,
+  type VoiceUseBasis,
+  type WalletwallOwnable,
 } from './vocabulary.ts';
 
 export interface Evidence {
@@ -70,6 +100,40 @@ export interface RightsClaim {
   clearance?: Clearance;
 }
 
+/** One provider control on a narration voice, as found or as undetermined with the exact uncertainty in `note`. */
+export interface ProviderControl {
+  kind: ProviderControlKind;
+  state: (typeof PROVIDER_CONTROL_STATES)[number];
+  note: string;
+  /** A notice period in force names its length in days. */
+  days?: number;
+  observedBy?: 'OWNER';
+  observedOn?: string;
+  /** Recorded for a use-restricting control in force: whether the restriction still permits this use (a withdrawal may leave only the output already generated). */
+  compliance?: 'SATISFIED' | 'NOT_SATISFIED' | 'EXISTING_OUTPUT_ONLY';
+}
+
+/**
+ * The rights in the narration voice a provider service speaks with. The right to use the voice (source, voiceType,
+ * authorizationBasis, useBasis) and the right to use what it says commercially (commercialOutputBasis) are separate facts and
+ * each is needed to clear it. The voice id is not recorded (the privacy scan refuses one): the record is bound to it by
+ * the sha256 of the id the narration binding names.
+ */
+export interface VoiceRights {
+  binding: { id: string; voiceIdSha256: string };
+  source: VoiceSource;
+  voiceType: VoiceType;
+  authorizationBasis: VoiceAuthorizationBasis;
+  useBasis: VoiceUseBasis;
+  commercialOutputBasis: CommercialOutputBasis;
+  ownership: { walletwallOwns: WalletwallOwnable[]; speakerVoiceAndLikeness: SpeakerOwnership };
+  /** Who says the voice is what this record states, the day, and what that rests on. Required once the origin is established. */
+  attestation?: { attestedBy: 'OWNER'; attestedOn: string; basis: string };
+  /** Only for a speaker's written authorization: when it was granted, who holds the document (it stays out of the public repository), and what it covers. */
+  speakerAuthorization?: { documentHeldBy: 'OWNER'; grantedOn: string; scope: string[] };
+  providerControls: ProviderControl[];
+}
+
 export interface Component extends RightsClaim {
   id: string;
   layer: ComponentLayer;
@@ -81,6 +145,8 @@ export interface Component extends RightsClaim {
   producedBy?: string[];
   /** Components this one cannot be CLEARED above (the source it is built from, the tool it needs). */
   dependsOn?: string[];
+  /** Only on the provider service the narration binding uses: whose voice it is and why it may be used. */
+  voiceRights?: VoiceRights;
 }
 
 /** One tracked media file or an exact list of them (never a directory, which would cover whatever is dropped into it later), and the component or video asset whose rights cover them. */
@@ -371,13 +437,206 @@ function readClaim(r: Reader, rec: Rec, path: string): void {
   }
 }
 
+const pick = <T extends string>(v: unknown, list: readonly T[]): T | null => (typeof v === 'string' && (list as readonly string[]).includes(v) ? (v as T) : null);
+
+interface ReadControl {
+  kind: ProviderControlKind | null;
+  state: string | null;
+  compliance: string | null;
+}
+
+/** The provider controls of a voice: each kind at most once, each as found (who read it, when) or as undetermined with the exact uncertainty. */
+function readProviderControls(r: Reader, v: unknown, path: string, source: VoiceSource | null): ReadControl[] {
+  const out: ReadControl[] = [];
+  const seen = new Set<string>();
+  r.array(v, path, 0, PROVIDER_CONTROL_KINDS.length)?.forEach((c, i) => {
+    const p = `${path}[${i}]`;
+    const e = r.shape(c, p, ['kind', 'state', 'note'], ['days', 'observedBy', 'observedOn', 'compliance']);
+    if (!e) return;
+    const kind = r.oneOf(own(e, 'kind'), `${p}.kind`, PROVIDER_CONTROL_KINDS);
+    const state = r.oneOf(own(e, 'state'), `${p}.state`, PROVIDER_CONTROL_STATES);
+    r.str(own(e, 'note'), `${p}.note`);
+    if (kind !== null) {
+      if (seen.has(kind)) r.bad(`${p}.kind`, `duplicate ${kind}`);
+      seen.add(kind);
+    }
+
+    const observedBy = own(e, 'observedBy');
+    const observedOn = own(e, 'observedOn');
+    if (state === 'UNDETERMINED') {
+      if (observedBy !== undefined || observedOn !== undefined) r.bad(`${p}.observedOn`, 'an undetermined control was not observed, so it has no observer or date');
+    } else if (state !== null) {
+      if (observedBy === undefined) r.bad(`${p}.observedBy`, 'required for a control in force or not in force (who read it)');
+      else r.exactly(observedBy, `${p}.observedBy`, 'OWNER');
+      if (observedOn === undefined) r.bad(`${p}.observedOn`, 'required for a control in force or not in force (the day it was read or reported)');
+      else r.date(observedOn, `${p}.observedOn`);
+    }
+
+    const days = own(e, 'days');
+    if (days !== undefined) {
+      if (kind !== null && kind !== 'NOTICE_PERIOD') r.bad(`${p}.days`, 'only a notice period has a length');
+      else if (state !== 'IN_FORCE') r.bad(`${p}.days`, 'only a notice period in force has a length');
+      else if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > MAX_NOTICE_PERIOD_DAYS) r.bad(`${p}.days`, `must be a whole number of days, 1 to ${MAX_NOTICE_PERIOD_DAYS}`);
+    } else if (kind === 'NOTICE_PERIOD' && state === 'IN_FORCE') {
+      r.bad(`${p}.days`, 'a notice period in force names its length');
+    }
+
+    const restricting = kind !== null && USE_RESTRICTING_CONTROLS.includes(kind);
+    const compliance = own(e, 'compliance');
+    let read: string | null = null;
+    if (compliance !== undefined) {
+      if (!(restricting && state === 'IN_FORCE')) r.bad(`${p}.compliance`, 'only a CUSTOM_RESTRICTION or LIBRARY_REMOVAL in force has one');
+      else {
+        read = r.oneOf(compliance, `${p}.compliance`, PROVIDER_CONTROL_COMPLIANCE);
+        if (read === 'EXISTING_OUTPUT_ONLY' && kind !== 'LIBRARY_REMOVAL') {
+          r.bad(`${p}.compliance`, 'EXISTING_OUTPUT_ONLY is for a LIBRARY_REMOVAL: a withdrawal ends new synthesis and leaves the output already generated while the voice was available');
+        }
+      }
+    } else if (restricting && state === 'IN_FORCE') {
+      r.bad(`${p}.compliance`, 'required while a use-restricting control is in force (the owner records whether the restriction still permits this use)');
+    }
+    out.push({ kind, state, compliance: read });
+  });
+  if (source === 'ELEVENLABS_VOICE_LIBRARY') {
+    for (const kind of PROVIDER_CONTROL_KINDS) if (!seen.has(kind)) r.bad(path, `${kind} is not recorded: a Voice Library voice records every provider control, as found, or as undetermined with the exact uncertainty`);
+  }
+  return out;
+}
+
+/**
+ * The rights record of a narration voice (docs/RELEASE_RIGHTS.md, "Voice rights"). It refuses what the owner's policy
+ * prohibits and clears only what it establishes: the pairings of source, type, authorization, use and output basis
+ * admit three routes and no other, an unauthorized voice is BLOCKED, an undetermined origin is never CLEARED, the right
+ * to use the voice and the right to use its output commercially are each needed, WalletWall never records the speaker's
+ * voice or likeness as its own, and a provider restriction in force is assessed and never ignored.
+ */
+function readVoiceRights(r: Reader, v: unknown, path: string, owner: { path: string; kind: string | null; rightsBasis: RightsBasis | null; status: RightsStatus | null }): void {
+  const rec = r.shape(v, path, ['binding', 'source', 'voiceType', 'authorizationBasis', 'useBasis', 'commercialOutputBasis', 'ownership', 'providerControls'], ['attestation', 'speakerAuthorization']);
+  if (!rec) return;
+  if (owner.kind !== null && owner.kind !== 'provider-service') r.bad(path, 'only a provider-service component records a narration voice');
+  if (owner.rightsBasis !== null && owner.rightsBasis !== 'PROVIDER_TERMS' && owner.rightsBasis !== 'VENDOR_LICENSE') {
+    r.bad(`${owner.path}.rightsBasis`, `a narration voice is the speaker's, not WalletWall's: its basis is PROVIDER_TERMS or VENDOR_LICENSE, never ${owner.rightsBasis}`);
+  }
+
+  const binding = r.shape(own(rec, 'binding'), `${path}.binding`, ['id', 'voiceIdSha256']);
+  if (binding) {
+    r.id(own(binding, 'id'), `${path}.binding.id`);
+    r.hex64(own(binding, 'voiceIdSha256'), `${path}.binding.voiceIdSha256`);
+  }
+
+  const source = r.oneOf(own(rec, 'source'), `${path}.source`, VOICE_SOURCES);
+  const voiceType = r.oneOf(own(rec, 'voiceType'), `${path}.voiceType`, VOICE_TYPES);
+  const authorization = r.oneOf(own(rec, 'authorizationBasis'), `${path}.authorizationBasis`, VOICE_AUTHORIZATION_BASES);
+  const use = r.oneOf(own(rec, 'useBasis'), `${path}.useBasis`, VOICE_USE_BASES);
+  const output = r.oneOf(own(rec, 'commercialOutputBasis'), `${path}.commercialOutputBasis`, COMMERCIAL_OUTPUT_BASES);
+
+  // The routes: each part is the one the part before it requires, so no part is borrowed from another route.
+  const types = source === null ? undefined : VOICE_SOURCE_TYPES[source];
+  if (types !== undefined && voiceType !== null && voiceFactEstablished(voiceType) && !types.includes(voiceType)) r.bad(`${path}.voiceType`, `a ${source} voice is a ${types.join(' or ')}, not a ${voiceType}`);
+  const needAuthorization = voiceType === null ? undefined : VOICE_TYPE_AUTHORIZATION[voiceType];
+  if (needAuthorization !== undefined && authorization !== null && voiceFactEstablished(authorization) && authorization !== needAuthorization) {
+    r.bad(`${path}.authorizationBasis`, `a ${voiceType} is authorized only by ${needAuthorization}, not ${authorization}: cloning a voice, or conditioning one on reference audio, without the speaker's own authorization is prohibited`);
+  }
+  const needUse = source === null ? undefined : VOICE_SOURCE_USE[source];
+  if (needUse !== undefined && use !== null && voiceFactEstablished(use) && use !== needUse) r.bad(`${path}.useBasis`, `a ${source} voice is used under ${needUse}, not ${use}`);
+  const needOutput = use === null ? undefined : VOICE_USE_OUTPUT[use];
+  if (needOutput !== undefined && output !== null && voiceFactEstablished(output) && output !== needOutput) r.bad(`${path}.commercialOutputBasis`, `${use} pairs with ${needOutput} for commercial output, not ${output}`);
+
+  // Ownership: WalletWall's own work, never the speaker's voice or likeness.
+  const ownership = r.shape(own(rec, 'ownership'), `${path}.ownership`, ['walletwallOwns', 'speakerVoiceAndLikeness']);
+  if (ownership) {
+    const claimed = new Set<string>();
+    r.array(own(ownership, 'walletwallOwns'), `${path}.ownership.walletwallOwns`, 1, 8)?.forEach((claim) => {
+      if (pick(claim, WALLETWALL_OWNABLE) === null) r.bad(`${path}.ownership.walletwallOwns`, `${JSON.stringify(claim)} is not WalletWall's to claim: it owns its ${WALLETWALL_OWNABLE.join(', ').toLowerCase().replaceAll('_', ' ')}, never a speaker's voice or likeness`);
+      else if (claimed.has(claim as string)) r.bad(`${path}.ownership.walletwallOwns`, `duplicate ${String(claim)}`);
+      else claimed.add(claim as string);
+    });
+    const speaker = r.oneOf(own(ownership, 'speakerVoiceAndLikeness'), `${path}.ownership.speakerVoiceAndLikeness`, SPEAKER_OWNERSHIP);
+    if (speaker !== null && authorization !== null && (authorization === 'NO_HUMAN_SPEAKER') !== (speaker === 'NO_HUMAN_SPEAKER')) {
+      r.bad(`${path}.ownership.speakerVoiceAndLikeness`, 'NO_HUMAN_SPEAKER is for a voice with no human speaker (authorizationBasis NO_HUMAN_SPEAKER); every other voice has a speaker who keeps the rights in their voice and likeness (SPEAKER_RETAINS)');
+    }
+  }
+
+  // Whoever says the voice is what this record states is named: no route is stated as fact on nobody's word.
+  const attestation = own(rec, 'attestation');
+  if (attestation !== undefined) {
+    const a = r.shape(attestation, `${path}.attestation`, ['attestedBy', 'attestedOn', 'basis']);
+    if (a) {
+      r.exactly(own(a, 'attestedBy'), `${path}.attestation.attestedBy`, 'OWNER');
+      r.date(own(a, 'attestedOn'), `${path}.attestation.attestedOn`);
+      r.str(own(a, 'basis'), `${path}.attestation.basis`);
+    }
+  } else if ([source, voiceType, authorization, use].every(voiceFactEstablished)) {
+    r.bad(`${path}.attestation`, 'required once the origin is established (who says this voice is what the record states, the day, and what that rests on)');
+  }
+
+  // A speaker's written authorization: when it was granted, who holds it (it stays out of this public file), and what it covers.
+  const written = authorization === 'SPEAKER_WRITTEN_AUTHORIZATION';
+  const speakerAuthorization = own(rec, 'speakerAuthorization');
+  let speakerScope: string[] | null = null;
+  if (speakerAuthorization !== undefined) {
+    if (!written) r.bad(`${path}.speakerAuthorization`, 'only a SPEAKER_WRITTEN_AUTHORIZATION has one');
+    else {
+      const sa = r.shape(speakerAuthorization, `${path}.speakerAuthorization`, ['documentHeldBy', 'grantedOn', 'scope']);
+      if (sa) {
+        r.exactly(own(sa, 'documentHeldBy'), `${path}.speakerAuthorization.documentHeldBy`, 'OWNER');
+        r.date(own(sa, 'grantedOn'), `${path}.speakerAuthorization.grantedOn`);
+        const seenScope = new Set<string>();
+        const items = r.array(own(sa, 'scope'), `${path}.speakerAuthorization.scope`, 1, SPEAKER_AUTHORIZATION_SCOPES.length);
+        items?.forEach((item, i) => {
+          const scope = r.oneOf(item, `${path}.speakerAuthorization.scope[${i}]`, SPEAKER_AUTHORIZATION_SCOPES);
+          if (scope === null) return;
+          if (seenScope.has(scope)) r.bad(`${path}.speakerAuthorization.scope`, `duplicate ${scope}`);
+          seenScope.add(scope);
+        });
+        if (items !== null && items.every((item) => pick(item, SPEAKER_AUTHORIZATION_SCOPES) !== null)) speakerScope = items as string[];
+      }
+    }
+  } else if (written) {
+    r.bad(`${path}.speakerAuthorization`, 'required for a SPEAKER_WRITTEN_AUTHORIZATION (when it was granted, who holds the document, and what it covers)');
+  }
+
+  const controls = readProviderControls(r, own(rec, 'providerControls'), `${path}.providerControls`, source);
+
+  // What the status may be.
+  const status = owner.status;
+  if (status === null) return;
+  const unauthorized: [string, string][] = [];
+  if (authorization === 'NOT_ESTABLISHED') unauthorized.push(['authorization', 'authorizationBasis']);
+  if (use === 'NOT_ESTABLISHED') unauthorized.push(['use basis', 'useBasis']);
+  if (unauthorized.length > 0) {
+    if (status !== 'BLOCKED') {
+      for (const [name, field] of unauthorized) r.bad(`${path}.${field}`, `a voice whose ${name} is not established is BLOCKED: it is never pending and never CLEARED (cloning without the speaker's authorization, or a use the provider or rights holder has not granted, is prohibited)`);
+    }
+  } else {
+    const undetermined = ([['source', source], ['voiceType', voiceType], ['authorizationBasis', authorization], ['useBasis', use]] as const).filter(([, x]) => x === 'UNDETERMINED').map(([name]) => name);
+    if (undetermined.length > 0 && status !== 'UNKNOWN' && status !== 'UNVERIFIED' && status !== 'BLOCKED') {
+      r.bad(`${path}.${undetermined[0]}`, `a voice whose origin is undetermined (${undetermined.join(', ')}) is UNKNOWN or UNVERIFIED (or BLOCKED), never pending confirmation or CLEARED`);
+    }
+  }
+  if (status === 'CLEARED') {
+    if (output !== null && !voiceFactEstablished(output)) {
+      r.bad(`${path}.commercialOutputBasis`, `commercial-output rights are not established (${output}): the right to use a voice and the right to use its output commercially are separate, and a CLEARED voice has both`);
+    }
+    if (speakerScope !== null) {
+      const needed = SPEAKER_SCOPE_NEEDED[voiceType ?? ''];
+      if (needed !== undefined && !needed.every((s) => speakerScope.includes(s))) r.bad(`${path}.speakerAuthorization.scope`, `a CLEARED speaker authorization covers ${needed.join(', ')}; this one covers ${speakerScope.join(', ')}`);
+    }
+    for (const c of controls) {
+      if (c.kind !== null && USE_RESTRICTING_CONTROLS.includes(c.kind) && c.state === 'IN_FORCE' && !COMPLIANCE_THAT_CLEARS.includes(c.compliance ?? '')) {
+        r.bad(`${path}.providerControls`, `${c.kind} is in force and not satisfied, so the voice cannot be CLEARED: a provider restriction is assessed, never ignored`);
+      }
+    }
+  }
+}
+
 function readComponents(r: Reader, v: unknown): Set<string> {
   const ids = new Set<string>();
   const list = r.array(v, 'components', 1, 200);
   if (!list) return ids;
   const toolIds = new Set<string>();
   const recs: (Rec | null)[] = list.map((c, i) => {
-    const rec = r.shape(c, `components[${i}]`, ['id', 'layer', 'kind', 'scope', 'rightsBasis', 'status', 'licenseExpression', 'distribution', 'summary', 'evidence'], ['resolution', 'clearance', 'assessedVersions', 'producedBy', 'dependsOn']);
+    const rec = r.shape(c, `components[${i}]`, ['id', 'layer', 'kind', 'scope', 'rightsBasis', 'status', 'licenseExpression', 'distribution', 'summary', 'evidence'], ['resolution', 'clearance', 'assessedVersions', 'producedBy', 'dependsOn', 'voiceRights']);
     if (!rec) return null;
     const id = own(rec, 'id');
     if (typeof id === 'string' && ID.test(id)) {
@@ -401,6 +660,8 @@ function readComponents(r: Reader, v: unknown): Set<string> {
     if (scope === 'RESEARCH_ONLY' && kind !== null && kind !== 'research-tool') r.bad(`${p}.scope`, 'RESEARCH_ONLY is for the research-tool kind only');
     if (scope === 'RELEASE_PATH' && kind === 'research-tool') r.bad(`${p}.scope`, 'a research-tool is RESEARCH_ONLY');
     readClaim(r, rec, p);
+    const voiceRights = own(rec, 'voiceRights');
+    if (voiceRights !== undefined) readVoiceRights(r, voiceRights, `${p}.voiceRights`, { path: p, kind, rightsBasis: pick(own(rec, 'rightsBasis'), RIGHTS_BASES), status: pick(own(rec, 'status'), RIGHTS_STATUSES) });
 
     const versions = own(rec, 'assessedVersions');
     if (versions !== undefined) {

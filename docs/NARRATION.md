@@ -13,7 +13,10 @@ The silent fixture voice stays the default everywhere.
 ## Production policy (2026-10-20)
 
 - **ElevenLabs Multilingual v2 is the publication narration provider**, on the voice the ElevenLabs binding in
-  `config/narration-providers.json` names (`DTLT09E2cxHF0DqjKVbc`).
+  `config/narration-providers.json` names (`DTLT09E2cxHF0DqjKVbc`). The voice is a Professional Voice Clone from the
+  provider's Voice Library; the rights to use it, and to use its output commercially, are recorded in
+  `config/release-rights.json` (`elevenlabs-service`, `voiceRights`; [RELEASE_RIGHTS.md](RELEASE_RIGHTS.md), "Voice
+  rights"). A different voice is a different binding and needs its own record.
 - **Qwen3-TTS is R&D and a local fallback.** Its candidate voices did not reach the publication bar in blind
   listening against the ElevenLabs anchor (2026-10-20); it is never promoted because it is free or local.
 - **Narration length is constrained upstream by the video class** through the narration budget below, and
@@ -243,7 +246,7 @@ The identity names no voice id: a provider interprets the direction with its own
 |---|---|---|---|
 | ElevenLabs | publication target | `en-AU` | voice choice; the adapter refuses a binding or an API-labelled voice of another variety before requesting speech |
 | Magpie (NeMo-Speech.cpp) | local development and offline fallback | `en-US` | cannot: five fixed American speakers, no Australian voice; the deviation is logged at synthesis and recorded per candidate in `results.json` |
-| Chatterbox Multilingual V3 | experimental | `en-US` | cannot without owned, licensed Australian reference audio, which is a separate decision |
+| Chatterbox Multilingual V3 | experimental | `en-US` | cannot without Australian reference audio its speaker has authorized in writing (see RELEASE_RIGHTS.md, "Voice rights"), which is a separate decision |
 
 Magpie's rendering of "Wallaby" as "wall-uh-bye" is a provider defect, not a text problem (its dictionary
 has the word right). No pronunciation alias was added for it: canonical text, the lexicon
@@ -394,7 +397,7 @@ not use.
 - The reference voice is an Australian English voice, and that accent is the intended character (the wallaby's
   geography), natural rather than caricatured. Neither local candidate can offer it: Magpie ships five fixed
   American English speakers and no `en-AU`, and Chatterbox's built-in voice is American, so an Australian
-  Chatterbox voice would need owned, licensed Australian reference audio. Done: voice identity v2 states the
+  Chatterbox voice would need Australian reference audio its speaker has authorized in writing. Done: voice identity v2 states the
   Australian direction (see "The character"), the spec's `voiceIdentityId` was regenerated, and the bakeoff
   record was re-synthesized under v2.
 
@@ -410,7 +413,7 @@ not use.
   adapter for long-form.
 - Provisional recommendation, pending the owner's blind listening and the reference column: **C**. ElevenLabs
   remains the publication voice; Magpie (`jason-cool`) is retained as the development, offline, and fallback
-  provider; Chatterbox stays an experiment until owned reference audio exists.
+  provider; Chatterbox stays an experiment until reference audio its speaker has authorized exists.
 
 ## Security review
 

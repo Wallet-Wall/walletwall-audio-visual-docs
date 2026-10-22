@@ -205,3 +205,108 @@ export function withChange(change: (m: Json) => void): Json {
 
 /** The component of a manifest with this id, for a test to edit. */
 export const component = (m: Json, id: string): Json => m.components.find((c: Json) => c.id === id);
+
+// ── A narrated video: the publication binding, its voice, and the rights record for that voice ─────────────────────────
+
+export const BINDING_ID = 'demo-publication-v1';
+/** The voice the fixture binding names. It lives in config/narration-providers.json, never in the manifest: the rights record carries only its sha256. */
+export const FIXTURE_VOICE_ID = 'fixture-voice-0001';
+export const OWNER_CLEARANCE = { clearedBy: 'OWNER', clearedOn: '2026-10-22', basis: 'The owner confirmed the voice rights and the paid-plan terms for the narration set that ships.' };
+
+const control = (kind: string, state: string, extra: Json = {}): Json => ({
+  kind,
+  state,
+  note: state === 'UNDETERMINED' ? `The ${kind} setting could not be read offline; it is recorded as undetermined.` : `The owner read the ${kind} setting on the voice's provider page.`,
+  ...(state === 'UNDETERMINED' ? {} : { observedBy: 'OWNER', observedOn: '2026-10-22' }),
+  ...extra,
+});
+
+/** Controls of a Voice Library voice: a 30-day notice period the owner read, and three the owner could not read. */
+export function libraryControls(): Json[] {
+  return [control('NOTICE_PERIOD', 'IN_FORCE', { days: 30 }), control('LIVE_MODERATION', 'UNDETERMINED'), control('CUSTOM_RESTRICTION', 'UNDETERMINED'), control('LIBRARY_REMOVAL', 'UNDETERMINED')];
+}
+
+const ownership = (speaker: 'SPEAKER_RETAINS' | 'NO_HUMAN_SPEAKER'): Json => ({ walletwallOwns: ['AUTHORED_SCRIPT', 'COMPOSITION', 'AUDIOVISUAL_WORK'], speakerVoiceAndLikeness: speaker });
+
+/** Who says the voice is what its record says, and on what basis: required once the origin is established. */
+const attestation = (basis = 'The owner inspected the voice in the provider\'s interface and reported what the record states.'): Json => ({ attestedBy: 'OWNER', attestedOn: '2026-10-22', basis });
+
+/** A Professional Voice Clone its verified owner published to the provider's Voice Library for other people to use. */
+export function libraryVoice(): Json {
+  return {
+    binding: { id: BINDING_ID, voiceIdSha256: sha256Hex(FIXTURE_VOICE_ID) },
+    source: 'ELEVENLABS_VOICE_LIBRARY',
+    voiceType: 'PROFESSIONAL_VOICE_CLONE',
+    authorizationBasis: 'VERIFIED_OWNER_PUBLISHED',
+    useBasis: 'PROVIDER_AUTHORIZED',
+    commercialOutputBasis: 'PAID_PLAN_TERMS',
+    ownership: ownership('SPEAKER_RETAINS'),
+    attestation: attestation(),
+    providerControls: libraryControls(),
+  };
+}
+
+/** A synthetic voice the provider designed: no human speaker, so nothing for a speaker to authorize. */
+export function designedVoice(): Json {
+  return { ...libraryVoice(), source: 'PROVIDER_DESIGNED_SYNTHETIC', voiceType: 'VOICE_DESIGN', authorizationBasis: 'NO_HUMAN_SPEAKER', ownership: ownership('NO_HUMAN_SPEAKER'), providerControls: [] };
+}
+
+/** A speaker's own voice, licensed to WalletWall directly in writing with the commercial scope documented. */
+export function licensedVoice(): Json {
+  return {
+    ...libraryVoice(),
+    source: 'SPEAKER_LICENSED_DIRECT',
+    voiceType: 'RECORDED_SPEAKER',
+    authorizationBasis: 'SPEAKER_WRITTEN_AUTHORIZATION',
+    useBasis: 'SPEAKER_LICENSED',
+    commercialOutputBasis: 'SPEAKER_LICENSE',
+    speakerAuthorization: { documentHeldBy: 'OWNER', grantedOn: '2026-10-01', scope: ['COMMERCIAL_USE', 'PUBLIC_DISTRIBUTION'] },
+    providerControls: [],
+  };
+}
+
+/**
+ * Makes the fixture video narrated through the provider `elevenlabs`: the binding config, the spec's voice identity, the
+ * provider service with its voice record, the generated audio it produces, and the video's narration asset, all CLEARED
+ * with the owner's record unless `status` says otherwise. Remotion stays pending, as in the base manifest.
+ */
+export function withNarration(x: { files: Record<string, string>; manifest: Json }, voice: Json = libraryVoice(), status = 'CLEARED'): void {
+  const cleared = status === 'CLEARED';
+  const open = { resolution: { ownerAction: 'Confirm the voice rights and the plan at synthesis time.', reassessmentTrigger: 'Each synthesis run.' } };
+  const gate = cleared ? { clearance: OWNER_CLEARANCE } : open;
+  x.files['config/narration-providers.json'] = JSON.stringify({ publication: { id: BINDING_ID, provider: 'elevenlabs' }, providers: { elevenlabs: { voiceId: FIXTURE_VOICE_ID } } });
+  x.files['specs/demo/spec.json'] = JSON.stringify({ assets: [{ id: 'brand-mark', kind: 'BRAND_MARK', path: 'p.png', sha256: BRAND_SHA }], source: { docPath: 'docs/demo.mdx', blob: BLOB }, audio: { voiceIdentityId: 'v2', sonicIdentityId: 'i', musicBedId: null } });
+  x.files['THIRD_PARTY_NOTICES.md'] += '### `elevenlabs-service`\n### `elevenlabs-narration-audio`\n';
+  x.manifest.components.push(
+    {
+      id: 'elevenlabs-service',
+      layer: 'TOOL_RUNTIME',
+      kind: 'provider-service',
+      scope: 'RELEASE_PATH',
+      rightsBasis: 'PROVIDER_TERMS',
+      status,
+      licenseExpression: null,
+      distribution: 'NOT_DISTRIBUTED',
+      summary: 'An external service synthesizes the narration under its terms, with the voice recorded in voiceRights.',
+      evidence: [{ type: 'URL', ref: 'https://example.com/terms', retrievedOn: '2026-10-22' }],
+      voiceRights: voice,
+      ...gate,
+    },
+    {
+      id: 'elevenlabs-narration-audio',
+      layer: 'GENERATED_MEDIA',
+      kind: 'generated-audio',
+      scope: 'RELEASE_PATH',
+      rightsBasis: 'PROVIDER_TERMS',
+      status,
+      licenseExpression: null,
+      distribution: 'IN_RELEASE_OUTPUT',
+      summary: 'Narration audio the provider generates.',
+      evidence: [{ type: 'URL', ref: 'https://example.com/terms', retrievedOn: '2026-10-22' }],
+      producedBy: ['elevenlabs-service'],
+      ...gate,
+    },
+  );
+  x.manifest.videos[0].assets.push({ id: 'narration', category: 'narration', binding: { type: 'COMPONENT', componentId: 'elevenlabs-service' }, rightsBasis: 'PROVIDER_TERMS', status, licenseExpression: null, evidence: [{ type: 'FILE', ref: 'docs/RELEASE_RIGHTS.md' }], ...gate });
+  x.manifest.videos[0].absent.splice(x.manifest.videos[0].absent.indexOf('narration'), 1);
+}

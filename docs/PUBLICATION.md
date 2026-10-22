@@ -406,7 +406,7 @@ everything that does not need the package's bytes (the MP4 included), and says t
   `npm run render`) may come from another approved environment than the one the invariants just ran in. The receipt
   requires one environment, so such a proof stops at its last step, after the encode. Delete
   `dist/blender/out/renders` (or render with `--fresh-blender`) and run the proof again.
-- **The receipt does not bind release rights.** It proves what rendered and which gates passed; whether the project may publish it (Remotion's eligibility, the narration provider's plan, the brand mark's provenance) is recorded in `config/release-rights.json` and checked by `npm run rights:check`, not by the receipt ([RELEASE_RIGHTS.md](RELEASE_RIGHTS.md)).
+- **The receipt does not bind release rights.** It proves what rendered and which gates passed; whether the project may publish it (Remotion's eligibility, the narration provider's plan, the brand mark's provenance) is recorded in `config/release-rights.json` and checked by `npm run rights:check`, not by the receipt ([RELEASE_RIGHTS.md](RELEASE_RIGHTS.md)). Recording or clearing a rights item therefore changes no frame, no build identity, and no receipt, and needs no re-render.
 - **MP4 bytes are not run-to-run stable.** A receipt identifies one artifact; determinism is proven on lossless frames.
 - **The invariants evidence proves which frames, plan, character, environment, and bar were measured.** Only a
   re-render can re-measure the values.
