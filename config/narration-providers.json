@@ -1,7 +1,14 @@
 {
   "schema": "walletwall.narration-providers/v1",
-  "note": "Bakeoff provider bindings (docs/NARRATION.md). These are evaluation adapters, not the publication voice: scripts/render.ts keeps the fixture voice and config/voice-identity.json still reports the publication binding as NOT_CONFIGURED. Credentials are named by environment variable only; model identities are pinned by revision and sha256; every variant is a complete, closed settings object validated by its adapter.",
+  "note": "Narration provider bindings (docs/NARRATION.md). The bakeoff adapters and their variants are evaluation bindings; publication narration is the one binding named under \"publication\" below, approved by the content address config/voice-identity.json pins, and synthesized only by the credentialed narration publication step (scripts/narration.ts). Renders use the fixture voice unless they replay a verified publication narration set. Credentials are named by environment variable only; model identities are pinned by revision and sha256; every variant is a complete, closed settings object validated by its adapter.",
   "voiceIdentity": "walletwallaby-v2",
+  "publication": {
+    "id": "walletwallaby-elevenlabs-v1",
+    "note": "The approved publication narration binding: ElevenLabs Multilingual v2 on the WalletWallaby voice, with the settings the owner chose in blind listening on 2026-10-20 (the anchor) and its chunk policy: whole sentences packed greedily up to maxChars per request, each chunk's edge silence trimmed to trimMs, chunks of one line joined with gapMs of silence. config/voice-identity.json pins the content address of this binding as resolved (provider, variant settings, voice, identity, language, chunk policy): any change here is refused until that pin moves in a reviewed change, and every narration set made under the old binding is stale.",
+    "provider": "elevenlabs",
+    "variant": "publication",
+    "chunking": { "mode": "sentence", "maxChars": 320, "gapMs": 220, "trimMs": 120 }
+  },
   "accentNote": "Each binding declares the variety its voice actually speaks. The identity asks for en-AU; a provider whose declared accent differs is a documented deviation (recorded per candidate in results.json), never a silent one. The ElevenLabs adapter also checks the voice's own labels through the API.",
   "providers": {
     "elevenlabs": {
@@ -31,6 +38,17 @@
           "style": 0,
           "useSpeakerBoost": true,
           "speed": 1,
+          "seed": 7,
+          "applyTextNormalization": "auto"
+        },
+        "publication": {
+          "modelId": "eleven_multilingual_v2",
+          "outputFormat": "pcm_24000",
+          "stability": 0.65,
+          "similarityBoost": 0.8,
+          "style": 0,
+          "useSpeakerBoost": true,
+          "speed": 0.95,
           "seed": 7,
           "applyTextNormalization": "auto"
         }

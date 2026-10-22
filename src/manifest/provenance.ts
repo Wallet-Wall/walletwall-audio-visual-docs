@@ -8,17 +8,18 @@ import type { CueSheet } from '../audio/cue-sheet.ts';
 import type { BuildIdentity } from './build-identity.ts';
 import type { MotionEngineIdentity } from '../motion/engine-identity.ts';
 import type { VideoSpec } from '../spec/types.ts';
-import type { NarrationTrack, Timeline } from '../timeline/timeline.ts';
+import type { NarrationTrack, PublicationNarrationRef, Timeline } from '../timeline/timeline.ts';
 
 export interface ProvenanceManifest {
-  schema: 'walletwall.video-provenance/v3';
+  schema: 'walletwall.video-provenance/v4';
   videoId: string;
   revision: number;
   specHash: string;
   source: VideoSpec['source'];
   planner: VideoSpec['planner'];
   claims: { id: string; type: string; evidence: { sectionId?: string; path?: string; quoteSha256?: string; sha256?: string }[] }[];
-  narration: { providerId: string; voiceIdentityId: string; synthetic: boolean; estimated: boolean; lines: number; audio: 'PRESENT' | 'NONE' };
+  /** `publication`: the verified narration set's identity, provider, model, voice, identity, language, and hashes (null for the fixture voice). */
+  narration: { providerId: string; voiceIdentityId: string; synthetic: boolean; estimated: boolean; lines: number; audio: 'PRESENT' | 'NONE'; publication: PublicationNarrationRef | null };
   timeline: { totalMs: number; segments: { id: string; role: string; startMs: number; endMs: number }[] };
   audio: { identAsset: string | null; musicBed: string | null; cues: number; silentCues: number; suppressedCues: number };
   validation: { ok: boolean; errors: number; warnings: number; codes: string[] };
@@ -39,7 +40,7 @@ export function buildProvenanceManifest(args: {
 }): ProvenanceManifest {
   const { spec, track, timeline, cueSheet, validation } = args;
   return {
-    schema: 'walletwall.video-provenance/v3',
+    schema: 'walletwall.video-provenance/v4',
     videoId: spec.id,
     revision: spec.revision,
     specHash: contentAddress(spec),
@@ -57,6 +58,7 @@ export function buildProvenanceManifest(args: {
       estimated: track.estimated,
       lines: track.lines.length,
       audio: track.lines.some((l) => l.audio) ? 'PRESENT' : 'NONE',
+      publication: track.publication ?? null,
     },
     timeline: { totalMs: timeline.totalMs, segments: timeline.segments.map((s) => ({ id: s.id, role: s.role, startMs: s.startMs, endMs: s.endMs })) },
     audio: {

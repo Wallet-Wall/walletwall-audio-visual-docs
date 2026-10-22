@@ -176,7 +176,7 @@ executable; `src/blender/production.ts`):
    terrain and depth, so its frames are exactly the full reveal's.
 
 Every render clears the bundle's Blender staging area first (the bundle copies the whole public dir, so frames left
-from other renders would ride along), stages its own frames, and bundles again. `render.json` (`walletwall.render-info/v5`)
+from other renders would ride along), stages its own frames, and bundles again. `render.json` (`walletwall.render-info/v6`)
 and `stills.json` (`walletwall.stills-info/v3`) record the character: the layout, the sequence and reveal (frame
 counts, content hashes of what Blender recorded, never its timings), their bridge hashes, the Blender identity (without
 the `.blend` cache's bytes), and the render environment and its class. `npm run public:check` re-derives all of it from

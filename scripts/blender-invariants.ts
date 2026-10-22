@@ -1,4 +1,5 @@
 // npm run blender:invariants [-- [videoId] --every=9] [--lab-every=1] [--motion-engine=typescript|rust-wasm]
+//                              [--narration=fixture|publication]
 //   -> dist/blender/out/invariants/report.json; exits 1 if any invariant fails. The bar (thresholds, coverage, the
 //   publication stride) is src/blender/invariants-policy.ts; the report records the video, engine, identity,
 //   environment, and exact frames it was measured on (walletwall.blender-invariants/v2).
@@ -30,7 +31,11 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { labLesson } from '../src/blender/lab.ts';
-import { lessonMotion, strideFrames, type LessonMotion } from '../src/blender/lesson.ts';
+import { lessonMotionWith, strideFrames, type LessonMotion } from '../src/blender/lesson.ts';
+import { loadPipelineConfig } from '../src/config/load.ts';
+import { narrationVoice, parseNarrationMode } from '../src/narration/publication.ts';
+import { loadCommittedSpec } from '../src/pipeline/context.ts';
+import { synthesize } from '../src/pipeline/render-input.ts';
 import { ensureCharacter, renderCharacterSequence } from '../src/blender/production.ts';
 import { BLENDER_JOBS, findBlender, loadBlenderConfig, outFile, runBlender, writeJob } from '../src/blender/toolchain.ts';
 import { bridgeFrame, type BlenderMotionFrame } from '../src/character/walletwallaby/blender/bridge.ts';
@@ -60,6 +65,9 @@ const videoId = args.find((a) => !a.startsWith('--')) ?? 'migration-readiness';
 if (!/^[a-z0-9][a-z0-9-]*$/.test(videoId)) throw new Error('the video id must be a plain slug');
 const engine = opt('motion-engine') ?? 'typescript';
 if (engine !== 'typescript' && engine !== 'rust-wasm') throw new Error('--motion-engine is typescript or rust-wasm');
+// The narration the render uses: its timing decides the timeline, so the plan whose frames are measured (the fixture
+// estimate, or the verified publication narration set replayed from disk; never synthesized here).
+const narration = parseNarrationMode(args);
 
 // The bar (src/blender/invariants-policy.ts), shared with the publication proof receipt and host qualification.
 const FOOT_PX = INVARIANT_THRESHOLDS.footPx;
@@ -159,7 +167,13 @@ const MIN_EXACT = INVARIANT_THRESHOLDS.minExact;
 const TAIL_BLEND_PX = INVARIANT_THRESHOLDS.tailBlendPx;
 
 
-const lesson = await lessonMotion(videoId, engine);
+let lesson: LessonMotion;
+try {
+  lesson = lessonMotionWith(videoId, engine, await synthesize(loadCommittedSpec(videoId), narrationVoice(narration, videoId), loadPipelineConfig()));
+} catch (err) {
+  console.error(`[invariants] ${videoId}: ${(err as Error).message}`);
+  process.exit(1);
+}
 const lab = labLesson();
 const rows = [...measuredRun('lesson', lesson, every), ...measuredRun('lab', lab, labEvery)];
 let opaque = 0;

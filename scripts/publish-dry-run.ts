@@ -2,9 +2,12 @@
 // YouTube publish manifest for a video, run media QA, and hand the manifest to
 // the credential-free DryRunUploadProvider. Never contacts YouTube.
 //
-// Usage: node scripts/publish-dry-run.ts [videoId]
+// Usage: node scripts/publish-dry-run.ts [videoId] [--narration=fixture|publication]
 // Picks up dist/<id>/render.json when a render exists; otherwise the manifest
-// records `files.video: null` (validation-only dry run).
+// records `files.video: null` (validation-only dry run). The narration is the
+// fixture voice, or with --narration=publication the verified publication
+// narration set replayed from disk (never synthesized here); it must be the
+// narration the render carries.
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -13,7 +16,7 @@ import { buildCueSheet } from '../src/audio/cue-sheet.ts';
 import { choreograph, layoutsFor } from '../src/character/walletwallaby/choreography.ts';
 import { assertSupported, auditLesson } from '../src/character/walletwallaby/contacts.ts';
 import { planMotion } from '../src/character/walletwallaby/motion.ts';
-import { FixtureVoiceProvider } from '../src/audio/voice-provider.ts';
+import { narrationVoice, parseNarrationMode } from '../src/narration/publication.ts';
 import { loadPipelineConfig, readJson, VIDEO_ROOT } from '../src/config/load.ts';
 import { prettyJson } from '../src/core/canonical-json.ts';
 import { contentAddress, sha256Hex } from '../src/core/hash.ts';
@@ -39,7 +42,13 @@ const source = loadSnapshot(spec);
 const out = distDir(videoId);
 mkdirSync(out, { recursive: true });
 
-const track = await synthesize(spec, new FixtureVoiceProvider(), config);
+let track;
+try {
+  track = await synthesize(spec, narrationVoice(parseNarrationMode(process.argv.slice(2)), videoId), config);
+} catch (err) {
+  console.error(`[publish:dry-run] ${videoId}: ${(err as Error).message}`);
+  process.exit(1);
+}
 const timeline = buildTimeline(spec, track, config.templates);
 const validation = validateSpec(spec, validationContextFor(spec, config, loadDocsSite(), track));
 
@@ -64,7 +73,7 @@ try {
 }
 
 const renderInfoPath = path.join(out, 'render.json');
-const renderInfo = existsSync(renderInfoPath) ? readJson<{ specHash?: string; engine: { name: string; version: string }; output: { path: string; sha256: string }; identity?: unknown; motionEngine?: MotionEngineIdentity }>(renderInfoPath) : null;
+const renderInfo = existsSync(renderInfoPath) ? readJson<{ specHash?: string; engine: { name: string; version: string }; output: { path: string; sha256: string }; identity?: unknown; motionEngine?: MotionEngineIdentity; narration?: { providerId?: unknown; publication?: unknown } }>(renderInfoPath) : null;
 // A render made by a different toolchain, configuration, or character version cannot be described by this one.
 const identity = buildIdentity();
 if (renderInfo && prettyJson(renderInfo.identity ?? null) !== prettyJson(identity)) {
@@ -76,6 +85,11 @@ if (renderInfo && prettyJson(renderInfo.identity ?? null) !== prettyJson(identit
 const specHash = contentAddress(spec);
 if (renderInfo && renderInfo.specHash !== specHash) {
   console.error(`[publish:dry-run] ${videoId}: dist render.json was rendered from a different spec, or does not record one; re-render before publishing.`);
+  process.exit(1);
+}
+// Nor can a render that carries other narration than this dry run's (another voice, or another publication narration set).
+if (renderInfo && (renderInfo.narration?.providerId !== track.providerId || prettyJson(renderInfo.narration?.publication ?? null) !== prettyJson(track.publication ?? null))) {
+  console.error(`[publish:dry-run] ${videoId}: dist render.json carries other narration than this dry run (${String(renderInfo.narration?.providerId)} vs ${track.providerId}); re-render, or pass the same --narration.`);
   process.exit(1);
 }
 // Nor can a render whose motion came from an engine artifact or engine config this checkout no longer has.

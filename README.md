@@ -81,7 +81,7 @@ WalletWallrus remains WalletWall's engineering and repository identity; WalletWa
 ## Rendering and providers
 
 - **Remotion** is the v1 renderer. Every frame is a pure function of the spec and the frame number.
-- The LLM planner, voice, renderer, and upload target each sit behind an interface, so any of them can be replaced without changing the spec format. Today the planner is a hand-authored fixture storyboard and narration timing is estimated (silent review renders).
+- The LLM planner, voice, renderer, and upload target each sit behind an interface, so any of them can be replaced without changing the spec format. Today the planner is a hand-authored fixture storyboard; narration is the silent fixture voice (estimated timing) unless a render replays the video's verified publication narration set (`--narration=publication`, [docs/NARRATION.md](docs/NARRATION.md)).
 - **YouTube publishing is unlisted and manual-review-first.** The v1 upload type cannot express `public`; a human reviews every upload before it goes public. A materially updated video is a new upload with lineage, never an overwrite.
 
 Remotion is licensed separately from this repository: free for individuals and companies of up to three people; larger organizations need a [company license](https://www.remotion.dev/license).
@@ -109,6 +109,7 @@ npm run pipeline migration-readiness           # every gate, then stills, MP4, a
 | `npm run render` | Full MP4 into `dist/<id>/<id>.r<revision>.mp4` plus `render.json`. |
 | `npm run publish:dry-run` | Captions (VTT/SRT), semantic cue sheet, provenance, media QA, and the YouTube publish manifest; dry-run receipt only. |
 | `npm run public:check` | The public-output gate over `dist/<id>/` after `publish:dry-run`: dry run only, unlisted, captions, manifest, provenance, and build identity, with no placeholder text or local paths. `--stills=<dir>` adds review stills, `--require-render` the MP4. See [docs/CI.md](docs/CI.md). |
+| `npm run narration -- publication [<id>]` | Publication narration: synthesize the video's narration with the approved ElevenLabs binding (needs `ELEVENLABS_API_KEY`) into a verified set under `dist/<id>/narration/`, which `--narration=publication` replays; `publication-proof` does the same for one short segment. See [docs/NARRATION.md](docs/NARRATION.md). |
 | `node scripts/narration.ts <doctor\|pull\|synthesize\|place\|transcribe\|review>` | The WalletWallaby narration bakeoff: synthesize the evaluation corpus through a provider adapter (ElevenLabs reference, Magpie via NeMo-Speech.cpp, Chatterbox Multilingual), measure, transcribe, and build the blind review page under `dist/narration-bakeoff/`. Off the render path; see [docs/NARRATION.md](docs/NARRATION.md). |
 | `npm run stills:compare -- <a> <b>` | Repeat-render determinism: two `render:stills` outputs must be byte-identical. |
 | `npm run studio` | Remotion Studio preview of the committed spec. |

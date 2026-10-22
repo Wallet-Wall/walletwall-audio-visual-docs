@@ -14,7 +14,8 @@ export const NARRATION_PROVIDERS = ['elevenlabs', 'magpie-nemo-speech', 'chatter
 export type NarrationProviderId = (typeof NARRATION_PROVIDERS)[number];
 export const isNarrationProviderId = (v: unknown): v is NarrationProviderId => typeof v === 'string' && (NARRATION_PROVIDERS as readonly string[]).includes(v);
 
-export const NARRATION_LANGUAGES = ['en-US'] as const;
+/** en-US: the bakeoff corpus. en-AU: publication requests, which carry the voice identity's language. */
+export const NARRATION_LANGUAGES = ['en-US', 'en-AU'] as const;
 export type NarrationLanguage = (typeof NARRATION_LANGUAGES)[number];
 export const VOICE_PROFILE = 'walletwallaby' as const;
 

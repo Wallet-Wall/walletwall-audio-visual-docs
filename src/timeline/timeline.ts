@@ -24,6 +24,34 @@ export interface NarrationTrack {
   /** True when durations are estimates and no audio exists (fixture / dry run). */
   estimated: boolean;
   lines: NarrationLineTiming[];
+  /** Present only on a track replayed from a verified publication narration set (src/narration/publication.ts). */
+  publication?: PublicationNarrationRef;
+}
+
+/**
+ * What identifies publication narration wherever it is recorded (render.json, provenance, the proof receipt): the
+ * narration set's content address, and the provider, model, voice, identity, language, and hashes it was bound to.
+ * Versions and hashes only: never a credential, an environment value, or a local path.
+ */
+export interface PublicationNarrationRef {
+  /** Content address of the narration set record's subject. */
+  identity: string;
+  provider: string;
+  bindingId: string;
+  modelId: string;
+  voiceId: string;
+  voiceIdentityId: string;
+  language: string;
+  /** Content address of the whole resolved binding (what config/voice-identity.json pins). */
+  bindingSha256: string;
+  /** Content address of what shapes the audio: the provider, its validated settings, and the chunk policy. */
+  synthesisConfigSha256: string;
+  /** Content address of the script: every line's id and display and spoken text hashes, in order. */
+  scriptSha256: string;
+  /** Content address of the chunk plan: every line's chunk text hashes, in order. */
+  chunkPlanSha256: string;
+  /** Content address of every line's audio sha256, in order. */
+  audioSha256: string;
 }
 
 export const TIMING = {
@@ -165,4 +193,20 @@ export function msToFrame(ms: number, fps: number): number {
 
 export function totalFrames(timeline: Timeline): number {
   return Math.max(1, msToFrame(timeline.totalMs, timeline.fps));
+}
+
+export interface NarrationAudioCue {
+  lineId: string;
+  /** Where the render input stages the line's verified WAV in the bundle's public dir: derived from ids, never from a record. */
+  src: string;
+  fromFrame: number;
+  durationInFrames: number;
+}
+
+/** The narration audio a composition plays: one cue per timed line that has audio (none for a silent fixture track). */
+export function narrationAudio(timeline: Timeline, track: NarrationTrack, videoId: string): NarrationAudioCue[] {
+  const voiced = new Map(track.lines.filter((l) => l.audio).map((l) => [l.lineId, l.durationMs]));
+  return timeline.segments.flatMap((s) => s.lines)
+    .filter((l) => voiced.has(l.id))
+    .map((l) => ({ lineId: l.id, src: `${videoId}/narration/${l.id}.wav`, fromFrame: msToFrame(l.startMs, timeline.fps), durationInFrames: Math.max(1, Math.ceil((voiced.get(l.id)! * timeline.fps) / 1000)) }));
 }

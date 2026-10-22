@@ -223,7 +223,7 @@ function attachRender(dir: string, state: PublicState, opts: { bytes?: Buffer; o
   writeFileSync(
     path.join(dir, 'render.json'),
     prettyJson({
-      schema: 'walletwall.render-info/v5',
+      schema: 'walletwall.render-info/v6',
       videoId: VIDEO_ID,
       revision: 1,
       specHash: state.specHash,
@@ -232,7 +232,7 @@ function attachRender(dir: string, state: PublicState, opts: { bytes?: Buffer; o
       frames: state.frames,
       durationMs: state.totalMs,
       output,
-      narration: { providerId: state.narrationProviderId, estimated: true, audio: 'NONE' },
+      narration: { providerId: state.narrationProviderId, estimated: true, audio: 'NONE', publication: null },
       overlays: opts.overlays ?? { captions: true, characterless: false, guides: false },
       identity: state.identity,
       motionEngine,

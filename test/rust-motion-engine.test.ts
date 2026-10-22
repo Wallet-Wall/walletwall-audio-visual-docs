@@ -703,7 +703,7 @@ describe('motion engine provenance', () => {
     assert.deepEqual(typescriptEngineIdentity(), { motionEngine: 'typescript', motion: { id: MOTION.id, version: MOTION.version } });
     const { identity } = planRustMotion(args, engine);
     const manifest = buildProvenanceManifest({ spec, track: args.track, timeline: { totalMs: 1, segments: [] } as never, cueSheet: { identAsset: null, musicBed: { id: null }, cues: [], suppressed: [] } as never, validation: { ok: true, errors: 0, warnings: 0, issues: [] } as never, render: { engine: 'remotion', version: '4', output: 'x.mp4', sha256: 'a'.repeat(64), motionEngine: identity }, identity: buildIdentity() });
-    assert.equal(manifest.schema, 'walletwall.video-provenance/v3');
+    assert.equal(manifest.schema, 'walletwall.video-provenance/v4');
     assert.equal(manifest.render?.motionEngine.motionEngine, 'rust-wasm');
   });
 });

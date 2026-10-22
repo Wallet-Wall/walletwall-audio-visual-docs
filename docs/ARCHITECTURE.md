@@ -52,7 +52,7 @@ The terrain metaphor is geometry, not a game: cards and graph nodes are platform
 
 ## Timing and audio
 
-The planner orders lines and cues; the voice track supplies durations (the fixture estimates at 145 wpm with punctuation pauses); the timeline is integer milliseconds; the renderer converts to frames at the edge. The assembler picks the shortest class the runtime fits: Quick (≤ 3 min), Focused (≤ 5 min), Deep dive (≤ 10 min). Narration above 165 wpm fails validation — split, never speed up.
+The planner orders lines and cues; the voice track supplies durations (the fixture estimates at 145 wpm with punctuation pauses; publication narration's are measured from its verified audio); the timeline is integer milliseconds; the renderer converts to frames at the edge. The assembler picks the shortest class the runtime fits: Quick (≤ 3 min), Focused (≤ 5 min), Deep dive (≤ 10 min). Narration above 165 wpm fails validation — split, never speed up.
 
 Audio is semantic: actions and transitions map to a small sonic vocabulary with per-event minimum gaps; `INSPECT` is deliberately silent; quantum sonic events are valid only for sources in a quantum docs domain. Sonic identity, music bed, and cue assets are versioned ids, currently unassigned (silence), never generated at render time.
 
@@ -79,7 +79,7 @@ A rendered video traces back to: the doc blob id, normalized content hash, and n
 ## Open owner decisions
 
 1. Remotion company-license status.
-2. Voice provider. Decided for now: ElevenLabs Multilingual v2 is the publication narration provider and Qwen3-TTS is R&D and a local fallback ([NARRATION.md](NARRATION.md), "Production policy"); wiring the provider into renders is the integration step there. The WalletWallaby voice identity itself is decided: an Australian English expedition guide, natural and not caricatured (`config/voice-identity.json` v2, [NARRATION.md](NARRATION.md)); casting must not imitate a real person.
+2. Voice provider. Decided for now: ElevenLabs Multilingual v2 is the publication narration provider and Qwen3-TTS is R&D and a local fallback ([NARRATION.md](NARRATION.md), "Production policy"); it is wired as a verified narration set made by one credentialed step and replayed by every render and publish step ([NARRATION.md](NARRATION.md), "Publication narration"); a provider failure fails closed, never falls back. The WalletWallaby voice identity itself is decided: an Australian English expedition guide, natural and not caricatured (`config/voice-identity.json` v2, [NARRATION.md](NARRATION.md)); casting must not imitate a real person.
 3. Freshness severity order (`MATERIALLY_STALE` is treated as more severe than `REGENERATION_REQUIRED`: wrong beats visually outdated).
 4. Release-plan weights (`config/release-plan.json`) are an initial proposal.
 5. Synthetic-media disclosure default (`containsSyntheticMedia: true`).

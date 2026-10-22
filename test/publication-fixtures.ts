@@ -11,7 +11,7 @@ import path from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import { buildCaptions, checkCaptions, toSrt, toWebVtt } from '../src/audio/captions.ts';
 import { buildCueSheet } from '../src/audio/cue-sheet.ts';
-import { FixtureVoiceProvider } from '../src/audio/voice-provider.ts';
+import { FixtureVoiceProvider, type VoiceProvider } from '../src/audio/voice-provider.ts';
 import { environmentClass, loadEnvironments, presentationHashes, type RenderEnvironment } from '../src/blender/identity.ts';
 import { lessonBridge, lessonBridgeFor, lessonTerrain, strideFrames } from '../src/blender/lesson.ts';
 import { findRevealSeam } from '../src/blender/reveal.ts';
@@ -64,14 +64,18 @@ export const editJson = <T>(file: string, edit: (doc: T) => void): void => {
   writeFileSync(file, prettyJson(doc));
 };
 
-/** The package scripts/validate.ts + scripts/publish-dry-run.ts write for a video with no render. */
-export async function writeDryRunPackage(dir: string): Promise<void> {
+/**
+ * The package scripts/validate.ts + scripts/publish-dry-run.ts write for a video with no render: with the fixture voice,
+ * or, given `narration`, with that voice (a publication narration replay) and its verified set copied under narration/.
+ */
+export async function writeDryRunPackage(dir: string, narration?: { voice: VoiceProvider; setDir: string }): Promise<void> {
   const config = loadPipelineConfig();
   const spec = loadCommittedSpec(VIDEO_ID);
   const source = loadSnapshot(spec);
   const site = loadDocsSite();
   writeFileSync(path.join(dir, 'validation.json'), prettyJson(validateSpec(spec, validationContextFor(spec, config, site))));
-  const track = await synthesize(spec, new FixtureVoiceProvider(), config);
+  const track = await synthesize(spec, narration?.voice ?? new FixtureVoiceProvider(), config);
+  if (narration) cpSync(narration.setDir, path.join(dir, 'narration'), { recursive: true });
   const timeline = buildTimeline(spec, track, config.templates);
   const validation = validateSpec(spec, validationContextFor(spec, config, site, track));
   const cues = buildCaptions(timeline);
@@ -246,7 +250,7 @@ export function attachRender(dir: string, state: PublicState, opts: { bytes?: Bu
   writeFileSync(
     path.join(dir, 'render.json'),
     prettyJson({
-      schema: 'walletwall.render-info/v5',
+      schema: 'walletwall.render-info/v6',
       videoId: VIDEO_ID,
       revision: 1,
       specHash: state.specHash,
@@ -255,7 +259,7 @@ export function attachRender(dir: string, state: PublicState, opts: { bytes?: Bu
       frames: state.frames,
       durationMs: state.totalMs,
       output,
-      narration: { providerId: state.narrationProviderId, estimated: true, audio: 'NONE' },
+      narration: { providerId: state.narrationProviderId, estimated: !state.narrationPublication, audio: state.narrationPublication ? 'PRESENT' : 'NONE', publication: state.narrationPublication?.ref ?? null },
       overlays: { captions: true, characterless: false, guides: false },
       identity: state.identity,
       motionEngine,

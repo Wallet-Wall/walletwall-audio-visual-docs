@@ -9,14 +9,18 @@
 //     publication:proof, after the invariants: is the environment Blender just rendered in an approved publication
 //     class? If not, print the approved/observed/changed diff and stop before the whole video is rendered.
 //
-// node scripts/publication-receipt.ts write [videoId] --bundle=<proof package>
+// node scripts/publication-receipt.ts write [videoId] --bundle=<proof package> [--narration=fixture|publication]
 //     publication:proof, last: stage the evidence (the invariants report, Blender's render manifests) into the proof
 //     package, derive the receipt, write it (temporary file + rename), and verify it from disk; a receipt that does not
-//     verify is removed. Never writes outside the proof package.
+//     verify is removed. Never writes outside the proof package. With publication narration the receipt binds the
+//     verified narration set the render carries (replayed from dist/<videoId>/narration, never synthesized).
+//
+// A receipt that names publication narration is verified against the narration set its own proof package holds
+// (<package>/<videoId>/narration/), replayed and re-verified against this checkout's script and approved binding.
 //
 // Fixed arguments only; nothing here uploads, publishes, approves, or edits configuration.
 
-import { readFileSync, unlinkSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { publicationEnvironmentCheck } from '../src/blender/environment.ts';
 import { loadEnvironments } from '../src/blender/identity.ts';
@@ -24,6 +28,7 @@ import { loadBlenderConfig, outFile } from '../src/blender/toolchain.ts';
 import { DIST_ROOT, VIDEO_ROOT } from '../src/config/load.ts';
 import { loadRegistry } from '../src/pipeline/context.ts';
 import { buildReceipt, readReceiptDocument, ReceiptError, RECEIPT_FILE, stageEvidence, verifyReceipt, writeReceipt } from '../src/publish/proof-receipt.ts';
+import { parseNarrationMode, publicationNarrationDir } from '../src/narration/publication.ts';
 import { currentPublicState } from '../src/publish/public-output.ts';
 
 const [command, ...rest] = process.argv.slice(2);
@@ -46,10 +51,22 @@ if (command === 'verify') {
   // The video the receipt names, if it is a registered one; the verifier itself refuses anything else.
   let videoId = loadRegistry()[0]!.videoId;
   // Bounded and link-refusing, like the verifier's own read; an unreadable receipt is reported by verifyReceipt.
-  const named = (readReceiptDocument(receiptPath).doc as { subject?: { video?: { videoId?: unknown } } } | null)?.subject?.video?.videoId;
+  const doc = readReceiptDocument(receiptPath).doc as { subject?: { video?: { videoId?: unknown }; narration?: { publication?: unknown } } } | null;
+  const named = doc?.subject?.video?.videoId;
   if (registered(named)) videoId = named;
   const receiptOnly = rest.includes('--receipt-only');
-  const state = await currentPublicState(videoId);
+  // Publication narration is re-derived from the narration set inside the receipt's own proof package; a receipt
+  // checked alone (--receipt-only, no package beside it) is checked against this checkout's own set instead.
+  const publicationNarration = doc?.subject?.narration?.publication != null;
+  const packaged = path.join(path.dirname(receiptPath), videoId, 'narration');
+  const narrationDir = receiptOnly && !existsSync(packaged) ? publicationNarrationDir(videoId) : packaged;
+  let state;
+  try {
+    state = await currentPublicState(videoId, process.env, publicationNarration ? { narration: 'publication', narrationDir } : {});
+  } catch (err) {
+    console.log(`[publication:verify-receipt] FAIL: the narration this receipt names cannot be re-derived: ${(err as Error).message}`);
+    process.exit(1);
+  }
   const r = verifyReceipt(receiptPath, state, { receiptOnly });
   console.log(`[publication:verify-receipt] receipt ${r.receiptSha256 ?? '(no identity)'} for ${videoId}`);
   console.log(`  checked: schema, identity, leak policy, this checkout (spec, build, motion and MotionPlan, character, environment class, captions, invariants, gates)${receiptOnly ? '; NOT the proof package (--receipt-only): file bytes, including the MP4, were not re-checked' : '; the proof package (gate re-run, every file, evidence)'}`);
@@ -77,7 +94,7 @@ if (command === 'verify') {
     process.exit(1);
   }
 } else if (command === 'write') {
-  options(['--bundle=']);
+  options(['--bundle=', '--narration=']);
   const positional = rest.filter((a) => !a.startsWith('--'));
   const videoId = positional[0] ?? loadRegistry()[0]!.videoId;
   if (positional.length > 1 || !registered(videoId)) usage('name at most one registered video');
@@ -101,7 +118,7 @@ if (command === 'verify') {
     process.exit(1);
   };
   try {
-    const state = await currentPublicState(videoId);
+    const state = await currentPublicState(videoId, process.env, { narration: parseNarrationMode(rest) });
     stageEvidence(bundle, { invariantsReport: outFile('invariants/report.json'), blenderManifest: (name) => outFile(`renders/${name}/render.json`) });
     const receipt = buildReceipt(bundle, state, new Date().toISOString());
     const written = writeReceipt(bundle, receipt, state);

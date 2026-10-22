@@ -1,6 +1,6 @@
 // Node-side preparation of everything the Remotion composition needs.
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadAttentionConfig } from '../attention/config.ts';
 import { requestSpokenWords, voiceRequestFor, type VoiceProvider } from '../audio/voice-provider.ts';
@@ -8,6 +8,8 @@ import { loadVisualConfig } from '../blender/visual.ts';
 import { DIST_ROOT, readJson } from '../config/load.ts';
 import { readWorkspaceFile, resolveWorkspacePath } from './context.ts';
 import type { PipelineConfig } from '../config/types.ts';
+import { readContainedFile } from '../core/contained-read.ts';
+import { isLineId } from '../narration/publication.ts';
 import { sha256Hex } from '../core/hash.ts';
 import type { DocsVideoProps, ReviewOverlays } from '../remotion/props.ts';
 import type { NormalizedSource } from '../source/types.ts';
@@ -35,6 +37,31 @@ export function stageDeclaredAssets(spec: VideoSpec): string[] {
     staged.push(dest);
   }
   return staged;
+}
+
+/**
+ * Stage the narration audio the track names (publication narration only; the fixture voice is silent) into the bundle's
+ * public dir, where the composition plays it (src/timeline/timeline.ts narrationAudio). Each WAV is read from the
+ * verified narration set's directory through one handle, never a link, and must be the bytes the track names. The
+ * staged names come from line ids, never from a record. Returns the staged files.
+ */
+export function stageNarrationAudio(spec: VideoSpec, track: NarrationTrack, setDir: string): string[] {
+  const dest = path.join(PUBLIC_DIR, spec.id, 'narration');
+  rmSync(dest, { recursive: true, force: true });
+  const voiced = track.lines.filter((l) => l.audio);
+  if (voiced.length === 0) return [];
+  if (!track.publication) throw new Error('a track with audio must carry its publication narration identity');
+  const realDir = realpathSync(setDir);
+  mkdirSync(dest, { recursive: true });
+  return voiced.map((line) => {
+    if (!isLineId(line.lineId)) throw new Error(`narration line id ${JSON.stringify(line.lineId)} is not a plain id`);
+    const name = `${line.lineId}.wav`;
+    const bytes = readContainedFile(path.join(realDir, name), (real) => real === path.join(realDir, name));
+    if (!bytes || sha256Hex(bytes) !== line.audio!.sha256) throw new Error(`narration audio for ${line.lineId} is missing or is not the bytes the verified set names; re-run the narration step`);
+    const file = path.join(dest, name);
+    writeFileSync(file, bytes);
+    return file;
+  });
 }
 
 export function loadSnapshot(spec: VideoSpec): NormalizedSource {

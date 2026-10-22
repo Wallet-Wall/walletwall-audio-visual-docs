@@ -4,7 +4,12 @@
 // Usage: node scripts/render.ts [videoId] [--stills [--frames=a,b,c]] [--guides] [--no-captions]
 //                               [--characterless] [--motion-engine=typescript|rust-wasm]
 //                               [--character-layout=crop|full-frame] [--fresh-blender]
-// Uses the fixture voice (silent, estimated timing) unless a live provider is wired in a later lane.
+//                               [--narration=fixture|publication]
+// Narration: the fixture voice (silent, estimated timing) by default. --narration=publication replays the video's
+// verified publication narration set (dist/<id>/narration, made by `npm run narration -- publication`): every line's
+// WAV and record re-verified against the current script and the approved binding, timing measured from the audio,
+// the audio staged for the composition. It never synthesizes, reads a credential, or touches the network: a missing
+// or stale set stops the render. Stills render on the fixture timeline only.
 // --motion-engine=rust-wasm performs the paths in src/motion/rust-path.ts with the committed
 // Rust/WASM Motion Intelligence engine (everything else stays on the TypeScript solver); the
 // default is the TypeScript solver alone. Either way the engine is recorded in render.json.
@@ -21,7 +26,6 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { bundle } from '@remotion/bundler';
 import { renderMedia, renderStill, selectComposition } from '@remotion/renderer';
-import { FixtureVoiceProvider } from '../src/audio/voice-provider.ts';
 import { choreograph, layoutsFor } from '../src/character/walletwallaby/choreography.ts';
 import { assertSupported, auditLesson } from '../src/character/walletwallaby/contacts.ts';
 import { planMotion } from '../src/character/walletwallaby/motion.ts';
@@ -33,11 +37,13 @@ import { typescriptEngineIdentity, type MotionEngineIdentity } from '../src/moti
 import { planRustMotion } from '../src/motion/rust-adapter.ts';
 import { distDir, loadCommittedSpec, loadRegistry, validationContextFor } from '../src/pipeline/context.ts';
 import { validateSpec } from '../src/validation/validate-spec.ts';
-import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, synthesize } from '../src/pipeline/render-input.ts';
+import { buildProps, loadSnapshot, PUBLIC_DIR, stageDeclaredAssets, stageNarrationAudio, synthesize } from '../src/pipeline/render-input.ts';
+import { narrationVoice, parseNarrationMode, publicationNarrationDir, type NarrationMode } from '../src/narration/publication.ts';
+import { loadDocsSite } from '../src/source/load.ts';
 import { buildTimeline, msToFrame, totalFrames } from '../src/timeline/timeline.ts';
 import { classifyEnvironment, environmentSummary, formatEnvironmentDiff } from '../src/blender/environment.ts';
 import { loadEnvironments } from '../src/blender/identity.ts';
-import { lessonMotion } from '../src/blender/lesson.ts';
+import { lessonMotionWith } from '../src/blender/lesson.ts';
 import { ensureCharacter, renderCharacterSequence, renderDepthReveal } from '../src/blender/production.ts';
 import { findRevealSeam } from '../src/blender/reveal.ts';
 import { clearStagedBlender, stageBlenderSequence, stageBlenderTransition, type BlenderLayout } from '../src/blender/stage.ts';
@@ -52,6 +58,18 @@ const videoId = args.find((a) => !a.startsWith('--')) ?? loadRegistry()[0]!.vide
 const engineArg = args.find((a) => a.startsWith('--motion-engine='))?.slice('--motion-engine='.length) ?? 'typescript';
 if (engineArg !== 'typescript' && engineArg !== 'rust-wasm') {
   console.error(`[render] unknown motion engine ${JSON.stringify(engineArg)}: use typescript or rust-wasm`);
+  process.exit(2);
+}
+
+let narrationMode: NarrationMode;
+try {
+  narrationMode = parseNarrationMode(args);
+} catch (err) {
+  console.error(`[render] ${(err as Error).message}`);
+  process.exit(2);
+}
+if (narrationMode === 'publication' && flag('--stills')) {
+  console.error('[render] stills render on the fixture timeline; --narration=publication is for the whole-video render');
   process.exit(2);
 }
 
@@ -70,7 +88,25 @@ if (!gate.ok) {
 }
 
 const source = loadSnapshot(spec);
-const track = await synthesize(spec, new FixtureVoiceProvider(), config);
+// The render path's one route to a voice (the narration budget first): the fixture estimate, or the verified
+// publication narration set replayed from disk. A missing, stale, or tampered set stops the render here.
+let track;
+try {
+  track = await synthesize(spec, narrationVoice(narrationMode, videoId), config);
+} catch (err) {
+  console.error(`[render] ${videoId}: ${(err as Error).message}`);
+  process.exit(1);
+}
+if (track.publication) {
+  // The gate again, on the real narration's timing (its pace, the timeline, the captions).
+  const real = validateSpec(spec, validationContextFor(spec, config, loadDocsSite(), track));
+  if (!real.ok) {
+    for (const i of real.issues.filter((x) => x.severity === 'error')) console.error(`  ERROR ${i.code} ${i.path} — ${i.message}`);
+    console.error(`[render] ${videoId}: refusing to render: the spec fails validation with its publication narration (${real.errors} errors).`);
+    process.exit(1);
+  }
+  console.log(`[render] narration: publication set ${track.publication.identity.slice(0, 16)} (${track.publication.provider} ${track.publication.modelId}, voice ${track.publication.voiceId}, binding ${track.publication.bindingSha256.slice(0, 12)})`);
+}
 const timeline = buildTimeline(spec, track, config.templates);
 const out = distDir(videoId);
 mkdirSync(out, { recursive: true });
@@ -121,6 +157,7 @@ if (stills) {
 const overlays = { captions: !flag('--no-captions'), characterless: flag('--characterless'), guides: flag('--guides') };
 const bundleNow = () => bundle({ entryPoint: path.join(VIDEO_ROOT, 'src', 'remotion', 'index.ts'), publicDir: PUBLIC_DIR });
 stageDeclaredAssets(spec);
+stageNarrationAudio(spec, track, publicationNarrationDir(videoId));
 console.log(`[render] bundling ${COMPOSITION_ID} (${(timeline.totalMs / 1000).toFixed(1)} s, ${totalFrames(timeline)} frames)…`);
 let serveUrl = await bundleNow();
 
@@ -136,7 +173,7 @@ let character: { characterRenderer: BlenderCharacterProps; depthReveals: Blender
 if (!overlays.characterless) {
   const cfg = loadBlenderConfig();
   const blender = findBlender(cfg);
-  const lesson = await lessonMotion(videoId, engineArg);
+  const lesson = lessonMotionWith(videoId, engineArg, track);
   const fresh = flag('--fresh-blender');
   clearStagedBlender();
   const built = ensureCharacter(cfg, blender, fresh);
@@ -241,7 +278,7 @@ if (stills) {
     },
   });
   const info = {
-    schema: 'walletwall.render-info/v5',
+    schema: 'walletwall.render-info/v6',
     videoId,
     revision: spec.revision,
     specHash,
@@ -250,7 +287,8 @@ if (stills) {
     frames: totalFrames(timeline),
     durationMs: timeline.totalMs,
     output: { path: path.relative(VIDEO_ROOT, output).split(path.sep).join('/'), sha256: sha256Hex(readFileSync(output)) },
-    narration: { providerId: track.providerId, estimated: track.estimated, audio: track.lines.some((l) => l.audio) ? 'PRESENT' : 'NONE' },
+    /** The narration the video carries; for publication narration, the verified set's identity and binding. */
+    narration: { providerId: track.providerId, estimated: track.estimated, audio: track.lines.some((l) => l.audio) ? 'PRESENT' : 'NONE', publication: track.publication ?? null },
     overlays,
     identity: buildIdentity(),
     /** Which engine made the motion, down to the exact WASM bytes and plan bytes when it was rust-wasm. */
