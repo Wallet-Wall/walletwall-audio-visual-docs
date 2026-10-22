@@ -1,4 +1,4 @@
-// npm run publication:proof [-- --motion-engine=typescript|rust-wasm] [videoId]
+// npm run publication:proof [-- --motion-engine=typescript|rust-wasm] [--narration=fixture|publication] [videoId]
 //   -> dist/publication-proof/ (the proof package a human reviews before any publication, and its receipt)
 //
 // The whole-video publication proof, on the production render host (docs/BLENDER.md, Publication; docs/PUBLICATION.md).
@@ -6,11 +6,17 @@
 // in software GL in many hours. So this runs where the publication class is (config/blender-environments.json):
 // validate the spec; prove the rig invariants on the frames Blender renders (npm run blender:invariants); stop unless
 // the environment those frames were rendered in is an approved publication class, printing what changed against it;
-// render the whole video with the fixture voice; run the publish dry run against that exact render; run the
+// render the whole video with its narration; run the publish dry run against that exact render; run the
 // public-output gate with the render required, which refuses a render from any class that is not a publication class;
 // and, last, bind the passed proof in its receipt (publication-proof-receipt.json), written only after every step has
 // passed and verified from disk before this reports PASS. It never uploads anything and holds no publication credential:
 // CI CAN prove publication readiness, CI MUST NOT publish, and neither may this.
+//
+// Narration: the fixture voice (silent, estimated) by default. --narration=publication proves the video with its
+// publication narration: the verified set `npm run narration -- publication` made (dist/<videoId>/narration), replayed
+// from disk by every step (its timing decides the timeline, so the invariants, the render, the dry run, the gate, and
+// the receipt all use the same set). This step never synthesizes and holds no credential; a missing or stale set stops
+// the proof at its first step that replays it.
 
 import { spawnSync } from 'node:child_process';
 import { rmSync } from 'node:fs';
@@ -23,6 +29,12 @@ if (engine !== 'typescript' && engine !== 'rust-wasm') {
   console.error(`[publication:proof] unknown motion engine ${JSON.stringify(engine)}: use typescript or rust-wasm`);
   process.exit(2);
 }
+const narration = args.find((a) => a.startsWith('--narration='))?.slice('--narration='.length) ?? 'fixture';
+if (narration !== 'fixture' && narration !== 'publication') {
+  console.error(`[publication:proof] unknown narration ${JSON.stringify(narration)}: use fixture or publication`);
+  process.exit(2);
+}
+const narrationArg = `--narration=${narration}`;
 const videoId = args.find((a) => !a.startsWith('--'));
 if (videoId !== undefined && !/^[a-z0-9][a-z0-9-]*$/.test(videoId)) {
   console.error('[publication:proof] the video id must be a plain slug');
@@ -34,12 +46,12 @@ const bundle = path.join(DIST_ROOT, 'publication-proof');
 rmSync(bundle, { recursive: true, force: true });
 const steps: [string, string[]][] = [
   ['validate the spec', ['scripts/validate.ts']],
-  ['the rig invariants on the frames Blender renders (every 9th lesson frame, every lab frame)', ['scripts/blender-invariants.ts', ...(videoId ? [videoId] : []), `--motion-engine=${engine}`]],
+  ['the rig invariants on the frames Blender renders (every 9th lesson frame, every lab frame)', ['scripts/blender-invariants.ts', ...(videoId ? [videoId] : []), `--motion-engine=${engine}`, narrationArg]],
   ['the render environment is an approved publication class', ['scripts/publication-receipt.ts', 'environment']],
-  ['render the whole video with the fixture voice', ['scripts/render.ts', ...(videoId ? [videoId] : []), `--motion-engine=${engine}`]],
-  ['publish dry run against this exact render', ['scripts/publish-dry-run.ts', ...(videoId ? [videoId] : [])]],
-  ['public-output gate, render required (writes the proof package)', ['scripts/public-output-check.ts', ...(videoId ? [videoId] : []), '--require-render', `--bundle=${bundle}`]],
-  ['the publication proof receipt (evidence, receipt, verified from disk)', ['scripts/publication-receipt.ts', 'write', ...(videoId ? [videoId] : []), `--bundle=${bundle}`]],
+  [`render the whole video with the ${narration} narration`, ['scripts/render.ts', ...(videoId ? [videoId] : []), `--motion-engine=${engine}`, narrationArg]],
+  ['publish dry run against this exact render', ['scripts/publish-dry-run.ts', ...(videoId ? [videoId] : []), narrationArg]],
+  ['public-output gate, render required (writes the proof package)', ['scripts/public-output-check.ts', ...(videoId ? [videoId] : []), '--require-render', `--bundle=${bundle}`, narrationArg]],
+  ['the publication proof receipt (evidence, receipt, verified from disk)', ['scripts/publication-receipt.ts', 'write', ...(videoId ? [videoId] : []), `--bundle=${bundle}`, narrationArg]],
 ];
 for (const [what, argv] of steps) {
   console.log(`[publication:proof] ${what}`);

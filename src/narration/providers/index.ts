@@ -3,9 +3,10 @@
 // config/narration-providers.json binds each adapter to its runtime, its pinned
 // model identity, and its named settings variants. A provider id outside the
 // closed list is refused; a variant's settings are validated by the adapter's
-// own schema before anything runs. The publication path never reads this file:
-// scripts/render.ts keeps the fixture voice, and config/voice-identity.json still
-// reports the publication binding as NOT_CONFIGURED. Node-only.
+// own schema before anything runs. The publication binding (the "publication"
+// block) is resolved by src/narration/publication.ts, which render and publish
+// steps reach to replay a verified narration set; only scripts/narration.ts
+// reaches an adapter. Node-only.
 
 import path from 'node:path';
 import { readJson, VIDEO_ROOT } from '../../config/load.ts';

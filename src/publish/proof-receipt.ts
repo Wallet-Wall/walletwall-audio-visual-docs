@@ -1,10 +1,12 @@
-// The publication proof receipt (walletwall.publication-proof-receipt/v1): one small, deterministic, machine-readable
+// The publication proof receipt (walletwall.publication-proof-receipt/v2): one small, deterministic, machine-readable
 // document, written last by `npm run publication:proof` on the production render host, that answers "what exact
 // bytes, identities, environment, and gates produced this approved publication candidate?". It binds the video bytes,
 // the spec and its canonical docs identity, the build identity, the motion engine and MotionPlan, the Blender
 // character (canonical model, materials, config, lane source, this host's realization), the render environment and
-// the approved publication class it falls in, Remotion, the narration and captions, every file of the proof package,
-// and each required gate together with the evidence it passed on.
+// the approved publication class it falls in, Remotion, the narration (for publication narration: the verified
+// narration set's identity, provider, model, voice, identity, language, binding, synthesis config, script, chunk plan,
+// and audio hashes; v2) and captions, every file of the proof package, and each required gate together with the
+// evidence it passed on.
 //
 // Identity: receiptSha256 = sha256 of the canonical JSON (sorted keys) of { schema, subject }. Key order never
 // matters. `informational.writtenAt`, the only wall-clock value, sits outside the subject and is never hashed; the
@@ -35,9 +37,10 @@ import { contentAddress, sha256Hex } from '../core/hash.ts';
 import { localPathIn, machineNameIn, credentialPatternIn } from '../core/leak-scan.ts';
 import type { BuildIdentity } from '../manifest/build-identity.ts';
 import type { MotionEngineIdentity } from '../motion/engine-identity.ts';
+import type { PublicationNarrationRef } from '../timeline/timeline.ts';
 import { checkPublicOutput, jsonStrings, type PublicState } from './public-output.ts';
 
-export const RECEIPT_SCHEMA = 'walletwall.publication-proof-receipt/v1';
+export const RECEIPT_SCHEMA = 'walletwall.publication-proof-receipt/v2';
 /** The receipt, at the root of the proof package (dist/publication-proof/). */
 export const RECEIPT_FILE = 'publication-proof-receipt.json';
 /** The public-output gate's report, as writeReviewBundle leaves it at the package root. */
@@ -98,7 +101,7 @@ export interface ReceiptSubject {
   };
   renderEnvironment: { classId: string; approvedClass: string; purpose: 'publication'; record: Record<string, unknown> };
   remotion: { version: string; compositionId: string };
-  narration: { providerId: string; estimated: boolean; audio: 'NONE' | 'PRESENT' };
+  narration: { providerId: string; estimated: boolean; audio: 'NONE' | 'PRESENT'; publication: PublicationNarrationRef | null };
   captions: { vtt: string; srt: string };
   invariants: { evidence: string; motionEngine: 'typescript' | 'rust-wasm'; every: number; labEvery: number; lessonFrames: number[]; lessonBridgeSha256: string; pass: true };
   /** Every file of the proof package but the receipt, by path. */
@@ -176,6 +179,25 @@ const CHARACTER_IDENTITY: Shape = {
     renderSettingsSha256: 'hex64',
   },
 };
+/** Publication narration's identity (src/timeline/timeline.ts PublicationNarrationRef); null for the fixture voice. */
+const NARRATION_REF: Shape = {
+  nullable: {
+    obj: {
+      identity: 'hex64',
+      provider: 'string',
+      bindingId: 'string',
+      modelId: 'string',
+      voiceId: 'string',
+      voiceIdentityId: 'string',
+      language: 'string',
+      bindingSha256: 'hex64',
+      synthesisConfigSha256: 'hex64',
+      scriptSha256: 'hex64',
+      chunkPlanSha256: 'hex64',
+      audioSha256: 'hex64',
+    },
+  },
+};
 const RECEIPT_SHAPE: Shape = {
   obj: {
     schema: { const: RECEIPT_SCHEMA },
@@ -208,7 +230,7 @@ const RECEIPT_SHAPE: Shape = {
         },
         renderEnvironment: { obj: { classId: 'string', approvedClass: 'string', purpose: { const: 'publication' }, record: 'json' } },
         remotion: { obj: { version: 'string', compositionId: 'string' } },
-        narration: { obj: { providerId: 'string', estimated: 'bool', audio: { enum: ['NONE', 'PRESENT'] } } },
+        narration: { obj: { providerId: 'string', estimated: 'bool', audio: { enum: ['NONE', 'PRESENT'] }, publication: NARRATION_REF } },
         captions: { obj: { vtt: 'hex64', srt: 'hex64' } },
         invariants: { obj: { evidence: 'string', motionEngine: { enum: ['typescript', 'rust-wasm'] }, every: 'int', labEvery: 'int', lessonFrames: { arr: 'int' }, lessonBridgeSha256: 'hex64', pass: { const: true } } },
         files: { arr: FILE },
@@ -314,14 +336,14 @@ function packageVideoId(realPackage: string): string {
 
 // ── What a passed proof leaves, and the evidence it is bound to ─────────────────────────────────────
 
-/** What render.json records (scripts/render.ts, walletwall.render-info/v5), as far as the receipt reads it. */
+/** What render.json records (scripts/render.ts, walletwall.render-info/v6), as far as the receipt reads it. */
 interface RenderRecord {
   output: { path: string; sha256: string };
   fps: number;
   frames: number;
   durationMs: number;
   engine: { name: string; version: string; compositionId: string };
-  narration: { providerId: string; estimated: boolean; audio: 'NONE' | 'PRESENT' };
+  narration: { providerId: string; estimated: boolean; audio: 'NONE' | 'PRESENT'; publication?: PublicationNarrationRef | null };
   identity: BuildIdentity;
   motionEngine: MotionEngineIdentity;
   character: {
@@ -596,7 +618,7 @@ export function deriveSubject(packageDir: string, state: PublicState): { subject
     },
     renderEnvironment: { classId: cls.classId, approvedClass: cls.approvedClass!.name, purpose: 'publication', record: environment },
     remotion: { version: render.engine.version, compositionId: render.engine.compositionId },
-    narration: { providerId: render.narration.providerId, estimated: render.narration.estimated, audio: render.narration.audio },
+    narration: { providerId: render.narration.providerId, estimated: render.narration.estimated, audio: render.narration.audio, publication: render.narration.publication ?? null },
     captions: { vtt: byPath.get(`${id}/${id}.en.vtt`)!.sha256, srt: byPath.get(`${id}/${id}.en.srt`)!.sha256 },
     invariants: inv.block!,
     files,
@@ -661,8 +683,11 @@ function checkoutFindings(r: PublicationProofReceipt, state: PublicState): Recei
   }
 
   if (s.remotion.version !== state.identity.toolchain.packages.remotion || s.remotion.compositionId !== COMPOSITION_ID) bad('CHECKOUT_MISMATCH', 'subject.remotion', "it is not this checkout's renderer and composition");
-  // The only narration this proof can re-derive: the fixture voice, silent and estimated.
-  if (s.narration.providerId !== state.narrationProviderId || s.narration.audio !== 'NONE' || s.narration.estimated !== true) bad('CHECKOUT_MISMATCH', 'subject.narration', `it is not the narration this proof can re-derive (${state.narrationProviderId}: estimated, no audio)`);
+  // The narration this checkout re-derives: the fixture voice (silent, estimated), or the verified publication narration
+  // set it replays (audio present, durations measured, and exactly that set's identity, binding, and hashes).
+  const pub = state.narrationPublication;
+  const narration = pub ? { providerId: state.narrationProviderId, estimated: false, audio: 'PRESENT', publication: pub.ref } : { providerId: state.narrationProviderId, estimated: true, audio: 'NONE', publication: null };
+  if (!same(s.narration, narration)) bad('CHECKOUT_MISMATCH', 'subject.narration', pub ? `it is not the publication narration set ${pub.ref.identity.slice(0, 12)} this checkout replays (${pub.ref.provider} ${pub.ref.modelId}, voice ${pub.ref.voiceId})` : `it is not the narration this proof can re-derive (${state.narrationProviderId}: estimated, no audio)`);
   if (s.captions.vtt !== sha256Hex(state.captions.vtt) || s.captions.srt !== sha256Hex(state.captions.srt)) bad('CHECKOUT_MISMATCH', 'subject.captions', 'they are not the captions the committed narration produces');
 
   // The gates: exactly the required ones, in order, each re-derivable from the bound files it names.

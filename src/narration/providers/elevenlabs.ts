@@ -1,13 +1,16 @@
-// ElevenLabs: the external, publication-quality REFERENCE adapter.
+// ElevenLabs: the publication narration provider and the bakeoff's reference.
 //
-// It exists so the bakeoff can hear the bar. It is never part of the render or
-// publish path (test/guards.test.ts proves it is unreachable from them), and it
-// never clones, scrapes, or conditions anything on the reference voice. The
-// endpoint host is a constant in this file so no configuration can send the
-// key anywhere else; the key is read from the environment at call time and is
+// Only scripts/narration.ts reaches it: the bakeoff, and the credentialed
+// publication synthesis step (src/narration/providers/publication.ts). It is
+// never part of the render or publish path (test/guards.test.ts proves it is
+// unreachable from them; they replay a verified narration set from disk), and
+// it never clones, scrapes, or conditions anything on the voice. The endpoint
+// host is a constant in this file so no configuration can send the key
+// anywhere else; the key is read from the environment at call time and is
 // never placed in a result, a record, a log line, or an error message.
 // Node-only (fetch).
 
+import type { VoiceIdentity } from '../../config/types.ts';
 import { NarrationProviderError, validateSettings, type NarrationProvider, type NarrationRequest, type NarrationSettings, type SettingsSchema, type SynthesisContext, type SynthesisResult } from '../contract.ts';
 import { wrapPcm16 } from '../wav.ts';
 
@@ -101,16 +104,38 @@ export class ElevenLabsProvider implements NarrationProvider {
 
   async synthesize(request: NarrationRequest, settings: NarrationSettings, ctx: SynthesisContext): Promise<SynthesisResult> {
     const s = this.validateSettings(settings);
+    const voiceId = this.voiceId(ctx.env);
+    await this.preflight(voiceId, request.identity, ctx);
+    return this.speak(request, s, voiceId, ctx);
+  }
+
+  private key(ctx: SynthesisContext): string {
     const key = ctx.env[this.binding.apiKeyEnv];
     if (!key) throw new NarrationProviderError(`${this.binding.apiKeyEnv} is not set: generate the reference audio elsewhere and register it with "narration place"`);
-    const voiceId = this.voiceId(ctx.env);
-    const url = elevenlabsUrl(voiceId, String(s.outputFormat));
+    // fetch rejects a header value with whitespace or control characters by quoting the whole value in its error.
+    if (!/^[\x21-\x7e]+$/.test(key)) throw new NarrationProviderError(`${this.binding.apiKeyEnv} is not a plain token (it holds whitespace or control characters); its value is not shown and nothing was requested`);
+    return key;
+  }
+
+  /**
+   * The read-only preflight (no synthesis, no credit): the key is accepted, the voice exists, and it is the variety the
+   * identity asks for, declared in the binding and confirmed by the voice's own labels. Returns the voice id the API reports.
+   */
+  async preflight(voiceId: string, identity: VoiceIdentity, ctx: SynthesisContext): Promise<{ reportedVoiceId: string | null }> {
+    const key = this.key(ctx);
     const doFetch = ctx.fetch ?? globalThis.fetch;
-    // The voice must be the variety the identity asks for: declared in the binding, and confirmed by the voice's own labels.
     const meta = await doFetch(elevenlabsVoiceUrl(voiceId), { method: 'GET', headers: { 'xi-api-key': key, accept: 'application/json' } });
     if (!meta.ok) throw new NarrationProviderError(`ElevenLabs refused the voice lookup: HTTP ${meta.status}`);
-    const voice = (await meta.json()) as { labels?: Record<string, string> };
-    checkVoiceAccent(request.identity.direction.language, this.binding.accent, voiceId, voice.labels);
+    const voice = (await meta.json()) as { voice_id?: unknown; labels?: Record<string, string> };
+    checkVoiceAccent(identity.direction.language, this.binding.accent, voiceId, voice.labels);
+    return { reportedVoiceId: typeof voice.voice_id === 'string' ? voice.voice_id : null };
+  }
+
+  /** One text-to-speech request (the paid call): already-validated settings, a voice the preflight accepted. */
+  async speak(request: NarrationRequest, s: NarrationSettings, voiceId: string, ctx: SynthesisContext): Promise<SynthesisResult> {
+    const key = this.key(ctx);
+    const url = elevenlabsUrl(voiceId, String(s.outputFormat));
+    const doFetch = ctx.fetch ?? globalThis.fetch;
     const t0 = performance.now();
     const res = await doFetch(url, { method: 'POST', headers: { 'xi-api-key': key, 'content-type': 'application/json', accept: 'application/octet-stream' }, body: JSON.stringify(elevenlabsBody(request, s)) });
     const bytes = new Uint8Array(await res.arrayBuffer());

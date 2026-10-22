@@ -58,9 +58,13 @@ describe('WalletWallaby voice identity v2', () => {
     const identityText = text('config/voice-identity.json');
     assert.ok(!identityText.includes(ELEVENLABS_REFERENCE_VOICE), 'no voice id in the canonical identity');
     assert.ok(!/"voiceId"\s*:/.test(identityText), 'no voiceId field in the canonical identity');
-    const binding = config.voice.providerBindings.elevenlabs as Record<string, unknown>;
-    assert.deepEqual(Object.keys(binding).sort(), ['apiKeyEnv', 'modelId', 'status', 'voiceIdEnv'], 'the publication binding names environment variables only');
-    assert.equal(binding.status, 'NOT_CONFIGURED');
+    // The publication binding approves a versioned binding by its content address (src/narration/publication.ts); the
+    // voice, model, and settings stay in config/narration-providers.json, and no credential name or value is here.
+    const binding = config.voice.providerBindings.publication as Record<string, unknown>;
+    assert.deepEqual(Object.keys(binding).sort(), ['binding', 'bindingSha256', 'provider', 'status'], 'the publication binding is a reference and a pin');
+    assert.equal(binding.status, 'APPROVED');
+    assert.equal(binding.provider, 'elevenlabs');
+    assert.ok(!/ELEVENLABS_API_KEY|apiKey|sk_/.test(identityText), 'no credential in the identity');
     assert.equal(providers.voiceIdentity, config.voice.id, 'config/narration-providers.json follows the identity');
     assert.equal(providers.providers.elevenlabs.accent, config.voice.direction.language, 'the publication target speaks the identity variety');
     for (const id of ['magpie-nemo-speech', 'chatterbox-multilingual'] as const) {

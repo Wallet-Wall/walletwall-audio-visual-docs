@@ -4,19 +4,23 @@
 //
 // Usage: node scripts/public-output-check.ts [videoId] [--dir=<dist dir>] [--stills=<dir>]...
 //                                            [--require-render] [--bundle=<empty dir>] [--summary=<file>]
+//                                            [--narration=fixture|publication]
 //   --dir             the package directory (default dist/<videoId>)
 //   --stills          a directory render:stills wrote (stills.json + PNGs); repeat once per motion engine
 //   --require-render  render.json and the MP4 it names must exist (the publication proof)
 //   --bundle          after a PASS, copy exactly the verified files and the report into this empty directory
 //   --summary         append a Markdown summary (for $GITHUB_STEP_SUMMARY)
+//   --narration       the narration the package carries: the fixture voice (default), or the video's verified
+//                     publication narration set, replayed from disk and bundled under narration/ (never synthesized)
 // Exit 0 = PASS; 1 = findings (nothing is bundled); 2 = usage error.
 
 import { appendFileSync } from 'node:fs';
 import { loadRegistry, distDir } from '../src/pipeline/context.ts';
+import { parseNarrationMode } from '../src/narration/publication.ts';
 import { checkPublicOutput, currentPublicState, markdownSummary, writeReviewBundle } from '../src/publish/public-output.ts';
 
 const args = process.argv.slice(2);
-const KNOWN = ['--dir=', '--stills=', '--require-render', '--bundle=', '--summary='];
+const KNOWN = ['--dir=', '--stills=', '--require-render', '--bundle=', '--summary=', '--narration='];
 const unknown = args.filter((a) => a.startsWith('--') && !KNOWN.some((k) => (k.endsWith('=') ? a.startsWith(k) : a === k)));
 if (unknown.length) {
   console.error(`[public:check] unknown option ${unknown.join(', ')}`);
@@ -26,7 +30,14 @@ const value = (flag: string): string | undefined => args.find((a) => a.startsWit
 const videoId = args.find((a) => !a.startsWith('--')) ?? loadRegistry()[0]!.videoId;
 const stills = args.filter((a) => a.startsWith('--stills=')).map((a) => a.slice('--stills='.length));
 
-const state = await currentPublicState(videoId);
+let state;
+try {
+  state = await currentPublicState(videoId, process.env, { narration: parseNarrationMode(args) });
+} catch (err) {
+  // A missing, stale, or tampered publication narration set, or a bad --narration: nothing to check against.
+  console.error(`[public:check] ${videoId}: FAIL: ${(err as Error).message}`);
+  process.exit(1);
+}
 const result = checkPublicOutput(value('--dir=') ?? distDir(videoId), state, { requireRender: args.includes('--require-render'), stills });
 const { report } = result;
 

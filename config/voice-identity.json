@@ -52,12 +52,12 @@
     "commaPauseMs": 90
   },
   "providerBindings": {
-    "note": "Provider-specific settings live here, never in a VideoSpec, and never a voice id: a provider interprets the direction above with its own controls. Credentials are read from the environment at synthesis time only and are never written to manifests. The narration bakeoff's evaluation bindings (voice ids, pinned models, named variants) live in config/narration-providers.json; the publication binding below stays NOT_CONFIGURED until a provider is promoted.",
-    "elevenlabs": {
-      "voiceIdEnv": "WALLETWALLABY_ELEVENLABS_VOICE_ID",
-      "apiKeyEnv": "ELEVENLABS_API_KEY",
-      "modelId": null,
-      "status": "NOT_CONFIGURED"
+    "note": "Provider-specific settings live in config/narration-providers.json, never in a VideoSpec, and never a voice id here: a provider interprets the direction above with its own controls. The publication binding names its provider and the versioned binding it approves, and pins the content address of that binding as resolved (src/narration/publication.ts: provider, model, voice, this identity, its language, the variant settings, the chunk policy). A binding that does not hash to the pin is refused before any synthesis; moving the pin is a reviewed change. Credentials are read from the environment at synthesis time only and are never written to manifests.",
+    "publication": {
+      "status": "APPROVED",
+      "provider": "elevenlabs",
+      "binding": "walletwallaby-elevenlabs-v1",
+      "bindingSha256": "c3c1cda901311da1b629d3143b127ef5cd69c1d213473076ab5d879cc436159b"
     }
   }
 }

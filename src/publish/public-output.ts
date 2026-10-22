@@ -19,7 +19,8 @@ import { loadEnvironments, type EnvironmentsDocument } from '../blender/identity
 import { lessonBridge, lessonBridgeFor, lessonMotionWith, type LessonMotion } from '../blender/lesson.ts';
 import { findRevealSeam } from '../blender/reveal.ts';
 import { loadBlenderConfig, type BlenderConfig } from '../blender/toolchain.ts';
-import { FIXTURE_VOICE_PROVIDER_ID, FixtureVoiceProvider } from '../audio/voice-provider.ts';
+import { FixtureVoiceProvider, voiceRequestFor } from '../audio/voice-provider.ts';
+import { loadPublicationBinding, PUBLICATION_NARRATION_SCHEMA, PUBLICATION_RECORD_FILE, PublicationNarrationReplay, publicationNarrationDir, type NarrationMode } from '../narration/publication.ts';
 import { DOCS_URL } from '../brand/repo-constants.ts';
 import { choreograph, layoutsFor } from '../character/walletwallaby/choreography.ts';
 import { planMotion, sampleWallaby } from '../character/walletwallaby/motion.ts';
@@ -38,7 +39,7 @@ import { loadSnapshot, synthesize } from '../pipeline/render-input.ts';
 import type { NormalizedSource } from '../source/types.ts';
 import type { VideoSpec } from '../spec/types.ts';
 import { loadDocsSite } from '../source/load.ts';
-import { buildTimeline, totalFrames } from '../timeline/timeline.ts';
+import { buildTimeline, totalFrames, type PublicationNarrationRef } from '../timeline/timeline.ts';
 import { validateSpec } from '../validation/validate-spec.ts';
 import type { Lineage } from './lineage.ts';
 import { buildPublishManifest, checkPublishManifest, type PublishManifest } from './manifest.ts';
@@ -83,6 +84,7 @@ export const PUBLIC_OUTPUT_CODES = {
   MACHINE_NAME: "A record of the render names this machine's host or user.",
   METADATA_PRESENT: 'A review still carries textual or unknown metadata.',
   CREDENTIAL_PRESENT: 'A publication credential is present in the environment of a credential-free gate.',
+  NARRATION_INVALID: 'Publication narration is missing, or is not the verified narration set this checkout replays and the render and provenance name.',
 } as const;
 
 export type PublicOutputCode = keyof typeof PUBLIC_OUTPUT_CODES;
@@ -112,9 +114,14 @@ export interface PublicState {
   identity: BuildIdentity;
   youtube: YoutubeChannelConfig;
   lineage: Lineage;
-  /** The only narration this gate can re-derive captions for. */
+  /** The narration this gate re-derives captions for: the fixture voice, or the publication provider of a verified set. */
   narrationProviderId: string;
-  /** The captions the committed spec produces with the fixture voice, and their caption QA issues. */
+  /**
+   * Publication narration the package must carry, or null for the fixture voice: the verified set's identity, and its
+   * record and every line's WAV by name and sha256 (bundled under narration/). Replayed from disk, never synthesized.
+   */
+  narrationPublication: { ref: PublicationNarrationRef; files: { name: string; sha256: string }[] } | null;
+  /** The captions the committed spec produces with that narration, and their caption QA issues. */
   captions: { vtt: string; srt: string; qa: ValidationIssue[] };
   /** A fresh validation of the committed spec (the same call publish:dry-run makes). */
   validation: ValidationReport;
@@ -173,12 +180,19 @@ export function thisMachineNames(env: Record<string, string | undefined>): strin
   return machineNames([os.hostname(), user, env.USERNAME, env.USER, env.LOGNAME, env.COMPUTERNAME, env.HOSTNAME], publicVocabulary());
 }
 
-export async function currentPublicState(videoId: string, env: Record<string, string | undefined> = process.env): Promise<PublicState> {
+/**
+ * `narration`: the narration the package carries (publish:dry-run's --narration). For publication narration the
+ * verified set is replayed from `narrationDir` (default dist/<videoId>/narration; a proof package's own copy when a
+ * receipt is verified), never synthesized: a missing, stale, or tampered set throws.
+ */
+export async function currentPublicState(videoId: string, env: Record<string, string | undefined> = process.env, opts: { narration?: NarrationMode; narrationDir?: string } = {}): Promise<PublicState> {
   const config = loadPipelineConfig();
   const spec = loadCommittedSpec(videoId);
   const source = loadSnapshot(spec);
-  // The same narration track publish:dry-run uses: the fixture voice.
-  const track = await synthesize(spec, new FixtureVoiceProvider(), config);
+  // The same narration track publish:dry-run uses.
+  const replay = opts.narration === 'publication' ? new PublicationNarrationReplay(opts.narrationDir ?? publicationNarrationDir(videoId), loadPublicationBinding(), { videoId, scope: 'video' }) : null;
+  const track = await synthesize(spec, replay ?? new FixtureVoiceProvider(), config);
+  const set = replay ? replay.read(voiceRequestFor(spec, config.voice, config.lexicon)) : null;
   const timeline = buildTimeline(spec, track, config.templates);
   const cues = buildCaptions(timeline);
   const qa = new IssueCollector();
@@ -199,7 +213,8 @@ export async function currentPublicState(videoId: string, env: Record<string, st
     identity: buildIdentity(),
     youtube: config.youtube,
     lineage: readJson<Lineage>(path.join(VIDEO_ROOT, 'manifests', `${videoId}.lineage.json`)),
-    narrationProviderId: FIXTURE_VOICE_PROVIDER_ID,
+    narrationProviderId: track.providerId,
+    narrationPublication: set ? { ref: set.ref, files: [{ name: PUBLICATION_RECORD_FILE, sha256: set.recordSha256 }, ...set.lines.map((l) => ({ name: `${l.lineId}.wav`, sha256: l.sha256 }))] } : null,
     captions: { vtt, srt: toSrt(cues), qa: qa.issues },
     validation: validateSpec(spec, validationContextFor(spec, config, loadDocsSite(), track)),
     totalMs: timeline.totalMs,
@@ -508,6 +523,17 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
     scanPublicCopy(bp(name), text);
   }
 
+  // ── Publication narration: the verified set this checkout replays, byte for byte, bundled under narration/ ──
+  if (state.narrationPublication) {
+    for (const f of state.narrationPublication.files) {
+      const name = `narration/${f.name}`;
+      if (f.name === PUBLICATION_RECORD_FILE) readJsonFile(at(name), bp(name), PUBLICATION_NARRATION_SCHEMA);
+      else readFile(at(name), bp(name));
+      const read = files.find((x) => x.path === bp(name));
+      if (read && read.sha256 !== f.sha256) fail('NARRATION_INVALID', bp(name), 'is not the verified narration set this checkout replays');
+    }
+  }
+
   // ── The publish manifest ──
   const manifest = readJsonFile<PublishManifest>(at('publish-manifest.json'), bp('publish-manifest.json'), 'walletwall.youtube-publish-manifest/v1');
   const narrationProvider = manifest?.provenance?.narration?.providerId ?? null;
@@ -567,13 +593,13 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
     frames?: unknown;
     durationMs?: unknown;
     output?: { path?: string; sha256?: string };
-    narration?: { providerId?: unknown };
+    narration?: { providerId?: unknown; publication?: unknown };
     overlays?: { captions?: unknown; characterless?: unknown; guides?: unknown };
     identity?: unknown;
     motionEngine?: MotionEngineIdentity;
     character?: CharacterRecord;
   };
-  const render = readJsonFile<RenderInfo>(at('render.json'), bp('render.json'), 'walletwall.render-info/v5', opts.requireRender === true, true);
+  const render = readJsonFile<RenderInfo>(at('render.json'), bp('render.json'), 'walletwall.render-info/v6', opts.requireRender === true, true);
   let renderSha: string | null = null;
   if (render) {
     const where = (p: string) => `${bp('render.json')}.${p}`;
@@ -592,6 +618,7 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
       if (o.characterless) fail('DEBUG_OUTPUT', where('overlays.characterless'), 'the characterless design test is not the publication render');
     }
     if (render.narration?.providerId !== narrationProvider) fail('RENDER_INCONSISTENT', where('narration.providerId'), 'the render and the manifest name different narration');
+    if (!same(render.narration?.publication ?? null, state.narrationPublication?.ref ?? null)) fail('NARRATION_INVALID', where('narration.publication'), 'the render carries other narration than the verified set this checkout replays');
     checkMotionEngine(render.motionEngine, where('motionEngine'));
     checkCharacter(render.character, where('character'), { engine: render.motionEngine?.motionEngine, frames: null, publication: true });
     if (render.output?.path !== `dist/${id}/${mp4Name}`) fail('RENDER_INCONSISTENT', where('output.path'), `is not dist/${id}/${mp4Name}`);
@@ -620,14 +647,14 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
     source?: unknown;
     planner?: unknown;
     claims?: { id?: unknown; type?: unknown }[];
-    narration?: { providerId?: unknown };
+    narration?: { providerId?: unknown; publication?: unknown };
     timeline?: { totalMs?: unknown };
     audio?: { identAsset?: unknown; musicBed?: unknown; cues?: unknown; silentCues?: unknown; suppressedCues?: unknown };
     validation?: unknown;
     render?: unknown;
     identity?: unknown;
   };
-  const prov = readJsonFile<Provenance>(at('provenance.json'), bp('provenance.json'), 'walletwall.video-provenance/v3');
+  const prov = readJsonFile<Provenance>(at('provenance.json'), bp('provenance.json'), 'walletwall.video-provenance/v4');
   if (prov) {
     const where = (p: string) => `${bp('provenance.json')}.${p}`;
     if (prov.videoId !== id || prov.revision !== spec.revision || prov.specHash !== state.specHash) fail('SPEC_STALE', where('specHash'), `${String(prov.specHash).slice(0, 12)} is not ${state.specHash.slice(0, 12)}`);
@@ -639,6 +666,7 @@ export function checkPublicOutput(dir: string, state: PublicState, opts: CheckOp
     if (!same(prov.validation, fresh)) fail('PROVENANCE_INCONSISTENT', where('validation'), 'is not the verdict a fresh validation gives');
     if (prov.timeline?.totalMs !== state.totalMs) fail('PROVENANCE_INCONSISTENT', where('timeline.totalMs'), 'is not the committed timeline');
     if (prov.narration?.providerId !== narrationProvider) fail('PROVENANCE_INCONSISTENT', where('narration.providerId'), 'disagrees with the manifest');
+    if (!same(prov.narration?.publication ?? null, state.narrationPublication?.ref ?? null)) fail('NARRATION_INVALID', where('narration.publication'), 'names other narration than the verified set this checkout replays');
     if (cueSheet && Array.isArray(cueSheet.cues)) {
       const expected = { identAsset: cueSheet.identAsset ?? null, musicBed: cueSheet.musicBed?.id ?? null, cues: cueSheet.cues.length, silentCues: cueSheet.cues.filter((c) => c.asset === null).length, suppressedCues: cueSheet.suppressed?.length ?? 0 };
       if (!same(prov.audio, expected)) fail('PROVENANCE_INCONSISTENT', where('audio'), 'does not describe the cue sheet');

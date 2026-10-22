@@ -1,9 +1,18 @@
-// The WalletWallaby narration bakeoff (docs/NARRATION.md): synthesize the
-// evaluation corpus with each provider adapter, measure the audio, transcribe
-// it for source agreement, and build the blind review page. Evaluation tooling
-// only: nothing here is on the render or publish path, every output lands in
-// dist/narration-bakeoff/ (never committed), and no provider is made the
-// publication voice by running it.
+// WalletWallaby narration (docs/NARRATION.md).
+//
+// Publication narration: the one credentialed step. It synthesizes a video's narration with the approved publication
+// binding (ElevenLabs, src/narration/publication.ts) into a verified narration set under dist/<videoId>/narration/,
+// which render, publish:dry-run, the public-output gate, and the proof receipt then replay from disk with
+// --narration=publication. The spec is validated (its narration budget included) and the binding resolved before any
+// key is read or request made; a current set is reused, never synthesized twice. `publication-proof` speaks only the
+// first narrated segment into dist/narration-proof/<videoId>/: the owner-run live proof of the same path.
+//
+//   node scripts/narration.ts publication [videoId]          # needs ELEVENLABS_API_KEY unless the set is current
+//   node scripts/narration.ts publication-proof [videoId]    # the same, for one short segment
+//
+// The bakeoff: synthesize the evaluation corpus with each provider adapter, measure the audio, transcribe it for
+// source agreement, and build the blind review page. Evaluation tooling only: every bakeoff output lands in
+// dist/narration-bakeoff/ (never committed), and no provider is made the publication voice by running it.
 //
 //   node scripts/narration.ts doctor
 //   node scripts/narration.ts pull chatterbox [--revision=<ref>]
@@ -31,6 +40,17 @@ import { loadProvidersConfig, providerFor, variantNames, variantSettings, type N
 import { directoryContent, nemoModelDir, pinnedPath, resolveMagpieModels } from '../src/narration/providers/magpie.ts';
 import { compareTranscript, type TranscriptDiff } from '../src/narration/transcript.ts';
 import { decodePcm16Mono, encodeWavPcm16, parseWav } from '../src/narration/wav.ts';
+import { buildCaptions, checkCaptions } from '../src/audio/captions.ts';
+import { effectiveWpm, voiceRequestFor } from '../src/audio/voice-provider.ts';
+import { IssueCollector } from '../src/core/issues.ts';
+import { loadPublicationBinding, publicationNarrationDir, type PublicationScope } from '../src/narration/publication.ts';
+import { ElevenLabsPublicationVoice } from '../src/narration/providers/publication.ts';
+import { loadCommittedSpec, loadRegistry, validationContextFor } from '../src/pipeline/context.ts';
+import { synthesize as synthesizeNarration } from '../src/pipeline/render-input.ts';
+import { loadDocsSite } from '../src/source/load.ts';
+import type { VideoSpec } from '../src/spec/types.ts';
+import { buildTimeline } from '../src/timeline/timeline.ts';
+import { validateSpec } from '../src/validation/validate-spec.ts';
 
 const BAKEOFF_ROOT = path.join(DIST_ROOT, 'narration-bakeoff');
 const REL_ROOT = 'dist/narration-bakeoff';
@@ -547,7 +567,74 @@ async function pull(): Promise<void> {
   log('pin "revision" in config/narration-providers.json to the resolved commit above');
 }
 
-const commands: Record<string, () => Promise<void>> = { doctor, pull, synthesize, place, transcribe, review };
+// ── Publication narration ────────────────────────────────────────────────────────────────────────
+
+/** The live proof's script: the committed spec's first narrated segment alone (a short, canonical, bounded passage). */
+function proofSpec(spec: VideoSpec): VideoSpec {
+  const first = spec.segments.find((s) => s.narration.length > 0);
+  if (!first) throw new NarrationContractError(`${spec.id} has no narration`);
+  return { ...spec, segments: [first] };
+}
+
+async function publicationNarration(scope: PublicationScope): Promise<void> {
+  const positional = args.slice(1).filter((a) => !a.startsWith('--'));
+  const unknown = args.slice(1).filter((a) => a.startsWith('--'));
+  if (unknown.length || positional.length > 1) throw new NarrationContractError(`usage: node scripts/narration.ts ${command} [videoId] (no options)`);
+  const videoId = positional[0] ?? loadRegistry()[0]!.videoId;
+  if (!loadRegistry().some((v) => v.videoId === videoId)) throw new NarrationContractError(`unknown video ${JSON.stringify(videoId)}; see config/videos.json`);
+  const pipeline = loadPipelineConfig();
+  const committed = loadCommittedSpec(videoId);
+  // 1. The spec: the publishability gate (NARRATION_OVER_BUDGET included), before any binding, key, or request.
+  const gate = validateSpec(committed, validationContextFor(committed, pipeline));
+  if (!gate.ok) throw new NarrationContractError(`${videoId} fails validation (${gate.errors} errors: ${[...new Set(gate.issues.filter((i) => i.severity === 'error').map((i) => i.code))].join(', ')}); nothing was requested`);
+  const spec = scope === 'proof' ? proofSpec(committed) : committed;
+  // 2. The approved binding, or nothing.
+  const publication = loadPublicationBinding();
+  const b = publication.binding;
+  log(`publication binding ${b.id}: ${b.provider} ${b.modelId}, voice ${b.voiceId}, ${b.voiceIdentityId} (${b.language}); binding ${publication.bindingSha256.slice(0, 16)}, synthesis config ${publication.synthesisConfigSha256.slice(0, 16)}`);
+  const dir = scope === 'video' ? publicationNarrationDir(videoId) : path.join(DIST_ROOT, 'narration-proof', videoId);
+  const voice = new ElevenLabsPublicationVoice({ videoId, scope, dir, publication, adapter: new ElevenLabsProvider(loadProvidersConfig().providers.elevenlabs), env: process.env, log });
+  // 3. The render path's one route to a voice: the narration budget, then the provider.
+  const track = await synthesizeNarration(spec, voice, pipeline);
+  const ref = track.publication!;
+  // 4. What the real audio does to timing and captions (the same functions render and publish:dry-run use).
+  const timeline = buildTimeline(spec, track, pipeline.templates);
+  const cues = buildCaptions(timeline);
+  const qa = new IssueCollector();
+  checkCaptions(cues, spec, timeline, pipeline.lexicon, qa);
+  const wpm = effectiveWpm(voiceRequestFor(spec, pipeline.voice, pipeline.lexicon), track);
+  const validation = scope === 'video' ? validateSpec(spec, validationContextFor(spec, pipeline, loadDocsSite(), track)) : null;
+  for (const l of track.lines) log(`  ${l.lineId}: ${fmt(l.durationMs / 1000, 2)} s, audio ${l.audio!.sha256.slice(0, 16)}`);
+  log(`narration set ${ref.identity} (${voice.outcome}): ${track.lines.length} lines, ${fmt(track.lines.reduce((n, l) => n + l.durationMs, 0) / 1000, 2)} s of speech, timeline ${fmt(timeline.totalMs / 1000, 2)} s, ${fmt(wpm, 0)} wpm (identity max ${pipeline.voice.pacing.maxWpm})`);
+  log(`  script ${ref.scriptSha256}`);
+  log(`  chunk plan ${ref.chunkPlanSha256}`);
+  log(`  audio ${ref.audioSha256}`);
+  const issues = [...qa.report().issues, ...(validation?.issues ?? [])].filter((i) => i.severity === 'error');
+  log(`caption QA ${qa.report().ok ? 'PASS' : 'FAIL'} (${cues.length} cues)${validation ? `; validation with the real narration ${validation.ok ? 'PASS' : 'FAIL'}` : ''}`);
+  for (const i of issues) log(`  ERROR ${i.code} ${i.path}: ${i.message}`);
+  if (scope === 'proof') {
+    const proof = {
+      schema: 'walletwall.publication-narration-proof/v1',
+      videoId,
+      segment: spec.segments[0]!.id,
+      outcome: voice.outcome,
+      binding: { id: b.id, provider: b.provider, modelId: b.modelId, voiceId: b.voiceId, voiceIdentityId: b.voiceIdentityId, language: b.language, settings: b.settings, chunking: b.chunking, bindingSha256: publication.bindingSha256, synthesisConfigSha256: publication.synthesisConfigSha256 },
+      narration: ref,
+      lines: track.lines.map((l) => ({ lineId: l.lineId, durationMs: l.durationMs, sha256: l.audio!.sha256 })),
+      timeline: { totalMs: timeline.totalMs, effectiveWpm: Math.round(wpm * 10) / 10, maxWpm: pipeline.voice.pacing.maxWpm },
+      captions: { cues: cues.length, qa: qa.report() },
+    };
+    const proofFile = path.join(DIST_ROOT, 'narration-proof', `${videoId}.proof.json`);
+    writeFileSync(proofFile, prettyJson(proof));
+    log(`proof summary: ${path.relative(VIDEO_ROOT, proofFile).split(path.sep).join('/')} (its narration block is exactly what render.json, provenance, and the proof receipt bind)`);
+  }
+  if (issues.length) process.exitCode = 1;
+}
+
+const publication = (): Promise<void> => publicationNarration('video');
+const publicationProof = (): Promise<void> => publicationNarration('proof');
+
+const commands: Record<string, () => Promise<void>> = { doctor, pull, synthesize, place, transcribe, review, publication, 'publication-proof': publicationProof };
 const run = command ? commands[command] : undefined;
 if (!run) {
   console.error(`usage: node scripts/narration.ts <${Object.keys(commands).join('|')}> [--option=value ...]`);

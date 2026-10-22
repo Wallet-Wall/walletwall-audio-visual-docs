@@ -61,7 +61,7 @@ describe('a passed publication proof', () => {
     assert.equal(r.ok, true);
     assert.equal(r.checked.package, true);
     const receipt = readJsonFile<PublicationProofReceipt>(receiptPath);
-    assert.equal(receipt.schema, 'walletwall.publication-proof-receipt/v1');
+    assert.equal(receipt.schema, 'walletwall.publication-proof-receipt/v2');
     assert.equal(receipt.subject.video.file.sha256, sha256Hex(readFileSync(path.join(bundle, VIDEO_ID, MP4))));
     assert.equal(receipt.subject.renderEnvironment.approvedClass, 'production-rtx5080');
     assert.equal(receipt.subject.renderEnvironment.purpose, 'publication');
@@ -100,7 +100,7 @@ describe('receipt identity', () => {
     const shuffled = reversed(a.subject) as typeof a.subject;
     assert.notEqual(JSON.stringify(shuffled), JSON.stringify(a.subject));
     assert.equal(receiptIdentity(shuffled), a.receiptSha256);
-    assert.equal(a.receiptSha256, contentAddress({ schema: 'walletwall.publication-proof-receipt/v1', subject: a.subject }));
+    assert.equal(a.receiptSha256, contentAddress({ schema: 'walletwall.publication-proof-receipt/v2', subject: a.subject }));
   });
 
   test('the time it was written is not part of the identity: changing it leaves a valid receipt', () => {

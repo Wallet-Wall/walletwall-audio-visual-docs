@@ -3,12 +3,12 @@
 > WalletWall owns what is said and how the character sounds. A provider adapter owns synthesis. The
 > artifact is hashed and provenance-bound. Nothing in a VideoSpec can reach a speech provider.
 
-This lane builds the provider-neutral narration layer and a fair listening comparison between the
-publication-quality reference (ElevenLabs) and two local candidates (NVIDIA Magpie through
-NeMo-Speech.cpp, Chatterbox Multilingual V3). It changes nothing on the render or publish path:
-`scripts/render.ts` still uses the silent fixture voice, and `config/voice-identity.json` still reports
-the publication binding as `NOT_CONFIGURED`. Promoting a winner is a separate, deliberate change
-(see "Integration proposal").
+This document covers the provider-neutral narration layer, the fair listening comparison between the
+publication-quality reference (ElevenLabs) and two local candidates (NVIDIA Magpie through NeMo-Speech.cpp,
+Chatterbox Multilingual V3), and publication narration: the approved ElevenLabs binding, the one credentialed
+step that synthesizes a video's narration, and the verified narration set that render, the publish dry run,
+the public-output gate, and the publication proof receipt replay from disk (see "Publication narration").
+The silent fixture voice stays the default everywhere.
 
 ## Production policy (2026-10-20)
 
@@ -23,9 +23,9 @@ the publication binding as `NOT_CONFIGURED`. Promoting a winner is a separate, d
 - **Local voice work continues only if it genuinely matches or beats the publication anchor** in blind listening
   on the same corpus.
 
-Wiring the publication provider into renders is still the integration step at the end of this document:
-`scripts/render.ts` uses the fixture voice and the identity's publication binding reads `NOT_CONFIGURED` until
-that change lands. The budget gate already sits in front of the route that change will use.
+The publication provider is wired (2026-10-21, "Publication narration" below): the binding is explicit,
+versioned, and approved by a content-address pin in `config/voice-identity.json`, the budget gate sits in front
+of the one step that calls it, and a provider failure fails the step instead of falling back to another voice.
 
 ## Narration budget (`walletwall.narration-budget/v1`)
 
@@ -58,6 +58,137 @@ derived by `src/spec/narration-budget.ts`; nothing authors one.
   count, the word cap, the estimated duration, and the class ceiling.
 - It is not quota tracking: no credits, balances, or spend are recorded anywhere. The contract bounds what one
   video, or one evaluation passage, can ask a provider to speak.
+
+## Publication narration
+
+> The spec decides what may be spoken. The narration budget decides whether it may be synthesized. The provider
+> only performs synthesis, once, and every later step replays the verified result from disk.
+
+```text
+VideoSpec ─▶ validateSpec (NARRATION_OVER_BUDGET included) ─▶ synthesize(): the narration budget
+          ─▶ the approved binding ─▶ voice preflight (one read-only GET) ─▶ chunk plan ─▶ one POST per chunk
+          ─▶ join ─▶ narration set (staged, verified from disk, then put in place)
+          ─▶ render · publish:dry-run · public:check · publication receipt: replay the set (no network, no key)
+```
+
+### The binding (`walletwallaby-elevenlabs-v1`)
+
+`config/narration-providers.json` names it under `publication`: the provider, the settings variant, and the chunk
+policy. The values are the anchor the owner chose 4 of 4 in blind listening on 2026-10-20:
+
+| | |
+|---|---|
+| provider, model | ElevenLabs, `eleven_multilingual_v2` |
+| voice | `DTLT09E2cxHF0DqjKVbc` (the `elevenlabs` binding's `voiceId`; declared `en-AU`) |
+| identity, language | `walletwallaby-v2`, `en-AU` (from `config/voice-identity.json`) |
+| settings (variant `publication`) | `pcm_24000`, stability 0.65, similarity boost 0.8, style 0, speaker boost on, speed 0.95, seed 7, text normalization `auto` |
+| chunk policy | whole sentences packed greedily up to 320 characters per request (a longer sentence stands alone); each chunk's edge silence trimmed to 120 ms; chunks of one line joined with 220 ms of silence; join v1: silence is every sample at or below -50 dBFS, integer samples copied, never rescaled |
+
+`src/narration/publication.ts` resolves the binding (provider, variant, model, voice, identity, language, settings,
+chunk policy, join version) and its content address. `config/voice-identity.json` approves it:
+`providerBindings.publication` is `{ status: "APPROVED", provider, binding, bindingSha256 }`, no voice id and no
+credential. A binding that does not hash to the pin is refused before anything runs, so changing a voice, model,
+setting, chunk policy, or the identity is a reviewed change that moves the pin, and every narration set made under
+the old binding goes stale. `PUBLICATION_PROVIDERS` holds `elevenlabs` alone: no configuration can bind a local or
+R&D provider for publication; promoting one is a separate policy decision and a code change.
+
+### Modes
+
+- **Fixture (development and test).** The default for every command, test, and CI job: silent, estimated timing,
+  no network, no key, deterministic. A fixture track carries no publication identity, so it never qualifies as
+  publication narration: the gate and the receipt refuse it wherever publication narration is required.
+- **Publication.** `--narration=publication` on `render`, `publish:dry-run`, `public:check`, `blender:invariants`,
+  `publication:receipt write`, and `publication:proof` replays the video's verified narration set from
+  `dist/<videoId>/narration/`. Replay never synthesizes, reads a credential, or touches the network
+  (`test/guards.test.ts`, `test/publication-narration.test.ts`); a missing, stale, or tampered set stops the step.
+- **Qwen3-TTS** stays R&D and a local fallback for experiments. It is never selected for publication and never
+  substituted when ElevenLabs fails.
+
+### The step: `npm run narration -- publication [videoId]`
+
+In order, each failing closed:
+
+1. the committed spec passes `validateSpec`, its narration budget included;
+2. the approved binding resolves (the pin matches);
+3. `synthesize()` in `src/pipeline/render-input.ts` checks the narration budget before the provider is asked;
+4. a current, verified set already on disk is reused: no key, no request, never synthesized twice;
+5. `ELEVENLABS_API_KEY` must be set; `WALLETWALLABY_ELEVENLABS_VOICE_ID` naming another voice is refused;
+6. the settings pass the ElevenLabs adapter's closed schema;
+7. the voice preflight, one GET: the key is accepted, the voice exists, is labelled the identity's variety, and is
+   the bound voice; no test sentence is synthesized;
+8. one text-to-speech POST per chunk, in order, with no retry: the first failure stops the run and leaves nothing;
+9. the set is written to a staging directory, verified from disk, and only then replaces the previous one;
+10. the timeline, captions, caption QA, and a full validation run on the measured durations (pace included).
+
+There is no fallback: when ElevenLabs fails, publication narration fails. The adapter is reached only from this
+step and the bakeoff (`scripts/narration.ts`); it decides nothing about the script, its class, or its eligibility.
+
+### Credentials
+
+`ELEVENLABS_API_KEY` only, read from the environment at step 5 and sent only to the adapter's constant host. It is
+never written to the narration set, a track, `render.json`, provenance, the receipt, a log line, or an error (the
+adapter redacts it from refusals). The record is checked for any credential-shaped environment value before it is
+written. Render, publish, and verification steps hold no key and need none.
+
+### The narration set (`walletwall.publication-narration/v1`)
+
+`dist/<videoId>/narration/` holds one WAV per narration line (`<lineId>.wav`, 16-bit PCM mono at the binding's rate)
+and `publication-narration.json`, a closed record whose `identity` is the content address of `{ schema, subject }`:
+
+- `subject.binding`: the binding id, provider, model, voice, identity, language, `bindingSha256`, and
+  `synthesisConfigSha256` (the provider, its validated settings, and the chunk policy);
+- `subject.script`: the content address of every line's id and display and spoken text hashes, in order;
+- `subject.chunkPlanSha256`: every line's chunk text hashes, in order;
+- `subject.lines`: per line, the text hashes, spoken words, chunk hashes, and the audio (file, sha256, rate,
+  channels, bits, frames, duration);
+- `subject.audioSha256`: every line's audio hash, in order;
+- `informational` (outside the identity): when it was made and how many requests it took.
+
+A set is never valid because a WAV exists. Every replay re-validates the record (own keys, every derived hash, no
+local path) and re-hashes and re-parses every WAV, then checks it is current: the script (narration text and the
+lexicon's spoken forms), the binding (provider, model, voice, settings, chunk policy, identity, language), the chunk
+plan, the video, and the scope. Anything else (a visual-only spec change) leaves it current. A stale set is
+re-synthesized, never re-labelled.
+
+### Where it is bound
+
+- the track (`track.publication`): the set's identity, provider, binding id, model, voice, identity, language, and
+  the binding, synthesis-config, script, chunk-plan, and audio hashes;
+- `render.json` (`walletwall.render-info/v6`) and `provenance.json` (`walletwall.video-provenance/v4`):
+  `narration.publication`, the same block (null for the fixture voice);
+- the public-output gate bundles the record and every WAV under `narration/` and refuses a package whose files,
+  render, or provenance name other narration than the set it replays (`NARRATION_INVALID`);
+- the publication proof receipt (`walletwall.publication-proof-receipt/v2`): `subject.narration.publication`, and
+  every narration file among the bound files; a receipt is verified against the set in its own proof package.
+
+### Timing and captions
+
+Durations are measured from the audio (frames / rate), never estimated, and the existing timeline, captions, and
+caption QA run on them unchanged. The composition plays each line's WAV at the line's start (`narrationAudio` in
+`src/timeline/timeline.ts`); the render stages the WAVs from the set, re-hashed, under names derived from line ids.
+WalletWallaby's motion follows the measured timeline, so the support audit and the Blender bridge judge the real
+timing; both fail closed on timing they cannot carry. Stills render on the fixture timeline only.
+
+### The live proof (owner-run)
+
+`npm run narration -- publication-proof` speaks the committed spec's first narrated segment (two lines, 32 spoken
+words, 190 characters) through the same path into `dist/narration-proof/<videoId>/`, and writes
+`dist/narration-proof/<videoId>.proof.json`: the binding and its hashes, the chunk plan, every line's audio hash and
+duration, the timeline and its pace, the caption QA, and the `narration` block exactly as `render.json`,
+provenance, and the receipt bind it. A current proof set is reused, not synthesized again. It is never run in CI.
+
+```powershell
+$env:ELEVENLABS_API_KEY = "<owner supplies locally>"
+npm run narration -- publication-proof
+Remove-Item Env:ELEVENLABS_API_KEY
+```
+
+### Limits
+
+- The record proves which binding a set claims and that every byte is the one recorded. It cannot prove the audio
+  came from ElevenLabs: a hosted model has no content identity and the API signs nothing. Only the publication step
+  writes `dist/<videoId>/narration/`; tests write to private temporary directories.
+- MP4 bytes are not run-to-run stable; the narration set is the stable identity of the audio.
 
 ## The boundary
 
@@ -130,7 +261,7 @@ never re-labelled. `test/voice-identity.test.ts` pins all of this.
 
 | Provider | Kind | Runs through | Model identity | Credentials |
 |---|---|---|---|---|
-| `elevenlabs` | remote reference | `fetch` to `api.elevenlabs.io` (host constant in code) | hosted, not content-addressable; audio hash only | `ELEVENLABS_API_KEY` from the environment at call time; voice id from config, `WALLETWALLABY_ELEVENLABS_VOICE_ID` overrides |
+| `elevenlabs` | remote reference | `fetch` to `api.elevenlabs.io` (host constant in code) | hosted, not content-addressable; audio hash only | `ELEVENLABS_API_KEY` from the environment at call time; voice id from config, `WALLETWALLABY_ELEVENLABS_VOICE_ID` overrides it for the bakeoff only (publication refuses an override) |
 | `magpie-nemo-speech` | local | the pinned `nemo-speech` executable (`WALLETWALL_NEMO_SPEECH` or PATH), argv list, text via a file in the work dir | GGUF, NanoCodec, and tokenizer directory sha256 pins; refused on drift | none |
 | `chatterbox-multilingual` | local | `WALLETWALL_CHATTERBOX_PYTHON -I -B tools/chatterbox/synthesize.py --job <file>` | package version + source commit, checkpoint revision, per-file sha256; refused on drift | none |
 
@@ -294,17 +425,16 @@ not use.
 | Can generated audio contain words absent from the source? | The transcript diff reports extra, missing, and repeated words as diagnostics; a human listens for hallucinated speech. |
 | Can a provider outage silently substitute another provider? | No. The provider is an explicit argument, the record names it, and every adapter fails closed (missing key, missing tool, drifted model, non-zero exit, missing or malformed output). |
 | Can local model updates silently change speech? | No. The GGUF, codec, tokenizer directory, Chatterbox revision, package version, and source commit are pinned and verified on every run. |
-| Can review audio be mistaken for publication audio? | Review copies live under `review/audio/` as anonymous letters, are gain-adjusted, and carry no record; publication would take an artifact's WAV by identity through the voice-provider boundary, which this lane does not wire. |
+| Can review audio be mistaken for publication audio? | Review copies live under `review/audio/` as anonymous letters, are gain-adjusted, and carry no record. Publication narration is only a verified set under `dist/<videoId>/narration/`, bound by identity in the render, provenance, gate, and receipt. |
+| Can a paid request happen before validation? | No. The step validates the spec (budget included), resolves the approved binding, and passes the budget gate in `synthesize()` before the provider is constructed or asked; an invalid or over-budget script makes no request (`test/publication-narration.test.ts` counts the calls). |
+| Can publication narration fall back to another provider? | No. The binding names one allowlisted provider; an ElevenLabs failure fails the step, and replay never synthesizes. |
+| Can stale narration be reused? | No. Every replay re-checks the script, binding, chunk plan, and every WAV; a set made for other text, another voice, model, setting, chunk policy, or identity is refused. |
+| Can a fixture track pass as publication narration? | No. It carries no publication identity, and the gate and receipt require the replayed set's exact identity wherever publication narration is named. |
 
-## Integration proposal (after the bakeoff; not done in this lane)
+## Integration (done 2026-10-21)
 
-1. Add `audio.narrationArtifacts` to the publish inputs: one artifact identity per narration line, bound
-   in `render.json` and the provenance manifest next to the existing `narration` block.
-2. Implement a `VoiceProvider` (the existing boundary in `src/audio/voice-provider.ts`) that maps the
-   winning adapter's artifacts to `NarrationTrack` lines (`durationMs` from the WAV, `audio.sha256` from
-   the record); keep the fixture voice as the default and CI voice.
-3. Configure the chosen binding in `config/voice-identity.json` (`status` leaves `NOT_CONFIGURED`,
-   which bumps the identity hash), gate any live synthesis behind a separate, non-required, trusted
-   workflow (docs/CI.md), and extend the public-output gate to refuse a render whose narration artifacts
-   do not match their records.
-4. Retain the local provider as the development, offline, and fallback voice regardless of the winner.
+The bakeoff's integration proposal landed as "Publication narration" above: one artifact identity per narration set
+(per-line audio hashes inside it) bound in `render.json`, provenance, the gate, and the receipt; a `VoiceProvider`
+that replays the set with measured durations; the binding configured and approved by pin; the fixture voice kept as
+the default and CI voice. Live synthesis is an owner-run step, never a workflow. Magpie remains a development
+candidate only; no local provider is a publication fallback.

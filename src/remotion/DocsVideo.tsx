@@ -12,7 +12,7 @@
 // end screen's reserved zones) is never framed.
 
 import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { AbsoluteFill, cancelRender, continueRender, delayRender, Img, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, cancelRender, continueRender, delayRender, Html5Audio, Img, Sequence, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import { cameraAt, directionAt, framingCss, planAttention, type AttentionPlan } from '../attention/direction.ts';
 import { buildCaptions } from '../audio/captions.ts';
 import { TOKENS, withAlpha } from '../brand/tokens.ts';
@@ -22,7 +22,7 @@ import { CONTENT_BOTTOM, easeInOut, TITLE_SAFE } from '../layout/geometry.ts';
 import { END_SCREEN_ZONES, PROVENANCE_CHIP } from '../layout/brand-layout.ts';
 import type { SceneLayout } from '../layout/scene-layout.ts';
 import { bindMotionEngine, sampleWithEngine, type BoundMotionEngine } from '../motion/rust-path.ts';
-import { buildTimeline, type TimedSegment, type Timeline } from '../timeline/timeline.ts';
+import { buildTimeline, narrationAudio, type NarrationAudioCue, type TimedSegment, type Timeline } from '../timeline/timeline.ts';
 import { BrandSegment } from './brand/BrandSegment.tsx';
 import { loadBrandFonts } from './fonts.ts';
 import type { DocsVideoProps } from './props.ts';
@@ -42,6 +42,8 @@ interface Model {
   /** Where the viewer's eye is guided, when (src/attention/direction.ts): derived from the same beats and layouts. */
   attention: AttentionPlan;
   captions: ReturnType<typeof buildCaptions>;
+  /** Publication narration's line WAVs, where the timeline places them (none for the silent fixture voice). */
+  audio: NarrationAudioCue[];
 }
 
 export function buildModel(props: DocsVideoProps): Model {
@@ -52,7 +54,7 @@ export function buildModel(props: DocsVideoProps): Model {
   // Fails closed: an engine plan that does not answer exactly these clips stops the render.
   const engine = bindMotionEngine(props.motionEngine, motion, timeline.fps, props.spec.id);
   const attention = planAttention(timeline, layouts, clips, props.direction);
-  return { timeline, layouts, clips, motion, engine, attention, captions: buildCaptions(timeline) };
+  return { timeline, layouts, clips, motion, engine, attention, captions: buildCaptions(timeline), audio: narrationAudio(timeline, props.track, props.spec.id) };
 }
 
 /** `contacts`: what the platforms react to (the TypeScript plan's contacts, or the engine's on the paths it performs). */
@@ -184,6 +186,13 @@ export const DocsVideo: React.FC<DocsVideoProps> = (props) => {
             : null}
         </>
       ) : null}
+
+      {/* Publication narration: each line's verified WAV, staged by scripts/render.ts, at the time the timeline gives it. Draws nothing. */}
+      {model.audio.map((a) => (
+        <Sequence key={a.lineId} from={a.fromFrame} durationInFrames={a.durationInFrames} layout="none">
+          <Html5Audio src={staticFile(a.src)} />
+        </Sequence>
+      ))}
     </AbsoluteFill>
     </MaterialContext.Provider>
   );

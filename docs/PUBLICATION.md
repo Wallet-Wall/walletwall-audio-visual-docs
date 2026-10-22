@@ -231,10 +231,10 @@ derived as before (the record and the render config, hashed), so recorded ids st
 
 ## The receipt
 
-`walletwall.publication-proof-receipt/v1`, at `dist/publication-proof/publication-proof-receipt.json`:
+`walletwall.publication-proof-receipt/v2`, at `dist/publication-proof/publication-proof-receipt.json`:
 
 ```text
-schema                      walletwall.publication-proof-receipt/v1
+schema                      walletwall.publication-proof-receipt/v2
 receiptSha256               the identity (below)
 subject
   video                     videoId, revision, specHash, canonical docs source (path, URL, blob, content hash),
@@ -248,7 +248,9 @@ subject
                             frame count, evidence file)
   renderEnvironment         class id, approved publication class, purpose, and the closed environment record
   remotion                  version and composition
-  narration                 provider, estimated, audio
+  narration                 provider, estimated, audio, and for publication narration the verified set's identity,
+                            provider, binding id, model, voice, identity, language, and its binding, synthesis
+                            config, script, chunk plan, and audio hashes (v2; null for the fixture voice)
   captions                  WebVTT and SRT sha256
   invariants                the evidence file, the motion engine, the stride, the exact lesson frames, their bridge
                             hash, pass
@@ -295,7 +297,9 @@ Nothing a receipt says is trusted. The verifier:
   - the pinned Blender identity: version, build, config, lane source, canonical model, materials, rig, camera and
     render settings, terrain;
   - the environment's class, from the record, so a forged label fails;
-  - Remotion, the narration (the fixture voice: estimated, no audio), and the captions;
+  - Remotion, the narration (the fixture voice: estimated, no audio; or the publication narration set in the
+    receipt's own proof package, replayed and re-verified against this checkout's script and approved binding), and
+    the captions;
   - the invariants' engine, frames, and plan;
   - the gate and file structure;
 - with the package beside it (the default), **re-derives the whole subject from the package** and requires equality
@@ -395,6 +399,8 @@ everything that does not need the package's bytes (the MP4 included), and says t
 - **MP4 bytes are not run-to-run stable.** A receipt identifies one artifact; determinism is proven on lossless frames.
 - **The invariants evidence proves which frames, plan, character, environment, and bar were measured.** Only a
   re-render can re-measure the values.
-- **Narration:** like the gate, the receipt supports the fixture voice only.
+- **Narration:** the fixture voice, or a verified publication narration set (`--narration=publication`,
+  [NARRATION.md](NARRATION.md), "Publication narration"). The set proves which binding it claims and every byte; it
+  cannot prove the audio came from ElevenLabs (a hosted model signs nothing).
 - **Proven on the production host for the default motion engine.** A `--motion-engine=rust-wasm` proof (invariants on
   the Rust plan) is covered by tests, not yet by a production run.
