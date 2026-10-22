@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 WalletWall
+#
+# This file uses the Blender Python API, so it is licensed GPL-3.0-or-later.
+# The rest of this repository is MIT; see docs/LICENSING.md.
 """Render settings, light, and cameras, from the pinned config (config/blender.json).
 
 Colour management is `Standard` with no look, exposure 0, gamma 1, and no

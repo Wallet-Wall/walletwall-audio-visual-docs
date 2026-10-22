@@ -28,6 +28,7 @@
     "stills:compare": "node scripts/stills-compare.ts",
     "freshness": "node scripts/freshness.ts",
     "contracts:check": "node scripts/contracts-check.ts",
+    "rights:check": "node scripts/rights-check.ts",
     "motion:build": "bash motion-intelligence/build-wasm.sh dist/motion-intelligence/motion_intelligence.wasm && node scripts/motion-wasm.ts --write dist/motion-intelligence/motion_intelligence.wasm",
     "motion:check": "bash motion-intelligence/build-wasm.sh dist/motion-intelligence/motion_intelligence.wasm && node scripts/motion-wasm.ts --check dist/motion-intelligence/motion_intelligence.wasm",
     "motion:fixtures": "node scripts/motion-fixtures.ts",

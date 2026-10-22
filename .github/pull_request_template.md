@@ -97,6 +97,7 @@ docs page → VideoSpec → timeline → motion plan → resolved pose and IK ta
 | Build / artifact regeneration | `npm run plan:check`; `npm run motion:check` (Linux or WSL) | |
 | Validation | `npm run validate`; `npm run contracts:check` | |
 | Public output | `npm run publish:dry-run`; `npm run public:check` (add `--stills=<dir>` after `npm run render:stills`) | |
+| Licenses and rights | `npm run rights:check`; before any public release also `npm run rights:check -- --public-release` ([docs/RELEASE_RIGHTS.md](../docs/RELEASE_RIGHTS.md)) | |
 | Security audit | `npm audit --audit-level=moderate`; `cargo audit` when crate dependencies change | |
 | Diff hygiene | `git diff --check` | |
 | CI | Checks: Verify pipeline, Motion Intelligence (Rust/WASM), CodeQL, Public surface, Render determinism, Dependency review ([docs/CI.md](../docs/CI.md)) | |

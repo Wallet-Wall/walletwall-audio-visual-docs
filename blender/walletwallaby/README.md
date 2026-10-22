@@ -17,3 +17,13 @@ See [docs/BLENDER.md](../../docs/BLENDER.md) for the architecture, the coordinat
 
 Only `scripts/blender.ts` runs these, through `src/blender/toolchain.ts` (fixed arguments, a minimal environment,
 jobs and outputs confined to `dist/blender/`).
+
+## License
+
+The repository is MIT, but a Python file that uses the Blender Python API is licensed `GPL-3.0-or-later`, because
+Blender's FAQ requires published scripts that call the API to be GPL. Eight files here do (`build.py`, `controls.py`,
+`materials.py`, `render.py`, `rig.py`, `scene.py`, `terrain.py`, `transition.py`); each carries its SPDX header.
+`common.py` and `geometry.py` import only the standard library and numpy, are loaded inside Blender by those files,
+and keep MIT (which is GPL-compatible). The images and `.blend` files Blender produces are not covered by the GPL.
+`npm run rights:check` derives this split from the imports and fails if a file disagrees; see
+[docs/LICENSING.md](../../docs/LICENSING.md).

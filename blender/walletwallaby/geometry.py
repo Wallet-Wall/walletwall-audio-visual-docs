@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 WalletWall
+#
+# This file uses no Blender API and keeps the repository license (MIT). GPL-3.0-or-later
+# files in this directory load it inside Blender; see docs/LICENSING.md.
 """WalletWallaby's 3D body, authored as code.
 
 The body is one mass: smooth signed-distance volumes (ellipsoids and round

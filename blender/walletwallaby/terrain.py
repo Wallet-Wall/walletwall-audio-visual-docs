@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 WalletWall
+#
+# This file uses the Blender Python API, so it is licensed GPL-3.0-or-later.
+# The rest of this repository is MIT; see docs/LICENSING.md.
 """The declared terrain, as geometry (walletwall.blender-terrain/v1).
 
 Each block is a declared element of the scene (a card, a graph node, the summit
