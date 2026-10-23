@@ -358,13 +358,48 @@
       "distribution": "NOT_DISTRIBUTED",
       "scope": "RELEASE_PATH",
       "rightsBasis": "PROVIDER_TERMS",
-      "status": "OWNER_CONFIRMATION_PENDING",
+      "status": "CLEARED",
       "licenseExpression": null,
-      "summary": "ElevenLabs synthesizes the narration (the publication binding in config/narration-providers.json). It is an external proprietary service under its Terms of Use, not an open-source dependency. Those Terms (last updated 09 October 2026) restrict free plans to non-commercial use and let paid plans use the service commercially, so commercial-use eligibility comes from the owner's plan and terms at the time of each synthesis. WalletWall policy prohibits cloning a real person's voice and using reference audio. The Terms refer to supplemental documents (a Prohibited Use Policy and others) that this record did not read. Output and provenance evidence belong to the narration receipt path.",
+      "summary": "ElevenLabs synthesizes the narration (the publication binding in config/narration-providers.json). It is an external proprietary service under its Terms of Use (non-EEA edition, last updated 09 October 2026), not an open-source dependency; the Terms let paid plans use it commercially. The narration voice is a Voice Library Professional Voice Clone, as the owner reports (voiceRights.attestation); by the provider's rules only the person whose voice it is can create, verify, and publish such a clone for other users. WalletWall holds no ownership in the speaker's voice or likeness and claims only its authored script, composition, and audiovisual work. voiceRights keeps the right to use the voice apart from the right to use its output commercially, and records the provider controls as found. Read 2026-10-22: the Terms, the Prohibited Use Policy, the Voice Library Addendum, and the API and Creative terms. No credential, account identifier, or plan tier is recorded here, only that synthesis was on a paid plan.",
       "evidence": [
         {
           "type": "URL",
           "ref": "https://elevenlabs.io/terms-of-use",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "URL",
+          "ref": "https://elevenlabs.io/vla",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "URL",
+          "ref": "https://elevenlabs.io/use-policy",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "URL",
+          "ref": "https://elevenlabs.io/docs/eleven-creative/voices/voice-library",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "URL",
+          "ref": "https://elevenlabs.io/docs/eleven-creative/voices/voice-cloning/professional-voice-cloning",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "URL",
+          "ref": "https://elevenlabs.io/docs/eleven-creative/voices/payouts",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "URL",
+          "ref": "https://elevenlabs.io/elevenapi-terms",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "URL",
+          "ref": "https://elevenlabs.io/creative-terms",
           "retrievedOn": "2026-10-22"
         },
         {
@@ -376,9 +411,59 @@
           "ref": "docs/NARRATION.md"
         }
       ],
-      "resolution": {
-        "ownerAction": "Read the supplemental terms the Terms refer to, confirm that the plan in force at each synthesis permits commercial use of the output, and record that confirmation as the clearance. Keep no account, plan, or credential details in this repository.",
-        "reassessmentTrigger": "Before each synthesis run, on any change of plan, and on any change to the provider's Terms (read 2026-10-22; last updated 09 October 2026)."
+      "voiceRights": {
+        "binding": {
+          "id": "walletwallaby-elevenlabs-v1",
+          "voiceIdSha256": "db12da018b1203450f5ba41f917696964677e77d87d158c4649969a415c1fe3b"
+        },
+        "source": "ELEVENLABS_VOICE_LIBRARY",
+        "voiceType": "PROFESSIONAL_VOICE_CLONE",
+        "authorizationBasis": "VERIFIED_OWNER_PUBLISHED",
+        "useBasis": "PROVIDER_AUTHORIZED",
+        "commercialOutputBasis": "PAID_PLAN_TERMS",
+        "ownership": {
+          "walletwallOwns": [
+            "AUTHORED_SCRIPT",
+            "COMPOSITION",
+            "AUDIOVISUAL_WORK"
+          ],
+          "speakerVoiceAndLikeness": "SPEAKER_RETAINS"
+        },
+        "attestation": {
+          "attestedBy": "OWNER",
+          "attestedOn": "2026-10-22",
+          "basis": "The owner inspected the voice in the provider's interface and reported it to the owner-rights clearance lane on 2026-10-22: a Professional Voice Clone, Australian English, narration, with a 30-day notice period. That it is its speaker's own verified clone, intentionally published for others, rests on the provider's rules for the Voice Library (only a verified owner can publish a clone), not on an independent check of who the speaker is. It cannot be re-read offline."
+        },
+        "providerControls": [
+          {
+            "kind": "NOTICE_PERIOD",
+            "state": "IN_FORCE",
+            "days": 30,
+            "observedBy": "OWNER",
+            "observedOn": "2026-10-22",
+            "note": "The owner reported a 30-day notice period on the voice's Voice Library listing, read in the provider's interface (the provider's stated minimum is 30 days). A notice period governs how long a voice stays available after its owner withdraws it: users who saved it keep access for the period, and output generated before it ends continues to exist (Voice Library Addendum, section 4). It is a condition of availability, not a restriction on this use. Not verifiable offline."
+          },
+          {
+            "kind": "LIVE_MODERATION",
+            "state": "UNDETERMINED",
+            "note": "Whether the voice's owner enabled Live Moderation was not read and cannot be read offline. When enabled, the provider screens each request's text against prohibited categories and may refuse a request or add latency; it changes no right in output already generated."
+          },
+          {
+            "kind": "CUSTOM_RESTRICTION",
+            "state": "UNDETERMINED",
+            "note": "Whether the voice's owner set a restriction beyond the notice period and Live Moderation (for example excluding free-plan users, which the provider documents as an owner option) was not read and cannot be read offline. The Voice Library Addendum describes no other owner-set restriction, but the Terms make restrictions on the use of a User Voice Model that are disclosed within the Services part of the agreement, so one found in force binds this use. Record it here with the owner's compliance record before the voice stays CLEARED."
+          },
+          {
+            "kind": "LIBRARY_REMOVAL",
+            "state": "UNDETERMINED",
+            "note": "No withdrawal has been reported to this record, but whether the voice's owner later withdraws it, or the provider removes it (the Addendum reserves that right, with or without notice), cannot be determined offline. A withdrawal is prospective: it ends synthesis after its notice period and is no evidence that output generated while the voice was available was unauthorized."
+          }
+        ]
+      },
+      "clearance": {
+        "clearedBy": "OWNER",
+        "clearedOn": "2026-10-22",
+        "basis": "Recorded on the owner's instruction (owner-rights clearance lane, 2026-10-22) after the Terms, Prohibited Use Policy, Voice Library Addendum, and API and Creative terms were read that day. By the provider's rules a Professional Voice Clone is created and verified only by the person whose voice it is and published to the Voice Library only by that person, for other users; the provider authorizes its use and a paid plan carries a commercial license. The owner reports the voice is such a clone and states the narration set was generated through the owner's paid account. Reassess before each synthesis, on a change of plan or terms, and if the voice is withdrawn."
       }
     },
     {
@@ -511,13 +596,23 @@
       "scope": "RELEASE_PATH",
       "distribution": "IN_RELEASE_OUTPUT",
       "rightsBasis": "PROVIDER_TERMS",
-      "status": "OWNER_CONFIRMATION_PENDING",
+      "status": "CLEARED",
       "licenseExpression": null,
-      "summary": "Synthetic narration audio sets the provider generates and the publication receipt binds. The provider's Terms leave the user's rights in Output with the user, subject to the Terms, and allow commercial use only on a plan that permits it. The audio lives in the ignored dist directory, not in git; its identity is bound by the narration receipt, not by this record.",
+      "summary": "Synthetic narration audio sets the provider generates and the publication receipt binds. The Terms leave the user's rights in Output with the user as between the user and the provider and allow commercial use on a paid plan, subject to the Prohibited Use Policy. WalletWall owns the narration text and the work it composes, not the speaker's voice or likeness. The audio lives in the ignored dist directory, not in git; its identity is bound by the narration receipt, not by this record.",
       "evidence": [
         {
           "type": "URL",
           "ref": "https://elevenlabs.io/terms-of-use",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "URL",
+          "ref": "https://elevenlabs.io/docs/help-center/legal/can-i-publish-the-content-i-generate-on-the-platform",
+          "retrievedOn": "2026-10-22"
+        },
+        {
+          "type": "URL",
+          "ref": "https://elevenlabs.io/vla",
           "retrievedOn": "2026-10-22"
         },
         {
@@ -528,9 +623,10 @@
       "producedBy": [
         "elevenlabs-service"
       ],
-      "resolution": {
-        "ownerAction": "Resolve the elevenlabs-service item for the synthesis run that produced the set that ships.",
-        "reassessmentTrigger": "Each new synthesis run, or a change of plan or terms."
+      "clearance": {
+        "clearedBy": "OWNER",
+        "clearedOn": "2026-10-22",
+        "basis": "Recorded on the owner's instruction (2026-10-22): the narration set 412671a1 (24 lines, generated through the owner's paid account, not resynthesized) is output of the elevenlabs-service voice, which is CLEARED. The Terms give paid plans commercial use and leave the rights in Output with the user, subject to the Prohibited Use Policy; the publication default declares the video as containing synthetic media. WalletWall owns the text and the work, not the speaker's voice or likeness. A new synthesis run, a change of plan or terms, or a withdrawal of the voice reopens this."
       }
     }
   ],
@@ -1054,7 +1150,7 @@
             "componentId": "elevenlabs-service"
           },
           "rightsBasis": "PROVIDER_TERMS",
-          "status": "OWNER_CONFIRMATION_PENDING",
+          "status": "CLEARED",
           "licenseExpression": null,
           "evidence": [
             {
@@ -1067,9 +1163,10 @@
               "retrievedOn": "2026-10-22"
             }
           ],
-          "resolution": {
-            "ownerAction": "Confirm that the plan in force when this video's narration set was synthesized permits commercial use, and record it as the clearance.",
-            "reassessmentTrigger": "Each new synthesis run for this video."
+          "clearance": {
+            "clearedBy": "OWNER",
+            "clearedOn": "2026-10-22",
+            "basis": "Recorded on the owner's instruction (2026-10-22): this video's narration is the set 412671a1 (24 lines), already generated through the owner's paid account with the elevenlabs-service voice and the elevenlabs-narration-audio output, both CLEARED; it is not resynthesized. WalletWall owns the authored text and the work, not the speaker's voice or likeness. A new synthesis run, a change of plan or terms, or a withdrawal of the voice reopens this."
           }
         }
       ],
