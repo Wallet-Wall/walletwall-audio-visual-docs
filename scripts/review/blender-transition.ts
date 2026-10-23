@@ -32,7 +32,7 @@ const opt = (n: string): string | undefined => args.find((a) => a.startsWith(`--
 const context = opt('context');
 const stillsOnly = args.includes('--stills-only'); // skip the Remotion clip: Blender's reveal frames are the evidence
 const reuseLayers = args.includes('--reuse-layers'); // reuse the two characterless surfaces from an earlier run
-const clip = (opt('clip') ?? '1620..1770').split('..').map(Number) as [number, number];
+const clip = (opt('clip') ?? '1644..1794').split('..').map(Number) as [number, number];
 const NAME = 'reveal-tiers-signals';
 const videoId = 'migration-readiness';
 const cfg = loadBlenderConfig();

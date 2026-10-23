@@ -68,7 +68,7 @@ Everything is a pure function of (timeline, layouts, clips, config, time). The m
 ## Review
 
 ```bash
-npm run render:stills -- migration-readiness --frames=1430,1630,1780,2830,3880,4430,5030
+npm run render:stills -- migration-readiness --frames=1471,1654,1804,2750,3720,4243,4455
 node scripts/review/attention-review.ts --before=<main's stills> --after=dist/migration-readiness/stills --out=dist/attention-review
 ```
 

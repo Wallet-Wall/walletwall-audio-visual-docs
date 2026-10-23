@@ -20,13 +20,13 @@
   "realizationSha256": "ac81bb8e27868cb5feb0dee2c9cf7e66b6a4b63d5df77dd242a33bab5273f18c",
   "blenderConfigSha256": "f89c3a8b238d23ae214a5abab381486cc2e629463bbdfdefea7216e9b310beeb",
   "blenderSceneSourceSha256": "ad53c844d9ff5fbe85fe625c5ed8c591bb0a97ff6cfc23843ac370a544e1b39e",
-  "motionPlanSha256": "33a8627c3a7dccbe87dd8d6dbe2b183469615fc0e157354747b3b203f5d2fb0f",
+  "motionPlanSha256": "e46e3d0675e1fcd57db645e95c8f74b6ffd13464e9523e2e8646eeb928070237",
   "roles": [
     {
       "role": "idle",
       "frame": 39,
       "file": "idle.png",
-      "sha256": "3187427f3cce0f934676b67ea9412f5133310534a224970350598acc50b23bc8",
+      "sha256": "3a74a33557d1425f917424f1e68b1b3e8b264910cd59ec2632d79d38ac847540",
       "crop": {
         "height": 353,
         "width": 356,
@@ -36,7 +36,7 @@
     },
     {
       "role": "crouch",
-      "frame": 196,
+      "frame": 309,
       "file": "crouch.png",
       "sha256": "5ed6f9fc38377c5706882f122f29397e0f6e0d260e4f57934509b7cc8db040d0",
       "crop": {
@@ -62,7 +62,7 @@
       "role": "landing",
       "frame": 30,
       "file": "landing.png",
-      "sha256": "1f2a919199561cb7ee0824b2c33ea0ab85b44fb193c9c23074ab7202718fab33",
+      "sha256": "5fc4d888b046a26332c198c8ed7fcc283f90a23ca23f76a3407ccffaf07c6e06",
       "crop": {
         "height": 354,
         "width": 356,
@@ -72,9 +72,9 @@
     },
     {
       "role": "perch",
-      "frame": 2651,
+      "frame": 2571,
       "file": "perch.png",
-      "sha256": "2fc4acaf8bf616868a206204e3a051f7712e979075a76df198e54fe3044260f3",
+      "sha256": "6ad13b9b2addf9c86d90f2c19e67971a69938270182b59b8673452df74aa32ad",
       "crop": {
         "height": 353,
         "width": 356,
@@ -84,9 +84,9 @@
     },
     {
       "role": "inspect",
-      "frame": 64,
+      "frame": 176,
       "file": "inspect.png",
-      "sha256": "e49fa2966aefc28370d3ba0767066b6beb9fc1a2fe98e01a266dd9df9f4c6b53",
+      "sha256": "f9297b6979ce72661fc2dbe16e6b02138410e93b13e406648cee3579893c6463",
       "crop": {
         "height": 353,
         "width": 356,
@@ -96,35 +96,35 @@
     },
     {
       "role": "tail-brace",
-      "frame": 925,
+      "frame": 2227,
       "file": "tail-brace.png",
-      "sha256": "9b0f06a9e864b745ea056b7f2e690c565de011e5ba5acf9fc298d6a4dc428c90",
+      "sha256": "37d7f7567568e5b1a41b137a9e7730116505e5fd70921753ec61824a6e5fd6a2",
       "crop": {
-        "height": 317,
-        "width": 320,
-        "x": 175,
-        "y": 417
+        "height": 354,
+        "width": 356,
+        "x": 680,
+        "y": 120
       }
     },
     {
       "role": "transition-entry",
-      "frame": 1649,
+      "frame": 1673,
       "file": "transition-entry.png",
-      "sha256": "2fb4f2833bdf7ccc5f5695770c5ae4df3f5356876de03083ad706756dee7b866",
+      "sha256": "2c59896f8a7696d733df844e1f18cf368f16d40b67e616ae061097854fa92cd0",
       "crop": null
     },
     {
       "role": "transition-peak",
-      "frame": 1690,
+      "frame": 1714,
       "file": "transition-peak.png",
       "sha256": "9041fa22504cedd387115477f486d68668a6b47fa9f4b3b9ff024acc9e27ee99",
       "crop": null
     },
     {
       "role": "transition-exit",
-      "frame": 1744,
+      "frame": 1768,
       "file": "transition-exit.png",
-      "sha256": "fa871d963348fed2e89ee761306e2c64efe958b8601f12384da8966075a21e2d",
+      "sha256": "06c38f15960866b32e07fe238d1cf757f863a2894f300f16ca1008ab68a63a33",
       "crop": null
     }
   ],

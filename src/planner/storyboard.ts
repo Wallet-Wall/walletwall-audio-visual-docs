@@ -28,7 +28,7 @@ export interface Storyboard {
 
 export interface ContentStoryboardSegment {
   id: string;
-  role: Exclude<SegmentRole, 'CTA' | 'DOCS_REFERENCE' | 'OUTRO' | 'END_SCREEN'>;
+  role: Exclude<SegmentRole, 'DOCS_REFERENCE' | 'END_SCREEN'>;
   transitionIn: TransitionSpec;
   scene: SceneSpec;
   narration: Omit<NarrationLine, 'templateId'>[];
@@ -38,7 +38,7 @@ export interface ContentStoryboardSegment {
 
 export interface BrandStoryboardSegment {
   id: string;
-  role: 'CTA' | 'DOCS_REFERENCE' | 'OUTRO' | 'END_SCREEN';
+  role: 'DOCS_REFERENCE' | 'END_SCREEN';
   transitionIn: TransitionSpec;
   templateId: string;
 }

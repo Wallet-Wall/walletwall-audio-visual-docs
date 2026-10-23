@@ -45,11 +45,12 @@ import { committedSnapshot, committedSpec, config } from './helpers.ts';
 const RIVE_PROVEN_POSES_PIN = 'f8e79d0b1c2cbc3588d6f09a5e0273537624a2a009970ac0730988f783d7467a';
 /**
  * Self-derived regression pins of today's lesson (not Rive-proven): its resolved poses of every 23rd frame
- * (re-derived 2026-10-21), and those of the hook alone, which precedes the removed ident and so resolves exactly as on
- * main 011b39c5.
+ * (re-derived 2026-10-22, when the speech came to own the cadence and the lesson gained its opening line), and the
+ * body of the hook's first hop: every frame from the start through its settle (0..55), with the mouth at rest (the
+ * opening line speaks other words), resolves exactly as on main 83640ffb, where this same pin was computed.
  */
-const RESOLVED_POSES_PIN = '26ea6d8c5def98a4edf6a1265f229954425e6b5f12ebd041b496492026978a63';
-const HOOK_POSES_PIN = 'e690444d9312c20140897b7ec2c4741ea55a1cd124ed46db8d21a2b395e701d7';
+const RESOLVED_POSES_PIN = 'fd2ea667c0f01ea512b042a3a2e81203c3079f7dedca14d90e357f9f82de16ee';
+const HOOK_BODY_POSES_PIN = 'e9460f2cefee61ca5d79db72a18ff62ac3d5d81b81534028a3c01efbbb9dac1c';
 const RIG_DOCUMENT_PIN = 'cd49bd326c3fe914e57f7f5123ba65489282357fc022d2ea90e411d6d9e4cc38';
 
 const spec = committedSpec();
@@ -98,13 +99,17 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
       if (state.visible) poses.push({ frame: f, pose: round(resolvePose(model, rigControls(state))) });
     }
     assert.equal(contentAddress(poses), RESOLVED_POSES_PIN, `${poses.length} resolved poses`);
-    const hookEnd = Math.round((timeline.segments[0]!.endMs * timeline.fps) / 1000);
-    assert.equal(contentAddress(poses.filter((p) => p.frame < hookEnd)), HOOK_POSES_PIN, 'the hook resolves exactly as on main 011b39c5');
+    const hookBody = [];
+    for (let f = 0; f <= 55; f++) {
+      const state = sampleWallaby(plan, (f * 1000) / timeline.fps, 'REST');
+      if (state.visible) hookBody.push({ frame: f, pose: round(resolvePose(model, rigControls(state))) });
+    }
+    assert.equal(contentAddress(hookBody), HOOK_BODY_POSES_PIN, 'the hook\'s first hop and its settle resolve exactly as on main 83640ffb');
     assert.equal(contentAddress(blenderRigDocument(model)), RIG_DOCUMENT_PIN);
   });
 
   test('positive control: a 0.01 degree change in one bone is caught', () => {
-    const { state } = at(1780);
+    const { state } = at(1804);
     const controls = rigControls(state);
     const a = resolvePose(model, controls);
     const b = resolvePose(model, { ...controls, head: { deg: controls.head.deg + 0.01 } });
@@ -124,13 +129,13 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
   });
 
   test('a grounded frame with no declared top under it is refused (positive control: the real terrain passes)', () => {
-    const { state, segment, onScreen } = at(1780);
-    assert.doesNotThrow(() => bridgeFrame(model, 1780, segment, state, onScreen));
-    assert.throws(() => bridgeFrame(model, 1780, segment, state, [{ surfaces: [], protectedText: [] }]), BlenderBridgeError);
+    const { state, segment, onScreen } = at(1804);
+    assert.doesNotThrow(() => bridgeFrame(model, 1804, segment, state, onScreen));
+    assert.throws(() => bridgeFrame(model, 1804, segment, state, [{ surfaces: [], protectedText: [] }]), BlenderBridgeError);
   });
 
   test('the bridge refuses anything that is not exactly v1', () => {
-    const good = doc(1770, 1775);
+    const good = doc(1794, 1799);
     assert.doesNotThrow(() => validateBridge(JSON.parse(JSON.stringify(good))));
     // A subset of the range (review stills, the proof set, some frames of a reveal) is a bridge too.
     const subset = JSON.parse(JSON.stringify(good));
@@ -142,8 +147,8 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
       ['no frames', (d) => (d.frames = [])],
       ['a repeated frame', (d) => (d.frames[2] = JSON.parse(JSON.stringify(d.frames[1])))],
       ['frames out of order', (d) => d.frames.reverse()],
-      ['a frame outside the range', (d) => (d.range.last = 1774)],
-      ['more frames than the range holds', (d) => (d.range.first = 1771)],
+      ['a frame outside the range', (d) => (d.range.last = 1798)],
+      ['more frames than the range holds', (d) => (d.range.first = 1795)],
       ['non-finite rotation', (d) => (d.frames[1].pose.rot.head = Number.NaN)],
       ['an unknown clip', (d) => (d.frames[1].pose.clips = { dance: 1 })],
       ['clip weights not summing to 1', (d) => (d.frames[1].pose.clips = { idle_alert: 0.5 })],
@@ -224,15 +229,15 @@ describe('character crops and the proof set', () => {
   });
 
   test('a crop needs a visible frame and a non-negative pad; a frame wholly outside the picture has none', () => {
-    const f = lesson.frames[1780]!;
+    const f = lesson.frames[1804]!;
     assert.throws(() => characterCrop(f, RIG_ENVELOPE, -1, frameSize));
     assert.equal(characterCrop({ ...f, place: { ...f.place, x: 5000 } }, RIG_ENVELOPE, 40, frameSize), null);
     assert.equal(characterCrop({ ...f, visible: false }, RIG_ENVELOPE, 40, frameSize), null);
   });
 
   test('the proof set is chosen by fixed rules from the lesson, the same every time', () => {
-    const a = characterProofFrames(lesson, 40, { first: 1649, last: 1744 });
-    const b = characterProofFrames(JSON.parse(JSON.stringify(lesson)), 40, { first: 1649, last: 1744 });
+    const a = characterProofFrames(lesson, 40, { first: 1673, last: 1768 });
+    const b = characterProofFrames(JSON.parse(JSON.stringify(lesson)), 40, { first: 1673, last: 1768 });
     assert.deepEqual(a, b);
     const at = (n: number) => lesson.frames[n]!.semantic;
     assert.equal(at(a.idle).action, 'IDLE');
@@ -242,7 +247,7 @@ describe('character crops and the proof set', () => {
     assert.ok(at(a['tail-brace']).landingImpulse > 0.9);
     assert.ok(lesson.frames[a['tail-brace']]!.pose.ik.tail >= 0.999, `the tail brace's tail is solved onto its support (frame ${a['tail-brace']}: tail IK ${lesson.frames[a['tail-brace']]!.pose.ik.tail})`);
     assert.equal(at(a.inspect).action, 'INSPECT');
-    for (const n of Object.values(a)) assert.ok(n < 1649 || n > 1744, 'character roles stay outside the reveal');
+    for (const n of Object.values(a)) assert.ok(n < 1673 || n > 1768, 'character roles stay outside the reveal');
   });
 });
 

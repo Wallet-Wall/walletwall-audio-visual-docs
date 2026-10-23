@@ -92,20 +92,20 @@ describe('the attention config', () => {
 describe('the mode grammar', () => {
   test('is derived from the beats alone, at the representative frames', () => {
     const expect: [number, string, AttentionMode, string[]][] = [
-      [1430, 'tiers', 'GUIDE', ['review']],
-      [1590, 'tiers', 'INSPECT', ['vault-candidate']],
-      [1649, 'tiers', 'TRANSITION', []],
-      [1720, 'signals', 'TRANSITION', []],
-      [1750, 'signals', 'ESTABLISH', []],
-      [1780, 'signals', 'GUIDE', ['value-at-risk']],
-      [1850, 'signals', 'INSPECT', ['wallet-structure']],
-      [2080, 'signals', 'GUIDE', ['tier']],
-      [2530, 'reading', 'COMPARE', ['reading-band', 'reading-verdict']],
-      [2830, 'reading', 'ESTABLISH', []],
-      [3260, 'vault-conditional', 'INSPECT', ['vault-testnet']],
-      [3530, 'vault-conditional', 'RESOLVE', ['vault-research']],
-      [3880, 'takeaway', 'GUIDE', ['takeaway-statement']],
-      [4130, 'takeaway', 'RESOLVE', ['takeaway-statement']],
+      [1471, 'tiers', 'GUIDE', ['review']],
+      [1630, 'tiers', 'INSPECT', ['vault-candidate']],
+      [1673, 'tiers', 'TRANSITION', []],
+      [1744, 'signals', 'TRANSITION', []],
+      [1774, 'signals', 'ESTABLISH', []],
+      [1804, 'signals', 'GUIDE', ['value-at-risk']],
+      [1859, 'signals', 'INSPECT', ['wallet-structure']],
+      [2053, 'signals', 'GUIDE', ['tier']],
+      [2450, 'reading', 'COMPARE', ['reading-band', 'reading-verdict']],
+      [2750, 'reading', 'ESTABLISH', []],
+      [3154, 'vault-conditional', 'INSPECT', ['vault-testnet']],
+      [3387, 'vault-conditional', 'RESOLVE', ['vault-research']],
+      [3720, 'takeaway', 'GUIDE', ['takeaway-statement']],
+      [3959, 'takeaway', 'RESOLVE', ['takeaway-statement']],
     ];
     for (const [frame, segId, mode, primary] of expect) {
       const s = segmentAt(msOf(frame));
@@ -146,7 +146,7 @@ describe('the mode grammar', () => {
     const again = planAttention(timeline, layouts, clips, attention);
     assert.deepEqual([...again.segments.entries()], [...plan.segments.entries()]);
     assert.deepEqual(again.camera, plan.camera);
-    for (const frame of [0, 56, 1430, 1590, 1630, 1780, 1850, 2530, 3260, 3880, 4050, 4250, 5030]) {
+    for (const frame of [0, 168, 1471, 1630, 1654, 1804, 1859, 2450, 3154, 3720, 3879, 4068, 4455]) {
       const s = segmentAt(msOf(frame));
       assert.deepEqual(directionAt(plan, s.id, msOf(frame)), directionAt(again, s.id, msOf(frame)));
       assert.deepEqual(cameraAt(plan, msOf(frame)), cameraAt(again, msOf(frame)));
@@ -317,13 +317,13 @@ describe('what attention direction may never change', () => {
     assert.equal(contentAddress(clips), clipsBefore);
     // The declared terrain and the layouts are exactly what test/terrain-art.test.ts pins as main's.
     const terrains = [...terrainsFor(timeline.segments, layouts).entries()].sort(([a], [b]) => (a < b ? -1 : 1));
-    assert.equal(contentAddress(terrains), '7a76e388b254f2b145281ae409e5df959de21e6c202d8bb37e272824a2b9f4d1');
+    assert.equal(contentAddress(terrains), '2be957526f16b5c476f24812e3f336b91fb20d978a58f6718aeeb11c17509e6e');
     assert.equal(before, '986d9087baffb1c727594416c64fb8ca8bd3ad55461fb132fddd02e9e4a02121');
   });
 
   test('the motion plan does not depend on attention direction, and direction does not read the character', () => {
     const motion = planMotion(clips, layouts);
-    const states = [1430, 1780, 3260, 3880, 4230].map((fr) => sampleWallaby(motion, msOf(fr)));
+    const states = [1471, 1804, 3154, 3720, 4059].map((fr) => sampleWallaby(motion, msOf(fr)));
     // The plan was built from the same clips and layouts; the character's feet are where the motion plan puts them, framed or not.
     for (const s of states) assert.ok(Number.isFinite(s.x) && Number.isFinite(s.y));
     const text = src('src/attention/direction.ts');
@@ -333,7 +333,7 @@ describe('what attention direction may never change', () => {
 
   test('the character and its support stay registered exactly: one transform about one origin frames the whole content world', () => {
     const motion = planMotion(clips, layouts);
-    for (const fr of [56, 100, 1850, 1930, 3260, 3530, 4130]) {
+    for (const fr of [168, 212, 1859, 1939, 3154, 3387, 3959]) {
       const c = cameraAt(plan, msOf(fr));
       const s = sampleWallaby(motion, msOf(fr));
       const feet = { x: s.x, y: s.y };

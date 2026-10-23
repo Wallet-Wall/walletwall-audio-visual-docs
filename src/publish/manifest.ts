@@ -53,7 +53,7 @@ export interface PublishManifest {
   };
 }
 
-const OUTRO_ROLES = new Set(['CTA', 'DOCS_REFERENCE', 'OUTRO', 'END_SCREEN']);
+const OUTRO_ROLES = new Set(['DOCS_REFERENCE', 'END_SCREEN']);
 
 /** Chapters from scene headings; brand segments fold into neighbors; chapters under the minimum merge back. */
 export function buildChapters(timeline: Timeline, minSeconds: number): Chapter[] {

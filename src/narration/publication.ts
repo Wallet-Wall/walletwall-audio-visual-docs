@@ -8,7 +8,11 @@
 //   or names a provider outside PUBLICATION_PROVIDERS, is refused before anything runs;
 // - the chunk plan (whole sentences packed up to a character budget) and the deterministic, lossless join;
 // - the narration set: one WAV per narration line plus a closed, content-addressed record binding the script, the
-//   binding, the chunk plan, and every audio byte (walletwall.publication-narration/v1);
+//   binding, the chunk plan, the pronunciation entries the script speaks, and every audio byte
+//   (walletwall.publication-narration/v2);
+// - partial regeneration: the lines of a previous verified set (v1 or v2) whose audio is still exactly right (the same
+//   spoken text, chunk plan, and binding, every byte checked against that set's own record) carry over into the next
+//   set; only the rest are paid for, and the new record is built from the current script alone;
 // - the replay: a VoiceProvider that reads a set from disk, verifies all of it against the current script and binding,
 //   and returns a track whose durations are measured from the audio. A stale or tampered set is refused, never reused.
 //
@@ -25,12 +29,15 @@ import { readContainedFile } from '../core/contained-read.ts';
 import { contentAddress, sha256Hex } from '../core/hash.ts';
 import type { NarrationTrack, PublicationNarrationRef } from '../timeline/timeline.ts';
 import { LOCAL_PATH_SHAPE } from './artifact.ts';
+import { assertLexiconPinned, narrationLexiconBinding, type NarrationLexiconBinding } from './lexicon.ts';
 import { parseWav, wrapPcm16 } from './wav.ts';
 
 /** The providers that may be bound for publication. Promoting another (a local or R&D voice) is a separate policy decision and a code change. */
 export const PUBLICATION_PROVIDERS = ['elevenlabs'] as const;
 export const PUBLICATION_BINDING_SCHEMA = 'walletwall.publication-voice-binding/v1';
-export const PUBLICATION_NARRATION_SCHEMA = 'walletwall.publication-narration/v1';
+export const PUBLICATION_NARRATION_SCHEMA = 'walletwall.publication-narration/v2';
+/** The record before it bound the lexicon: never current, but its lines can carry over (carryOverLines). */
+export const PUBLICATION_NARRATION_SCHEMA_V1 = 'walletwall.publication-narration/v1';
 export const PUBLICATION_RECORD_FILE = 'publication-narration.json';
 /** The join's own behaviour, versioned: part of every binding, so a change to the join stales every set made with the old one. */
 export const CHUNK_JOIN = Object.freeze({ version: 1, silenceDbfs: -50 } as const);
@@ -293,11 +300,24 @@ export interface PublicationNarrationRecord {
     binding: PublicationRecordBinding;
     script: { sha256: string; lines: number; spokenWords: number };
     chunkPlanSha256: string;
+    /** The lexicon (src/narration/lexicon.ts): its id and version, and the content address of the entries the script speaks. */
+    lexicon: NarrationLexiconBinding;
     audioSha256: string;
     lines: PublicationLineRecord[];
   };
-  /** Never part of the identity. */
-  informational: { generatedAt: string | null; requests: number };
+  /** Never part of the identity: when it was made, the paid requests it took, and the lines carried from a previous set. */
+  informational: { generatedAt: string | null; requests: number; carried: CarriedLine[] };
+}
+
+/**
+ * A line whose audio this set carried over instead of paying for it again, and where that audio was made: the identity
+ * of the set whose synthesis run made it, and that run's time (null when that record had none). Followed back through
+ * any number of carries, so a set that ships can always say which run, and so which plan, made each of its lines.
+ */
+export interface CarriedLine {
+  lineId: string;
+  madeIn: string;
+  madeAt: string | null;
 }
 
 /** What a set must be for the current script and binding: derived from the voice request alone, before any file is read. */
@@ -309,6 +329,7 @@ export interface PublicationExpectation {
   lines: { lineId: string; displaySha256: string; spokenSha256: string; spokenWords: number; chunks: string[]; texts: string[] }[];
   scriptSha256: string;
   chunkPlanSha256: string;
+  lexicon: NarrationLexiconBinding;
 }
 
 const scriptAddress = (lines: readonly { lineId: string; displaySha256: string; spokenSha256: string }[]): string => contentAddress(lines.map((l) => ({ lineId: l.lineId, displaySha256: l.displaySha256, spokenSha256: l.spokenSha256 })));
@@ -338,12 +359,13 @@ export function publicationExpectation(request: VoiceRequest, publication: Resol
     lines,
     scriptSha256: scriptAddress(lines),
     chunkPlanSha256: chunkAddress(lines),
+    lexicon: narrationLexiconBinding(request.lines.map((l) => l.displayText), request.lexicon),
   };
 }
 
 export const recordIdentity = (schema: string, subject: PublicationNarrationRecord['subject']): string => contentAddress({ schema, subject });
 
-export function buildPublicationRecord(args: { expectation: PublicationExpectation; videoId: string; audio: ReadonlyMap<string, Uint8Array>; generatedAt: string | null; requests: number }): PublicationNarrationRecord {
+export function buildPublicationRecord(args: { expectation: PublicationExpectation; videoId: string; audio: ReadonlyMap<string, Uint8Array>; generatedAt: string | null; requests: number; carried?: readonly CarriedLine[] }): PublicationNarrationRecord {
   const e = args.expectation;
   const lines: PublicationLineRecord[] = e.lines.map((l) => {
     const wav = args.audio.get(l.lineId);
@@ -357,19 +379,24 @@ export function buildPublicationRecord(args: { expectation: PublicationExpectati
     binding: { ...e.binding },
     script: { sha256: e.scriptSha256, lines: lines.length, spokenWords: lines.reduce((n, l) => n + l.spokenWords, 0) },
     chunkPlanSha256: e.chunkPlanSha256,
+    lexicon: { ...e.lexicon },
     audioSha256: contentAddress(lines.map((l) => l.audio.sha256)),
     lines,
   };
-  return { schema: PUBLICATION_NARRATION_SCHEMA, identity: recordIdentity(PUBLICATION_NARRATION_SCHEMA, subject), subject, informational: { generatedAt: args.generatedAt, requests: args.requests } };
+  return { schema: PUBLICATION_NARRATION_SCHEMA, identity: recordIdentity(PUBLICATION_NARRATION_SCHEMA, subject), subject, informational: { generatedAt: args.generatedAt, requests: args.requests, carried: (args.carried ?? []).map((c) => ({ lineId: c.lineId, madeIn: c.madeIn, madeAt: c.madeAt })) } };
 }
 
 const TOP = ['schema', 'identity', 'subject', 'informational'];
-const SUBJECT = ['videoId', 'scope', 'binding', 'script', 'chunkPlanSha256', 'audioSha256', 'lines'];
+const SUBJECT = ['videoId', 'scope', 'binding', 'script', 'chunkPlanSha256', 'lexicon', 'audioSha256', 'lines'];
+const SUBJECT_V1 = SUBJECT.filter((k) => k !== 'lexicon');
+const LEXICON = ['id', 'version', 'appliedSha256'];
 const BINDING = ['id', 'provider', 'modelId', 'voiceId', 'voiceIdentityId', 'language', 'bindingSha256', 'synthesisConfigSha256'];
 const SCRIPT = ['sha256', 'lines', 'spokenWords'];
 const LINE = ['lineId', 'displaySha256', 'spokenSha256', 'spokenWords', 'chunks', 'audio'];
 const AUDIO = ['file', 'sha256', 'sampleRate', 'channels', 'bitsPerSample', 'frames', 'durationMs'];
-const INFO = ['generatedAt', 'requests'];
+const INFO = ['generatedAt', 'requests', 'carried'];
+const INFO_V1 = ['generatedAt', 'requests'];
+const CARRIED = ['lineId', 'madeIn', 'madeAt'];
 
 function* strings(value: unknown): Generator<string> {
   if (typeof value === 'string') yield value;
@@ -385,9 +412,10 @@ function* strings(value: unknown): Generator<string> {
 /**
  * Validate a record: the closed shape at every level (own keys only), every hash it derives (script, chunk plan, audio,
  * identity) consistent with its lines, a publication provider, no local path, and no credential-shaped environment value
- * (`env`) anywhere in it. Returns the problems; an empty list is a valid record.
+ * (`env`) anywhere in it. Returns the problems; an empty list is a valid record. `legacy` also admits the v1 format
+ * (no lexicon binding), which is never current but whose lines may carry over.
  */
-export function validatePublicationRecord(value: unknown, env: Readonly<Record<string, string | undefined>>): string[] {
+export function validatePublicationRecord(value: unknown, env: Readonly<Record<string, string | undefined>>, opts: { legacy?: boolean } = {}): string[] {
   const errors: string[] = [];
   const shape = (v: unknown, keys: readonly string[], where: string): v is Obj => {
     if (v === null || typeof v !== 'object' || Array.isArray(v)) {
@@ -401,10 +429,16 @@ export function validatePublicationRecord(value: unknown, env: Readonly<Record<s
   const hex = (v: unknown, where: string) => typeof v === 'string' && HEX64.test(v) ? true : (errors.push(`${where} must be a sha256`), false);
   const whole = (v: unknown, where: string, min = 0) => typeof v === 'number' && Number.isInteger(v) && v >= min ? true : (errors.push(`${where} must be a whole number >= ${min}`), false);
   if (!shape(value, TOP, 'record')) return errors;
-  if (value.schema !== PUBLICATION_NARRATION_SCHEMA) errors.push(`schema must be ${PUBLICATION_NARRATION_SCHEMA}`);
+  const v1 = opts.legacy === true && value.schema === PUBLICATION_NARRATION_SCHEMA_V1;
+  if (value.schema !== PUBLICATION_NARRATION_SCHEMA && !v1) errors.push(`schema must be ${PUBLICATION_NARRATION_SCHEMA}`);
   hex(value.identity, 'identity');
   const s = value.subject;
-  if (shape(s, SUBJECT, 'subject')) {
+  if (shape(s, v1 ? SUBJECT_V1 : SUBJECT, 'subject')) {
+    if (!v1 && shape(s.lexicon, LEXICON, 'subject.lexicon')) {
+      if (typeof s.lexicon.id !== 'string' || !PLAIN.test(s.lexicon.id)) errors.push('subject.lexicon.id must be a plain id');
+      whole(s.lexicon.version, 'subject.lexicon.version', 1);
+      hex(s.lexicon.appliedSha256, 'subject.lexicon.appliedSha256');
+    }
     if (typeof s.videoId !== 'string' || !VIDEO_ID.test(s.videoId)) errors.push('subject.videoId must be a plain id');
     if (s.scope !== 'video' && s.scope !== 'proof') errors.push('subject.scope must be video or proof');
     if (shape(s.binding, BINDING, 'subject.binding')) {
@@ -448,10 +482,27 @@ export function validatePublicationRecord(value: unknown, env: Readonly<Record<s
       if (s.audioSha256 !== contentAddress(ls.map((l) => l.audio.sha256))) errors.push('subject.audioSha256 is not the hash of its lines');
     }
   }
-  if (shape(value.informational, INFO, 'informational')) {
+  if (shape(value.informational, v1 ? INFO_V1 : INFO, 'informational')) {
     const g = value.informational.generatedAt;
     if (g !== null && (typeof g !== 'string' || Number.isNaN(Date.parse(g)))) errors.push('informational.generatedAt must be an ISO timestamp or null');
     whole(value.informational.requests, 'informational.requests');
+    if (!v1) {
+      const c = value.informational.carried;
+      const subjectLines = (s as { lines?: unknown } | null | undefined)?.lines;
+      const lineIds = new Set(Array.isArray(subjectLines) ? (subjectLines as ({ lineId?: unknown } | null)[]).map((l) => l?.lineId) : []);
+      const seenCarried = new Set<string>();
+      if (!Array.isArray(c)) errors.push('informational.carried must be a list');
+      else {
+        c.forEach((e: unknown, k: number) => {
+          const where = `informational.carried[${k}]`;
+          if (!shape(e, CARRIED, where)) return;
+          if (!isLineId(e.lineId) || !lineIds.has(e.lineId) || seenCarried.has(e.lineId)) errors.push(`${where}.lineId must be a line of this set, once`);
+          else seenCarried.add(e.lineId);
+          hex(e.madeIn, `${where}.madeIn`);
+          if (e.madeAt !== null && (typeof e.madeAt !== 'string' || Number.isNaN(Date.parse(e.madeAt)))) errors.push(`${where}.madeAt must be an ISO timestamp or null`);
+        });
+      }
+    }
   }
   for (const text of strings(value)) if (LOCAL_PATH_SHAPE.test(text)) errors.push(`a local path appears in the record: ${JSON.stringify(text.slice(0, 40))}`);
   if (errors.length === 0 && value.identity !== recordIdentity(value.schema as string, s as PublicationNarrationRecord['subject'])) errors.push('identity is not the content address of the record');
@@ -477,36 +528,74 @@ export interface VerifiedPublicationSet {
   lines: { lineId: string; durationMs: number; sha256: string }[];
 }
 
-/**
- * Read and verify a narration set: the record (one handle, no links, bounded), its closed shape and identity, that it
- * is current for the expectation (scope, video, binding, script, chunk plan), and every WAV (present, a regular file in
- * the set's own directory, the bytes and format the record names). Throws PublicationNarrationError otherwise.
- */
-export function readPublicationSet(dir: string, expect: PublicationExpectation, env: Readonly<Record<string, string | undefined>> = {}): VerifiedPublicationSet {
+interface ReadRecord {
+  realDir: string;
+  bytes: Buffer;
+  record: PublicationNarrationRecord;
+}
+
+/** The record of the set in `dir` (one handle, no links, bounded), parsed and valid (the v1 format admitted when `legacy`). Throws PublicationNarrationError. */
+function readRecordIn(dir: string, videoId: string | null, env: Readonly<Record<string, string | undefined>>, legacy: boolean): ReadRecord {
   let realDir: string;
   try {
     realDir = realpathSync(dir);
   } catch {
-    throw new PublicationNarrationError('MISSING', `no publication narration set${expect.videoId ? ` for ${expect.videoId}` : ''}: synthesize it with npm run narration -- publication`);
+    throw new PublicationNarrationError('MISSING', `no publication narration set${videoId ? ` for ${videoId}` : ''}: synthesize it with npm run narration -- publication`);
   }
-  const inDir = (name: string) => (real: string) => real === path.join(realDir, name);
-  const bytes = readContainedFile(path.join(realDir, PUBLICATION_RECORD_FILE), inDir(PUBLICATION_RECORD_FILE), MAX_RECORD_BYTES);
-  if (!bytes) throw new PublicationNarrationError('MISSING', `no publication narration record (${PUBLICATION_RECORD_FILE})${expect.videoId ? ` for ${expect.videoId}` : ''}: synthesize it with npm run narration -- publication`);
+  const bytes = readContainedFile(path.join(realDir, PUBLICATION_RECORD_FILE), (real) => real === path.join(realDir, PUBLICATION_RECORD_FILE), MAX_RECORD_BYTES);
+  if (!bytes) throw new PublicationNarrationError('MISSING', `no publication narration record (${PUBLICATION_RECORD_FILE})${videoId ? ` for ${videoId}` : ''}: synthesize it with npm run narration -- publication`);
   let doc: unknown;
   try {
     doc = JSON.parse(bytes.toString('utf8'));
   } catch {
     throw new PublicationNarrationError('INVALID', 'the publication narration record is not JSON');
   }
-  const problems = validatePublicationRecord(doc, env);
+  const problems = validatePublicationRecord(doc, env, { legacy });
   if (problems.length) throw new PublicationNarrationError('INVALID', `the publication narration record is not valid: ${problems.slice(0, 6).join('; ')}`);
-  const record = doc as PublicationNarrationRecord;
-  const s = record.subject;
+  return { realDir, bytes, record: doc as PublicationNarrationRecord };
+}
+
+/** Why a valid record's set was made for something else (scope, video, binding): such a set is never current and carries nothing. */
+function foreignSet(s: PublicationNarrationRecord['subject'], expect: PublicationExpectation): string[] {
   const stale: string[] = [];
   if (s.scope !== expect.scope) stale.push(`it is a ${s.scope} set, not a ${expect.scope} set`);
   if (expect.videoId !== null && s.videoId !== expect.videoId) stale.push(`it was made for ${s.videoId}, not ${expect.videoId}`);
   for (const k of BINDING as (keyof PublicationRecordBinding)[]) {
     if (s.binding[k] !== expect.binding[k]) stale.push(`stale binding: made with ${k} ${String(s.binding[k]).slice(0, 24)}; the approved binding has ${String(expect.binding[k]).slice(0, 24)}`);
+  }
+  return stale;
+}
+
+type LineAudio = { problem: null; wav: Buffer; durationMs: number; sha256: string } | { problem: string };
+
+/** A line's WAV, verified: a regular file in the set's own directory, the bytes its record names, in the binding's format. */
+function verifiedLineAudio(realDir: string, l: PublicationLineRecord, sampleRate: number): LineAudio {
+  const wav = readContainedFile(path.join(realDir, l.audio.file), (real) => real === path.join(realDir, l.audio.file));
+  if (!wav) return { problem: `the audio for line ${l.lineId} is missing, a link, or not a regular file` };
+  const sha = sha256Hex(wav);
+  if (sha !== l.audio.sha256) return { problem: `the audio for line ${l.lineId} is not the bytes the record names` };
+  let info;
+  try {
+    info = parseWav(wav);
+  } catch (err) {
+    return { problem: `the audio for line ${l.lineId} is not 16-bit PCM: ${(err as Error).message}` };
+  }
+  if (info.sampleRate !== sampleRate || info.channels !== 1 || info.frames !== l.audio.frames || info.durationMs !== l.audio.durationMs) return { problem: `the audio for line ${l.lineId} is not the format the record and binding name` };
+  return { problem: null, wav, durationMs: info.durationMs, sha256: sha };
+}
+
+/**
+ * Read and verify a narration set: the record (one handle, no links, bounded), its closed shape and identity, that it
+ * is current for the expectation (scope, video, binding, lexicon, script, chunk plan), and every WAV (present, a regular
+ * file in the set's own directory, the bytes and format the record names). Throws PublicationNarrationError otherwise.
+ */
+export function readPublicationSet(dir: string, expect: PublicationExpectation, env: Readonly<Record<string, string | undefined>> = {}): VerifiedPublicationSet {
+  const { realDir, bytes, record } = readRecordIn(dir, expect.videoId, env, true);
+  const s = record.subject;
+  const stale = foreignSet(s, expect);
+  if (record.schema !== PUBLICATION_NARRATION_SCHEMA) stale.push(`it is a ${record.schema} record, made before a set bound its pronunciation lexicon`);
+  else if (s.lexicon.id !== expect.lexicon.id || s.lexicon.appliedSha256 !== expect.lexicon.appliedSha256) {
+    stale.push(`stale pronunciation: made with ${s.lexicon.id} v${s.lexicon.version}, whose entries for this script differ from ${expect.lexicon.id} v${expect.lexicon.version}`);
   }
   if (s.script.sha256 !== expect.scriptSha256) {
     const changed = expect.lines.filter((l, i) => s.lines[i]?.lineId !== l.lineId || s.lines[i]?.displaySha256 !== l.displaySha256 || s.lines[i]?.spokenSha256 !== l.spokenSha256).map((l) => l.lineId);
@@ -514,20 +603,94 @@ export function readPublicationSet(dir: string, expect: PublicationExpectation, 
   } else if (s.chunkPlanSha256 !== expect.chunkPlanSha256) stale.push('stale chunk plan: the same script is chunked differently now');
   if (stale.length) throw new PublicationNarrationError('STALE', `the publication narration set is stale and is never reused or re-labelled (synthesize it again): ${stale.join('; ')}`);
   const lines = s.lines.map((l) => {
-    const wav = readContainedFile(path.join(realDir, l.audio.file), inDir(l.audio.file));
-    if (!wav) throw new PublicationNarrationError('AUDIO', `the audio for line ${l.lineId} is missing, a link, or not a regular file`);
-    const sha = sha256Hex(wav);
-    if (sha !== l.audio.sha256) throw new PublicationNarrationError('AUDIO', `the audio for line ${l.lineId} is not the bytes the record names`);
-    let info;
-    try {
-      info = parseWav(wav);
-    } catch (err) {
-      throw new PublicationNarrationError('AUDIO', `the audio for line ${l.lineId} is not 16-bit PCM: ${(err as Error).message}`);
-    }
-    if (info.sampleRate !== expect.sampleRate || info.channels !== 1 || info.frames !== l.audio.frames || info.durationMs !== l.audio.durationMs) throw new PublicationNarrationError('AUDIO', `the audio for line ${l.lineId} is not the format the record and binding name`);
-    return { lineId: l.lineId, durationMs: info.durationMs, sha256: sha };
+    const a = verifiedLineAudio(realDir, l, expect.sampleRate);
+    if (a.problem !== null) throw new PublicationNarrationError('AUDIO', a.problem);
+    return { lineId: l.lineId, durationMs: a.durationMs, sha256: a.sha256 };
   });
   return { record, recordSha256: sha256Hex(bytes), ref: publicationRef(record), lines };
+}
+
+/** Where an interrupted run leaves a verified set it could not put in place (the next run adopts it, or carries from it). */
+export const stagingDirOf = (dir: string): string => `${dir}.staging`;
+
+export interface CarryOver {
+  /** Verified audio for the expectation's lines that carry over, keyed by the expectation's line id. */
+  audio: Map<string, Buffer>;
+  /** Where each carried line's audio was made (the set whose run made it, and that run's time). */
+  origins: Map<string, CarriedLine>;
+  /** The identities of the sets lines were carried from. */
+  from: string[];
+}
+
+/**
+ * The lines of earlier sets (in `dirs`, in order: the set directory and its staging directory; v2 or v1 records) that the
+ * expectation can reuse byte for byte: the same scope, video, and binding; a line with the same spoken text and the same
+ * chunk texts; its WAV verified against that set's record. A missing, invalid, or foreign set carries nothing. Keyed by
+ * the expectation's line id: the audio depends only on what is spoken and how, never on the line's id or display text.
+ * Each carried line keeps its origin: the run that made the audio, followed back through the earlier set's own carries.
+ */
+export function carryOverLines(dirs: string | readonly string[], expect: PublicationExpectation): CarryOver {
+  const out: CarryOver = { audio: new Map(), origins: new Map(), from: [] };
+  for (const dir of typeof dirs === 'string' ? [dirs] : dirs) {
+    let read: ReadRecord;
+    try {
+      read = readRecordIn(dir, expect.videoId, {}, true);
+    } catch (err) {
+      if (err instanceof PublicationNarrationError) continue;
+      throw err;
+    }
+    const record = read.record;
+    const s = record.subject;
+    if (foreignSet(s, expect).length) continue;
+    const earlier = new Map((record.schema === PUBLICATION_NARRATION_SCHEMA ? record.informational.carried : []).map((c) => [c.lineId, c]));
+    let used = false;
+    for (const want of expect.lines) {
+      if (out.audio.has(want.lineId)) continue;
+      const old = s.lines.find((l) => l.spokenSha256 === want.spokenSha256 && l.chunks.length === want.chunks.length && l.chunks.every((c, k) => c === want.chunks[k]));
+      if (!old) continue;
+      const a = verifiedLineAudio(read.realDir, old, expect.sampleRate);
+      if (a.problem !== null) continue;
+      const origin = earlier.get(old.lineId);
+      out.audio.set(want.lineId, a.wav);
+      out.origins.set(want.lineId, { lineId: want.lineId, madeIn: origin?.madeIn ?? record.identity, madeAt: origin ? origin.madeAt : record.informational.generatedAt });
+      used = true;
+    }
+    if (used) out.from.push(record.identity);
+  }
+  return out;
+}
+
+export interface PublicationNarrationPlan {
+  /** A current set is on disk (or left in staging, to be adopted): nothing to do. */
+  current: boolean;
+  /** Line ids whose verified audio carries over. */
+  carried: string[];
+  /** The lines a run would pay for, with the text of each request. */
+  synthesize: { lineId: string; texts: string[]; characters: number }[];
+  requests: number;
+  /** Characters of text sent to the provider (what it bills). */
+  characters: number;
+}
+
+/** What a publication run would do, decided offline: no credential, no network, nothing written. */
+export function planPublicationNarration(dir: string, expect: PublicationExpectation): PublicationNarrationPlan {
+  for (const d of [dir, stagingDirOf(dir)]) {
+    try {
+      readPublicationSet(d, expect);
+      return { current: true, carried: expect.lines.map((l) => l.lineId), synthesize: [], requests: 0, characters: 0 };
+    } catch (err) {
+      if (!(err instanceof PublicationNarrationError)) throw err;
+    }
+  }
+  const { audio } = carryOverLines([dir, stagingDirOf(dir)], expect);
+  const synthesize = expect.lines.filter((l) => !audio.has(l.lineId)).map((l) => ({ lineId: l.lineId, texts: [...l.texts], characters: l.texts.reduce((n, t) => n + t.length, 0) }));
+  return {
+    current: false,
+    carried: expect.lines.filter((l) => audio.has(l.lineId)).map((l) => l.lineId),
+    synthesize,
+    requests: synthesize.reduce((n, l) => n + l.texts.length, 0),
+    characters: synthesize.reduce((n, l) => n + l.characters, 0),
+  };
 }
 
 /** The track a verified set gives: durations measured from the audio, each line's WAV named relative to the video's package directory. */
@@ -565,6 +728,7 @@ export class PublicationNarrationReplay implements VoiceProvider {
 
   /** The verified set behind a request (render inputs stage its audio; the gate binds its record). */
   read(request: VoiceRequest): VerifiedPublicationSet {
+    assertLexiconPinned(request.lexicon);
     return readPublicationSet(this.dir, publicationExpectation(request, this.publication, this.videoId, this.scope));
   }
 }

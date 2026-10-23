@@ -108,7 +108,14 @@ fn the_plan_states_its_contacts_exactly_where_and_when_they_happen() {
 
 #[test]
 fn a_short_perch_hurries_the_settle_and_still_hands_the_body_back_at_rest() {
-    let input = common::fixture("hook-hop");
+    // The hook's first hop, on the short perch it had before the lesson gained its opening line (until 1850 ms): the
+    // lesson's own perch now has room, so the short one is constructed here.
+    let mut input = common::fixture("hook-hop");
+    assert!(
+        input.timing.end_ms > 1850.0 + input.config.landing.settle_ms,
+        "control: the lesson's perch has room"
+    );
+    input.timing.end_ms = 1850.0;
     let p = solve_motion(&input).unwrap();
     let settle = p.phases.iter().find(|w| w.phase == MotionPhase::Settle).unwrap();
     let configured = input.config.landing.settle_ms;
@@ -194,9 +201,9 @@ fn phases_run_in_order_and_the_landing_comes_before_the_settle_and_the_perch() {
 fn the_hop_is_the_transitional_typescript_solver_s_hop_exactly() {
     // Values from planHop (src/character/walletwallaby/motion.ts) for this clip, at full precision.
     let p = plan();
-    assert_eq!(p.timing.orient_end_ms, 121356.0);
-    assert_eq!(p.timing.liftoff_ms, 121554.0);
-    assert_eq!(p.timing.contact_ms, 122010.92321588083);
+    assert_eq!(p.timing.orient_end_ms, 116015.0);
+    assert_eq!(p.timing.liftoff_ms, 116213.0);
+    assert_eq!(p.timing.contact_ms, 116669.92321588083);
     assert_eq!(p.trajectory.depth_px, 403.5360645205965);
     assert_eq!(p.trajectory.gravity_px_per_s2, 3865.6800000000007);
     assert_eq!(p.trajectory.apex_above_px, 18.656799439396536);

@@ -2,8 +2,8 @@
 // (src/remotion/brand/Footer.tsx). The lesson teaches from its first frame; the brand rides along here, never as a
 // standalone logo scene. It covers nothing: it sits on the title-safe corner, right of the caption band and below
 // the ground every scene stands on, and it steps aside wherever the lesson leaves the flat plane (the staged depth
-// reveal, from the push to the flat frame, and the depth exit) and for the outro and end screen, which carry the
-// brand themselves. Its timing is a pure function of the timeline and the clip windows: nothing from Motion
+// reveal, from the push to the flat frame, and the depth exit) and for the end screen, which carries the brand
+// itself. Its timing is a pure function of the timeline and the clip windows: nothing from Motion
 // Intelligence or Blender, no clock, no randomness. Isomorphic.
 
 import type { Clip } from '../character/walletwallaby/choreography.ts';
@@ -26,7 +26,7 @@ export const FOOTER_WORDMARK_STYLE: TextStyle = { font: 'ui', size: 17, weight: 
 export const FOOTER_TIMING = { fadeInMs: 400, stepAsideMs: 300, returnMs: 400 } as const;
 
 /** Segments that carry the brand themselves: the footer is gone from the first of them to the end. */
-const SELF_BRANDED: ReadonlySet<TimedSegment['role']> = new Set<TimedSegment['role']>(['OUTRO', 'END_SCREEN']);
+const SELF_BRANDED: ReadonlySet<TimedSegment['role']> = new Set<TimedSegment['role']>(['END_SCREEN']);
 
 /** A stretch where the footer is fully transparent: [fromMs, toMs). */
 export interface FooterWindow {

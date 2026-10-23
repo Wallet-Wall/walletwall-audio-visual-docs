@@ -1,7 +1,8 @@
 {
-  "schema": "walletwall.pronunciation/v1",
-  "id": "walletwall-lexicon-v1",
-  "note": "Provider-neutral lexicon. `spoken` is a plain-text alias any TTS can read; `ipa` is optional for providers that accept phonemes. Captions always use display text, never aliases.",
+  "schema": "walletwall.pronunciation/v2",
+  "id": "walletwall-lexicon",
+  "version": 4,
+  "note": "Provider-neutral lexicon. `spoken` is a plain-text alias any TTS can read (the publication voice, ElevenLabs Multilingual v2, takes aliases only); `ipa` is optional for providers that accept phonemes. Captions, on-screen copy, and the spec always use display text, never aliases. A changed entry is a new `version` (src/narration/lexicon.ts pins each one); the id stays, so a pronunciation change never moves the spec. Add an entry only for a term a script speaks and a listen or recognizer check shows the voice gets wrong.",
   "entries": [
     { "term": "WalletWallaby", "spoken": "Wallet Wallaby", "ipa": "ˈwɒlɪt ˈwɒləbi" },
     { "term": "WalletWall", "spoken": "Wallet Wall", "ipa": "ˈwɒlɪt wɔːl" },
@@ -11,7 +12,7 @@
     { "term": "Etherscan", "spoken": "Ether scan", "ipa": "ˈiːθər skæn" },
     { "term": "Alchemy", "spoken": "Alchemy", "ipa": "ˈælkəmi" },
     { "term": "provenance", "spoken": "provenance", "ipa": "ˈprɒvənəns" },
-    { "term": "Sepolia", "spoken": "seh POH lee uh", "ipa": "səˈpoʊliə" },
+    { "term": "Sepolia", "spoken": "Sepolia", "ipa": "sɛpˈoʊliə" },
     { "term": "multisig", "spoken": "multi sig", "ipa": null },
     { "term": "EOA", "spoken": "E O A", "ipa": null },
     { "term": "Dune", "spoken": "Dune", "ipa": "djuːn" }

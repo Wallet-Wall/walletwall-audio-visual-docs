@@ -30,7 +30,7 @@ describe('committed spec', () => {
     assert.equal(spec.videoClass, 'QUICK');
     assert.deepEqual(
       spec.segments.map((s) => s.role),
-      ['HOOK', 'QUESTION', 'EXPLANATION', 'EXPLANATION', 'IMPLICATION', 'IMPLICATION', 'TAKEAWAY', 'CTA', 'DOCS_REFERENCE', 'OUTRO', 'END_SCREEN'],
+      ['HOOK', 'QUESTION', 'EXPLANATION', 'EXPLANATION', 'IMPLICATION', 'IMPLICATION', 'TAKEAWAY', 'DOCS_REFERENCE', 'END_SCREEN'],
     );
     assert.equal(spec.segments.filter((s) => s.transitionIn.type === 'DEPTH_ENTER').length, 1, 'one earned 2D -> 3D transition');
   });
@@ -38,6 +38,21 @@ describe('committed spec', () => {
   // The video teaches from its first frame: WalletWall's brand is a quiet fixed footer, never a standalone logo scene.
   test('a standalone ident segment is refused: the role does not exist', () =>
     expectCode((s) => s.segments.splice(1, 0, { id: 'ident', role: 'IDENT' as never, transitionIn: { type: 'CUT' }, narration: [], scene: null, templateId: 'ident.v1', wallaby: [], sonic: [] }), 'SPEC_SCHEMA_INVALID'));
+
+  // One ending: the takeaway, the canonical page, the end screen. No false endings in between.
+  test('a standalone like-and-subscribe slide or logo slide is refused: neither role exists', () => {
+    for (const role of ['CTA', 'OUTRO']) {
+      expectCode((s) => {
+        const at = s.segments.findIndex((x) => x.role === 'DOCS_REFERENCE');
+        s.segments.splice(at, 0, { id: role.toLowerCase(), role: role as never, transitionIn: { type: 'CUT' }, narration: [], scene: null, templateId: `${role.toLowerCase()}.v1`, wallaby: [], sonic: [] });
+      }, 'SPEC_SCHEMA_INVALID');
+    }
+  });
+
+  test('the ending is the takeaway, then the canonical page, then the end screen', () => {
+    const roles = committedSpec().segments.map((s) => s.role);
+    assert.deepEqual(roles.slice(-3), ['TAKEAWAY', 'DOCS_REFERENCE', 'END_SCREEN']);
+  });
 });
 
 describe('shape and vocabulary (no generative or styling channel exists)', () => {
@@ -147,8 +162,8 @@ describe('adversarial planner output (code-review controls)', () => {
     segment(spec, 'tiers').narration[0]!.text = 'Every assessment normalizes into one of four tiers, in ascending order of prioritization; the constructor is irrelevant.';
     assert.ok(!codes(validate(spec)).includes('NARRATION_NUMBER_UNSOURCED'));
   });
-  test('call-to-action variants outside the CTA are refused', () =>
-    expectCode((s) => Object.assign(segment(s, 'takeaway').narration[0] as object, { text: 'So: hit the like button. Quantum Exposure says how urgent.' }), 'COPY_CTA_REPEATED'));
+  test('call-to-action variants are refused', () =>
+    expectCode((s) => Object.assign(segment(s, 'takeaway').narration[0] as object, { text: 'So: hit the like button. Quantum Exposure says how urgent.' }), 'COPY_CTA_FORBIDDEN'));
   test('fragment quotes and mid-word matches bind to nothing', () => {
     expectCode((s) => Object.assign(s.claims.find((c) => c.id === 'c-qes')!.evidence[0] as object, { quote: 'the risk' }), 'CLAIM_QUOTE_NOT_IN_SOURCE');
     expectCode((s) => Object.assign(s.claims.find((c) => c.id === 'c-qes')!.evidence[0] as object, { quote: 'is it to move saf' }), 'CLAIM_QUOTE_NOT_IN_SOURCE');
@@ -167,13 +182,14 @@ describe('adversarial planner output (code-review controls)', () => {
 });
 
 describe('structure, transitions, and duration', () => {
-  test('the CTA is required', () => expectCode((s) => (s.segments = s.segments.filter((x) => x.role !== 'CTA')), 'STRUCTURE_SEGMENT_MISSING'));
+  test('the canonical page is required', () => expectCode((s) => (s.segments = s.segments.filter((x) => x.role !== 'DOCS_REFERENCE')), 'STRUCTURE_SEGMENT_MISSING'));
   test('the end screen is required', () => expectCode((s) => (s.segments = s.segments.filter((x) => x.role !== 'END_SCREEN')), 'STRUCTURE_SEGMENT_MISSING'));
-  test('a second CTA is refused', () =>
+  test('a second canonical-page segment is refused: one ending', () =>
     expectCode((s) => {
-      const extra = { ...clone(segment(s, 'cta')), id: 'cta-2' };
-      extra.narration = extra.narration.map((l) => ({ ...l, id: 'cta-2.line' }));
-      s.segments.splice(9, 0, extra);
+      const at = s.segments.findIndex((x) => x.role === 'DOCS_REFERENCE');
+      const extra = { ...clone(s.segments[at]!), id: 'docs-reference-2' };
+      extra.narration = extra.narration.map((l) => ({ ...l, id: 'docs-reference-2.line' }));
+      s.segments.splice(at + 1, 0, extra);
     }, 'STRUCTURE_SEGMENT_REPEATED'));
   test('the takeaway cannot precede the explanation', () =>
     expectCode((s) => {
@@ -208,10 +224,16 @@ describe('copy, titles, and source binding', () => {
   test('"your wallet" breaks the neutral-wallet copy rule', () =>
     expectCode((s) => Object.assign(segment(s, 'question').narration[2] as object, { text: 'It recommends one path, and places your wallet in a shared risk tier.' }), 'COPY_FORBIDDEN_PHRASE'));
   test('hype is refused', () => expectCode((s) => (s.title.topic = 'This Insane Feature Will Change Everything'), 'COPY_FORBIDDEN_PHRASE'));
-  test('subscribe-begging outside the CTA is refused', () =>
-    expectCode((s) => Object.assign(segment(s, 'takeaway').narration[0] as object, { text: 'So: subscribe. Quantum Exposure says how urgent.' }), 'COPY_CTA_REPEATED'));
+  test('subscribe-begging is refused anywhere, the canonical page included', () => {
+    expectCode((s) => Object.assign(segment(s, 'takeaway').narration[0] as object, { text: 'So: subscribe. Quantum Exposure says how urgent.' }), 'COPY_CTA_FORBIDDEN');
+    expectCode((s) => Object.assign(segment(s, 'docs-reference').narration[0] as object, { text: 'Like the video and subscribe. The link is in the description.' }), 'COPY_CTA_FORBIDDEN');
+  });
+  test('the canonical page line is not a subscribe call to action', () => {
+    const cta = new RegExp(config.policy.callToActionPattern, 'i');
+    for (const t of Object.values(config.templates.templates)) if (t.narration) assert.ok(!cta.test(t.narration), t.narration);
+  });
   test('brand copy must match its template', () =>
-    expectCode((s) => Object.assign(segment(s, 'cta').narration[0] as object, { text: 'Smash that like button!' }), 'NARRATION_TEMPLATE_MISMATCH'));
+    expectCode((s) => Object.assign(segment(s, 'docs-reference').narration[0] as object, { text: 'Smash that like button!' }), 'NARRATION_TEMPLATE_MISMATCH'));
   test('a part label never goes in the topic', () => expectCode((s) => (s.title.topic = 'Migration Readiness Part 1'), 'TITLE_INVALID'));
   test('a single video is not a series', () => expectCode((s) => (s.series = { seriesId: 'walletwall-vault', part: 1, totalParts: 1 }), 'SERIES_INVALID'));
   test('a spec planned against older content is stale', () => expectCode((s) => (s.source.contentHash = '0'.repeat(64)), 'SOURCE_HASH_STALE'));

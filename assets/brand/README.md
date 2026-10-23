@@ -4,7 +4,7 @@ Reviewed marks the renderer may show. A `BRAND_MARK` asset may only come from th
 
 | File | sha256 | Use |
 |---|---|---|
-| `walletwall-brick-wallet.png` | `91926a2eebc1777194ecf491049b8a7af3cf0892b09b363c5b2a17cd17d5dbad` | Outro and the footer |
+| `walletwall-brick-wallet.png` | `91926a2eebc1777194ecf491049b8a7af3cf0892b09b363c5b2a17cd17d5dbad` | The footer |
 
 ## walletwall-brick-wallet.png
 

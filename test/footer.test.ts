@@ -16,7 +16,7 @@ import { revealSeam } from '../src/blender/reveal.ts';
 import { choreograph } from '../src/character/walletwallaby/choreography.ts';
 import { RIG_ENVELOPE } from '../src/character/walletwallaby/rig/rig-source.ts';
 import { VIDEO_ROOT } from '../src/config/load.ts';
-import { CTA_TEXT, DOCS_CARD, END_SCREEN_LABEL, END_SCREEN_ZONES, OUTRO_MARK, OUTRO_TEXT, PROVENANCE_CHIP } from '../src/layout/brand-layout.ts';
+import { DOCS_CARD, END_SCREEN_LABEL, END_SCREEN_ZONES, PROVENANCE_CHIP } from '../src/layout/brand-layout.ts';
 import { CAPTION_BAND, FOOTER, FOOTER_MARK, FOOTER_TIMING, FOOTER_WORDMARK, FOOTER_WORDMARK_STYLE, footerOpacityAt, planFooter, type FooterPlan } from '../src/layout/footer.ts';
 import { easeInOut, FRAME, GROUND_Y, inside, intersects, TITLE_SAFE, type Rect } from '../src/layout/geometry.ts';
 import type { SceneLayout } from '../src/layout/scene-layout.ts';
@@ -49,7 +49,7 @@ describe('the footer: where it sits', () => {
   });
 
   test('clear of every brand template rect, the provenance chip, and the end screen\'s reserved zones', () => {
-    for (const [name, r] of Object.entries({ CTA_TEXT, DOCS_CARD, OUTRO_MARK, OUTRO_TEXT, END_SCREEN_LABEL, PROVENANCE_CHIP, ...END_SCREEN_ZONES })) {
+    for (const [name, r] of Object.entries({ DOCS_CARD, END_SCREEN_LABEL, PROVENANCE_CHIP, ...END_SCREEN_ZONES })) {
       assert.equal(intersects(FOOTER, r), false, name);
     }
   });
@@ -67,7 +67,7 @@ describe('the footer: when it shows', () => {
   test('it settles in over the first 400 ms and is fully there on settled teaching and brand frames', () => {
     assert.equal(footerOpacityAt(plan, 0), 0);
     assert.equal(footerOpacityAt(plan, FOOTER_TIMING.fadeInMs), 1);
-    for (const r of ['HOOK', 'QUESTION', 'TAKEAWAY', 'CTA', 'DOCS_REFERENCE'] as const) assert.equal(opacity(settled(role(r))), 1, r);
+    for (const r of ['HOOK', 'QUESTION', 'TAKEAWAY', 'DOCS_REFERENCE'] as const) assert.equal(opacity(settled(role(r))), 1, r);
     for (const s of timeline.segments.filter((x) => x.role === 'EXPLANATION' || x.role === 'IMPLICATION')) assert.equal(opacity(settled(s)), 1, s.id);
   });
 
@@ -90,10 +90,12 @@ describe('the footer: when it shows', () => {
     assert.ok(opacity(seam.flatAgain + 1) > 0, 'and it starts back right after');
   });
 
-  test('it is gone for the outro and the end screen', () => {
-    const outro = role('OUTRO');
+  test('it stays on the canonical page and is gone for the end screen, which carries the brand itself', () => {
+    const docs = role('DOCS_REFERENCE');
+    assert.equal(opacity(settled(docs)), 1, 'the canonical page keeps the footer');
+    const end = role('END_SCREEN');
     const frames = Math.round((timeline.totalMs * fps) / 1000);
-    for (let f = Math.ceil((outro.startMs * fps) / 1000); f < frames; f++) assert.equal(opacity(f), 0, `frame ${f}`);
+    for (let f = Math.ceil((end.startMs * fps) / 1000); f < frames; f++) assert.equal(opacity(f), 0, `frame ${f}`);
   });
 
   test('it never pops: from one frame to the next its opacity moves by at most one step of its fastest ramp', () => {
@@ -137,7 +139,7 @@ function drawnRects(seg: TimedSegment, layout: SceneLayout | undefined): Rect[] 
   // The ground and the rock under it (its strata, cap, and fracture: 30 px, drawn deeper here to be conservative).
   const ground: Rect = { x: 0, y: GROUND_Y, w: FRAME.width, h: 60 };
   if (!layout) {
-    const brand: Partial<Record<TimedSegment['role'], Rect[]>> = { CTA: [CTA_TEXT, ground], DOCS_REFERENCE: [DOCS_CARD, ground], OUTRO: [OUTRO_MARK, OUTRO_TEXT, ground], END_SCREEN: [END_SCREEN_LABEL, ...Object.values(END_SCREEN_ZONES), ground] };
+    const brand: Partial<Record<TimedSegment['role'], Rect[]>> = { DOCS_REFERENCE: [DOCS_CARD, ground], END_SCREEN: [END_SCREEN_LABEL, ...Object.values(END_SCREEN_ZONES), ground] };
     return brand[seg.role] ?? [];
   }
   const out: Rect[] = [...layout.texts.map((t) => t.rect), PROVENANCE_CHIP];

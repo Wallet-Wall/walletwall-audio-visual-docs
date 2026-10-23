@@ -114,13 +114,20 @@ In order, each failing closed:
 1. the committed spec passes `validateSpec`, its narration budget included;
 2. the approved binding resolves (the pin matches);
 3. `synthesize()` in `src/pipeline/render-input.ts` checks the narration budget before the provider is asked;
-4. a current, verified set already on disk is reused: no key, no request, never synthesized twice;
+4. a current, verified set already on disk is reused: no key, no request, never synthesized twice; a stale set's
+   lines whose audio is still exactly right (the same spoken text and chunk texts under the same binding, every byte
+   verified against that set's record; a stale set an interrupted run left in staging counts too) carry over, and only
+   the rest are requested; when every line carries over,
+   the set is rebuilt with no key and no request (`npm run narration -- publication-plan` reports the carried lines,
+   the requests, and the characters beforehand, offline);
 5. `ELEVENLABS_API_KEY` must be set; `WALLETWALLABY_ELEVENLABS_VOICE_ID` naming another voice is refused;
 6. the settings pass the ElevenLabs adapter's closed schema;
 7. the voice preflight, one GET: the key is accepted, the voice exists, is labelled the identity's variety, and is
    the bound voice; no test sentence is synthesized;
-8. one text-to-speech POST per chunk, in order, with no retry: the first failure stops the run and leaves nothing;
-9. the set is written to a staging directory, verified from disk, and only then replaces the previous one;
+8. one text-to-speech POST per chunk of the lines that do not carry over, in order, with no retry: the first failure
+   stops the run and leaves nothing;
+9. the set (carried and new audio, and a record built from the current script alone: no hash or identity of the old
+   set survives) is written to a staging directory, verified from disk, and only then replaces the previous one;
 10. the timeline, captions, caption QA, and a full validation run on the measured durations (pace included).
 
 There is no fallback: when ElevenLabs fails, publication narration fails. The adapter is reached only from this
@@ -133,7 +140,7 @@ never written to the narration set, a track, `render.json`, provenance, the rece
 adapter redacts it from refusals). The record is checked for any credential-shaped environment value before it is
 written. Render, publish, and verification steps hold no key and need none.
 
-### The narration set (`walletwall.publication-narration/v1`)
+### The narration set (`walletwall.publication-narration/v2`)
 
 `dist/<videoId>/narration/` holds one WAV per narration line (`<lineId>.wav`, 16-bit PCM mono at the binding's rate)
 and `publication-narration.json`, a closed record whose `identity` is the content address of `{ schema, subject }`:
@@ -142,15 +149,25 @@ and `publication-narration.json`, a closed record whose `identity` is the conten
   `synthesisConfigSha256` (the provider, its validated settings, and the chunk policy);
 - `subject.script`: the content address of every line's id and display and spoken text hashes, in order;
 - `subject.chunkPlanSha256`: every line's chunk text hashes, in order;
+- `subject.lexicon`: the pronunciation lexicon's id and version, and the content address of the entries the script
+  actually speaks (`src/narration/lexicon.ts`): a changed alias for a spoken term stales the set and re-voices only
+  the lines that say it; an entry the script never speaks changes nothing the set binds;
 - `subject.lines`: per line, the text hashes, spoken words, chunk hashes, and the audio (file, sha256, rate,
   channels, bits, frames, duration);
 - `subject.audioSha256`: every line's audio hash, in order;
-- `informational` (outside the identity): when it was made and how many requests it took.
+- `informational` (outside the identity): when this run made it, how many paid requests it took, and for each line
+  carried over instead of paid for again, where its audio was made: the identity of the set whose run made it and that
+  run's time, followed back through any earlier carries (`madeIn`, `madeAt`). A set that ships can always say which
+  synthesis run, and so which plan, made each of its lines (`config/release-rights.json` ties commercial use to the
+  plan in force at each synthesis).
+
+A v1 record (before the lexicon binding) is never current, but its lines can carry over. A lexicon whose entries are
+not the ones its `version` pins (`src/narration/lexicon.ts`) is refused before any paid request and on every replay.
 
 A set is never valid because a WAV exists. Every replay re-validates the record (own keys, every derived hash, no
 local path) and re-hashes and re-parses every WAV, then checks it is current: the script (narration text and the
-lexicon's spoken forms), the binding (provider, model, voice, settings, chunk policy, identity, language), the chunk
-plan, the video, and the scope. Anything else (a visual-only spec change) leaves it current. A stale set is
+lexicon's spoken forms), the pronunciation entries it speaks, the binding (provider, model, voice, settings, chunk
+policy, identity, language), the chunk plan, the video, and the scope. Anything else (a visual-only spec change) leaves it current. A stale set is
 re-synthesized, never re-labelled.
 
 ### Where it is bound
@@ -174,8 +191,8 @@ timing; both fail closed on timing they cannot carry. Stills render on the fixtu
 
 ### The live proof (owner-run)
 
-`npm run narration -- publication-proof` speaks the committed spec's first narrated segment (two lines, 32 spoken
-words, 190 characters) through the same path into `dist/narration-proof/<videoId>/`, and writes
+`npm run narration -- publication-proof` speaks the committed spec's first narrated segment (three lines, 40 spoken
+words, 232 characters) through the same path into `dist/narration-proof/<videoId>/`, and writes
 `dist/narration-proof/<videoId>.proof.json`: the binding and its hashes, the chunk plan, every line's audio hash and
 duration, the timeline and its pace, the caption QA, and the `narration` block exactly as `render.json`,
 provenance, and the receipt bind it. A current proof set is reused, not synthesized again. It is never run in CI.
@@ -393,7 +410,9 @@ not use.
   were synthesized with the same settings for listening under `dist/narration-bakeoff/probes/pronunciation/`; the
   respellings that leave the dictionary (`Wollaby`, `wol a bee`) derail the recognizer, so a lexicon fix must stay
   with in-dictionary words. A lexicon alias change bumps `config/pronunciation.json`'s id, which the committed spec
-  binds as `pronunciationDictionaryId`, so it is a small separate change with a spec regeneration.
+  binds as `pronunciationDictionaryId`, so it is a small separate change with a spec regeneration. (Since lexicon v2,
+  2026-10-22: the id is stable and an entry change bumps `version` instead, so a pronunciation fix re-voices only the
+  lines that speak the term and never moves the spec.)
 - The reference voice is an Australian English voice, and that accent is the intended character (the wallaby's
   geography), natural rather than caricatured. Neither local candidate can offer it: Magpie ships five fixed
   American English speakers and no `en-AU`, and Chatterbox's built-in voice is American, so an Australian

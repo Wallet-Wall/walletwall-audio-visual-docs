@@ -60,8 +60,11 @@ export interface LexiconEntry {
 }
 
 export interface PronunciationLexicon {
-  schema: 'walletwall.pronunciation/v1';
+  schema: 'walletwall.pronunciation/v2';
+  /** Stable: the spec names the lexicon by this id, so a pronunciation change never moves the spec. */
   id: string;
+  /** Bumped with every entry change; src/narration/lexicon.ts pins each version's entries. */
+  version: number;
   entries: LexiconEntry[];
 }
 

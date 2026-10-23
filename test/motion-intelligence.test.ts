@@ -106,22 +106,25 @@ describe('landings', () => {
 
 describe('the tail as a traversal tool', () => {
   test('loads before takeoff, counters the pitch in flight, and reaches down before contact', () => {
+    // Every real bound of the lesson and of the motion lab (since the single ending, the lesson alone has three).
     let checkedHops = 0;
-    for (let i = 0; i < plan.clips.length; i++) {
-      const m = plan.motions[i]!;
-      if (m.kind !== 'HOP' || m.apexAbovePx < 40) continue;
-      checkedHops++;
-      const pre = sampleWallaby(plan, m.takeoffMs - 2);
-      assert.equal(pre.motion.phase, 'PRELOAD');
-      assert.ok(pre.motion.tail.swing < 0 && pre.motion.tail.tension > MOTION_CONFIG.tail.restTension, 'loaded down and stiffened');
-      for (let k = 0.25; k < 0.7; k += 0.05) {
-        const s = sampleWallaby(plan, m.takeoffMs + (m.contactMs - m.takeoffMs) * k);
-        if (Math.abs(s.motion.rotation) < 2) continue;
-        assert.ok(Math.sign(s.motion.tail.swing) === -Math.sign(s.motion.rotation) || Math.abs(s.motion.tail.swing) < 3, `counter-rotation at k=${k.toFixed(2)}: pitch ${s.motion.rotation.toFixed(1)} tail ${s.motion.tail.swing.toFixed(1)}`);
+    for (const p of [plan, lab]) {
+      for (let i = 0; i < p.clips.length; i++) {
+        const m = p.motions[i]!;
+        if (m.kind !== 'HOP' || m.apexAbovePx < 40) continue;
+        checkedHops++;
+        const pre = sampleWallaby(p, m.takeoffMs - 2);
+        assert.equal(pre.motion.phase, 'PRELOAD');
+        assert.ok(pre.motion.tail.swing < 0 && pre.motion.tail.tension > MOTION_CONFIG.tail.restTension, 'loaded down and stiffened');
+        for (let k = 0.25; k < 0.7; k += 0.05) {
+          const s = sampleWallaby(p, m.takeoffMs + (m.contactMs - m.takeoffMs) * k);
+          if (Math.abs(s.motion.rotation) < 2) continue;
+          assert.ok(Math.sign(s.motion.tail.swing) === -Math.sign(s.motion.rotation) || Math.abs(s.motion.tail.swing) < 3, `counter-rotation at k=${k.toFixed(2)}: pitch ${s.motion.rotation.toFixed(1)} tail ${s.motion.tail.swing.toFixed(1)}`);
+        }
+        const reach = sampleWallaby(p, m.contactMs - 2);
+        assert.equal(reach.motion.phase, 'REACH');
+        assert.ok(reach.motion.tail.swing < sampleWallaby(p, m.takeoffMs + (m.contactMs - m.takeoffMs) * 0.5).motion.tail.swing, 'sweeps down to meet the ground');
       }
-      const reach = sampleWallaby(plan, m.contactMs - 2);
-      assert.equal(reach.motion.phase, 'REACH');
-      assert.ok(reach.motion.tail.swing < sampleWallaby(plan, m.takeoffMs + (m.contactMs - m.takeoffMs) * 0.5).motion.tail.swing, 'sweeps down to meet the ground');
     }
     assert.ok(checkedHops >= 4, `${checkedHops} real bounds checked`);
   });

@@ -29,13 +29,13 @@ const pad = (f: number): string => `f${String(f).padStart(5, '0')}`;
 
 /** The flat scenes: the lesson frame, and what it shows. */
 const CELLS = [
-  { name: 'flat-teaching', frame: 1780, title: 'Ordinary flat teaching frame', note: 'On a node card, layered slabs behind' },
-  { name: 'broad-support', frame: 2830, title: 'Broad support', note: 'A reading card, perched' },
-  { name: 'tier-support', frame: 1430, title: 'Tier support', note: 'Review node on its pillar' },
-  { name: 'vault-candidate', frame: 1630, title: 'Vault Candidate support', note: 'The top tier on its pillar' },
-  { name: 'summit-ledge', frame: 3880, title: 'Summit ledge', note: 'The takeaway ledge, perched' },
-  { name: 'cta', frame: 4430, title: 'CTA frame', note: 'On the ground, strata under the line' },
-  { name: 'end-screen', frame: 5030, title: 'End screen', note: 'Ground clear of the reserved zones' },
+  { name: 'flat-teaching', frame: 1804, title: 'Ordinary flat teaching frame', note: 'On a node card, layered slabs behind' },
+  { name: 'broad-support', frame: 2750, title: 'Broad support', note: 'A reading card, perched' },
+  { name: 'tier-support', frame: 1471, title: 'Tier support', note: 'Review node on its pillar' },
+  { name: 'vault-candidate', frame: 1670, title: 'Vault Candidate support', note: 'The top tier on its pillar' },
+  { name: 'summit-ledge', frame: 3710, title: 'Summit ledge', note: 'The takeaway ledge, perched' },
+  { name: 'canonical-page', frame: 4243, title: 'Canonical page frame', note: 'On the ground, strata under the line' },
+  { name: 'end-screen', frame: 4454, title: 'End screen', note: 'Ground clear of the reserved zones' },
 ] as const;
 
 const paper = hexRgba(TOKENS.paper);
@@ -59,7 +59,7 @@ writePng(path.join(out, 'narrow-perch.png'), full['narrow-perch']);
   writePng(path.join(out, 'depth-reveal.png'), bg);
 }
 
-// The contact shadow close-up: the feet at 4x on the flat teaching frame and on the CTA ground.
+// The contact shadow close-up: the feet at 4x on the flat teaching frame and on the canonical page's ground.
 {
   const close = (img: Image, frame: number): Image => {
     const ink = alphaBounds(readPng(outFile(`renders/sheet-f${frame}/${pad(frame)}.png`)), 8)!;
@@ -67,8 +67,8 @@ writePng(path.join(out, 'narrow-perch.png'), full['narrow-perch']);
     const cy = ink.y + ink.h - 46;
     return resize(crop(img, Math.max(0, cx), Math.max(0, cy), 260, 64), 1040, 256);
   };
-  const a = close(full['flat-teaching']!, 1780);
-  const b = close(full['cta']!, 4430);
+  const a = close(full['flat-teaching']!, 1804);
+  const b = close(full['canonical-page']!, 4243);
   const sheet = blank(a.width, a.height + 12 + b.height, gap);
   over(sheet, a, 0, 0);
   over(sheet, b, 0, a.height + 12);
@@ -116,7 +116,7 @@ const order: { name: string; label: string }[] = [
   { name: 'depth-reveal', label: 'Depth reveal' },
   { name: 'depth-contact', label: 'Depth view: the same rock' },
   { name: 'shadow-closeup', label: 'Contact shadow close-up' },
-  { name: 'cta', label: CELLS[5].title },
+  { name: 'canonical-page', label: CELLS[5].title },
   { name: 'end-screen', label: CELLS[6].title },
   { name: 'palette', label: 'Material palette' },
 ];

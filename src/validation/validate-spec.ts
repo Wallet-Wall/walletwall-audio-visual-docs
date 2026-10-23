@@ -7,12 +7,12 @@
 //   provenance   every claim resolves to a verbatim doc span or a hashed artifact;
 //                every spoken and on-screen statement cites claims; numbers and
 //                graph labels must appear in their evidence (no fabricated data)
-//   structure    hook, content, takeaway, CTA, docs reference, outro, end screen
+//   structure    hook, content, takeaway, then one ending: the canonical page and the end screen
 //   character    targets exist in the scene layout; exit actions drive transitions
 //   depth        2D -> 3D transitions are earned, budgeted, and balanced
 //   duration     class ceiling, natural pace, end-screen window
 //   layout       text fits bounded regions inside the YouTube title-safe area
-//   copy         neutral wallet language, no hype, one CTA
+//   copy         neutral wallet language, no hype, no subscribe call to action
 //   source       content hash current, canonical docs page published
 
 import type { PipelineConfig } from '../config/types.ts';
@@ -48,7 +48,8 @@ import {
   WALLABY_EXPRESSIONS,
   type SegmentRole,
 } from '../spec/vocabulary.ts';
-import { buildTimeline, EXIT_ACTIONS, type NarrationTrack } from '../timeline/timeline.ts';
+import { narrationCadence } from '../timeline/continuity.ts';
+import { buildTimeline, EXIT_ACTIONS, type NarrationTrack, type Timeline } from '../timeline/timeline.ts';
 import { ASSET_ROOTS, isSafeRepoPath } from './paths.ts';
 import { checkKeys, KEYS, scanGenerativeKeys } from './shape.ts';
 
@@ -64,7 +65,7 @@ export interface ValidationContext {
 }
 
 const ROLE_RANK: Record<SegmentRole, number> = Object.fromEntries(SEGMENT_ROLES.map((r, i) => [r, i])) as Record<SegmentRole, number>;
-const REQUIRED_ONCE: SegmentRole[] = ['HOOK', 'TAKEAWAY', 'CTA', 'DOCS_REFERENCE', 'OUTRO', 'END_SCREEN'];
+const REQUIRED_ONCE: SegmentRole[] = ['HOOK', 'TAKEAWAY', 'DOCS_REFERENCE', 'END_SCREEN'];
 
 export function validateSpec(spec: VideoSpec, ctx: ValidationContext): ValidationReport {
   const issues = new IssueCollector();
@@ -552,7 +553,13 @@ function checkTransitions(spec: VideoSpec, issues: IssueCollector): void {
 
 function checkDuration(spec: VideoSpec, ctx: ValidationContext, issues: IssueCollector): void {
   if (!isOneOf(VIDEO_CLASS_KINDS, spec.videoClass)) return;
-  const timeline = buildTimeline(spec, ctx.track, ctx.config.templates);
+  let timeline: Timeline;
+  try {
+    timeline = buildTimeline(spec, ctx.track, ctx.config.templates);
+  } catch (err) {
+    issues.error('TIMING_INVALID', 'segments', (err as Error).message);
+    return;
+  }
   if (!Number.isFinite(timeline.totalMs) || timeline.totalMs <= 0) {
     issues.error('TIMING_INVALID', 'segments', 'runtime is not a finite positive duration');
     return;
@@ -561,6 +568,8 @@ function checkDuration(spec: VideoSpec, ctx: ValidationContext, issues: IssueCol
     for (const b of seg.beats) if (b.startMs >= seg.endMs) issues.error('TIMING_INVALID', `segments[${seg.id}].wallaby[${b.index}]`, 'starts after its segment ends');
     for (const c of seg.sonic) if (c.atMs >= seg.endMs) issues.error('TIMING_INVALID', `segments[${seg.id}].sonic`, `${c.event} plays after its segment ends`);
   }
+  // Speech owns the cadence: every silence between lines is authored, never a transition's length.
+  for (const p of narrationCadence(spec, timeline)) issues.error('NARRATION_CADENCE', `narration[${p.to}]`, `${p.code}: ${p.detail}`);
   const ceiling = VIDEO_CLASSES[spec.videoClass].maxSeconds * 1000;
   if (timeline.totalMs > ceiling) issues.error('DURATION_EXCEEDS_CLASS', 'videoClass', `${(timeline.totalMs / 1000).toFixed(1)} s > ${ceiling / 1000} s`);
   const shortest = VIDEO_CLASS_KINDS.find((k) => VIDEO_CLASSES[k].maxSeconds * 1000 >= timeline.totalMs);
@@ -588,14 +597,15 @@ function checkDuration(spec: VideoSpec, ctx: ValidationContext, issues: IssueCol
 function checkCopy(spec: VideoSpec, ctx: ValidationContext, issues: IssueCollector): void {
   const forbidden = ctx.config.policy.forbiddenPhrases.map((f) => ({ re: new RegExp(f.pattern, 'i'), reason: f.reason }));
   const cta = new RegExp(ctx.config.policy.callToActionPattern, 'i');
-  const texts: { text: string; path: string; inCta: boolean }[] = [{ text: spec.title.topic, path: 'title.topic', inCta: false }];
+  const texts: { text: string; path: string }[] = [{ text: spec.title.topic, path: 'title.topic' }];
   spec.segments.forEach((s, i) => {
-    s.narration.forEach((l, j) => texts.push({ text: l.text, path: `segments[${i}].narration[${j}]`, inCta: s.role === 'CTA' }));
-    if (s.scene) for (const el of sceneTexts(s)) texts.push({ text: el.text, path: `segments[${i}].scene#${el.id}`, inCta: false });
+    s.narration.forEach((l, j) => texts.push({ text: l.text, path: `segments[${i}].narration[${j}]` }));
+    if (s.scene) for (const el of sceneTexts(s)) texts.push({ text: el.text, path: `segments[${i}].scene#${el.id}` });
   });
   for (const t of texts) {
     for (const f of forbidden) if (f.re.test(t.text)) issues.error('COPY_FORBIDDEN_PHRASE', t.path, `${f.reason} ("${t.text}")`);
-    if (!t.inCta && cta.test(t.text)) issues.error('COPY_CTA_REPEATED', t.path, `"${t.text}"`);
+    // No standalone like-and-subscribe: the canonical page's own restrained line is the only call to action.
+    if (cta.test(t.text)) issues.error('COPY_CTA_FORBIDDEN', t.path, `"${t.text}"`);
   }
 }
 

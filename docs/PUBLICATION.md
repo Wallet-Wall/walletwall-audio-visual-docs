@@ -184,7 +184,7 @@ Verdicts:
   approve.
 - **`QUALIFICATION_FAIL`**: a check failed, stated with the measure and the unchanged pin (three significant digits),
   for example
-  `transition-peak (frame 1690): changed fraction 0.570% > approved maximum 0.500% (crossClassTolerance.scene.maxFractionOverNoise)`.
+  `transition-peak (frame 1714): changed fraction 0.570% > approved maximum 0.500% (crossClassTolerance.scene.maxFractionOverNoise)`.
 - **`QUALIFICATION_BLOCKED`**: qualification could not mean anything: an unpinned Blender installed or recorded,
   classes whose Blender pin is not `config/blender.json`'s, a stale or damaged reference, an invalid environment record,
   or the proof class.
