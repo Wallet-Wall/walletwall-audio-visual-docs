@@ -13,6 +13,7 @@ export const ISSUE_CODES = {
   SPEC_ID_INVALID: 'Ids are lowercase slugs (line ids may contain dots); a few ids are reserved by the renderer.',
   TEXT_INVALID_CHARACTERS: 'Spoken and on-screen text must be NFKC-normalized, visible, Latin-script text (no zero-width or look-alike characters).',
   TIMING_INVALID: 'A timing field is not a sane integer, or an event falls outside its segment.',
+  NARRATION_CADENCE: 'A silence between narration lines is not authored language (a transition, slide, or landing is holding the speech back), or a line falls outside its segment.',
   SPEC_PATH_INVALID: 'A path must be repo-relative (no absolute paths, drive letters, backslashes, or "..").',
   SCENE_TYPE_UNSUPPORTED: 'Scene type is outside the supported scene vocabulary.',
   SCENE_ROLE_MISMATCH: 'Content roles need a scene; brand roles must not have one.',
@@ -43,7 +44,7 @@ export const ISSUE_CODES = {
   GRAPH_LAYER_INVALID: 'LAYERED graphs need UPPER and LOWER nodes; other layouts must not set layers.',
   EYEBROW_SECTION_UNKNOWN: 'Scene eyebrow cites a source section that does not exist.',
   // Structure
-  STRUCTURE_SEGMENT_MISSING: 'A required segment (hook, CTA, docs reference, outro, end screen) is missing.',
+  STRUCTURE_SEGMENT_MISSING: 'A required segment (hook, explanation, takeaway, canonical page, end screen) is missing.',
   STRUCTURE_ORDER: 'Segments are out of the required order.',
   STRUCTURE_SEGMENT_REPEATED: 'A segment role that must appear once appears more than once.',
   TEMPLATE_UNKNOWN: 'A brand segment names a template that does not exist or has the wrong role.',
@@ -78,7 +79,7 @@ export const ISSUE_CODES = {
   DOCS_URL_UNPUBLISHED: 'The canonical docs page is not published (not in navigation, or mintignored).',
   // Copy
   COPY_FORBIDDEN_PHRASE: 'Copy uses a phrase the WalletWall copy policy forbids.',
-  COPY_CTA_REPEATED: 'Calls to action may appear only in the CTA segment.',
+  COPY_CTA_FORBIDDEN: 'No like-and-subscribe call to action: the canonical page line is the only call to action, from its template.',
   TITLE_INVALID: 'Title breaks the naming rules (length, part labels, series order).',
   SERIES_INVALID: 'Series membership is inconsistent (one-part series, part out of range).',
   // Media QA

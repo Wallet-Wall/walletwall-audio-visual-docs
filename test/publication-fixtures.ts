@@ -278,8 +278,8 @@ export function attachRender(dir: string, state: PublicState, opts: { bytes?: Bu
  * The ported invariants' report (scripts/blender-invariants.ts, walletwall.blender-invariants/v2) for a passing run at
  * the publication stride, measured in `environment` on this checkout's plan and character.
  */
-/** The counts of a passing publication-stride run, as measured on the production host on 2026-10-19. */
-export const PASSING_COUNTS = { frames: 786, 'lesson.grounded': 539, 'lesson.sceneHolds': 405, 'lesson.supportedHolds': 312, 'lesson.resting': 310, 'lesson.heldClear': 2, 'lab.grounded': 152, 'lab.hang': 3, 'lab.unsupportedPerch': 48, shuffled: 12 };
+/** The counts of a passing publication-stride run, as measured on the production host on 2026-10-22 (the speech-owned lesson with its single ending). */
+export const PASSING_COUNTS = { frames: 707, 'lesson.grounded': 456, 'lesson.sceneHolds': 385, 'lesson.supportedHolds': 242, 'lesson.resting': 240, 'lesson.heldClear': 2, 'lab.grounded': 152, 'lab.hang': 3, 'lab.unsupportedPerch': 48, shuffled: 12 };
 
 export function invariantsReport(state: PublicState, opts: { environment?: EnvironmentName; engine?: 'typescript' | 'rust-wasm'; pass?: boolean; frames?: number[]; identity?: Record<string, unknown>; every?: number; excludedLesson?: number[]; realization?: string; thresholds?: Record<string, number>; counts?: Record<string, number> } = {}) {
   const engine = opts.engine ?? 'typescript';

@@ -34,9 +34,12 @@ export const MAX_TAIL_RELEASE = 0.1;
  * which the publication proof receipt re-derives from the plan): the video's own length sets them. The Rive tests'
  * absolute counts (400 grounded frames, 300 scene holds, 300 supported holds at every 9th frame), calibrated on the
  * 145 wpm fixture lesson (about 0.69 / 0.52 / 0.52 of its checked frames), refused the qualified publication narration
- * (153.6 wpm), whose holds are shorter; the owner replaced them with these fractions on 2026-10-22.
+ * (153.6 wpm), whose holds are shorter; the owner replaced them with these fractions on 2026-10-22. Later that day the
+ * single ending retired the like-and-subscribe and logo slides and cut the end screen to 7 s (55 sampled frames of
+ * WalletWallaby standing on brand ground), and the speech came to own the cadence; with the teaching segments' coverage
+ * unchanged, the owner set supported holds to 0.45 (the fixture-timed lesson then checks 242 of 497, 48.7%).
  */
-export const LESSON_COVERAGE = { 'lesson.grounded': 0.65, 'lesson.sceneHolds': 0.5, 'lesson.supportedHolds': 0.5 } as const;
+export const LESSON_COVERAGE = { 'lesson.grounded': 0.65, 'lesson.sceneHolds': 0.5, 'lesson.supportedHolds': 0.45 } as const;
 /** The lab's frames are fixed, so its floors stay counts (at every lab frame). */
 const LAB_COVERAGE = { 'lab.unsupportedPerch': 10, 'lab.hang': 2 } as const;
 

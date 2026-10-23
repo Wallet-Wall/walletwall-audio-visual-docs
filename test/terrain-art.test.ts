@@ -97,8 +97,10 @@ describe('a formation never moves what the motion system stands on', () => {
 
   test('the declared terrain and layouts are byte-for-byte what main declares (nothing a body touches moved)', () => {
     const terrains = [...terrainsFor(timeline.segments, layouts).entries()].sort(([a], [b]) => (a < b ? -1 : 1));
-    assert.equal(terrains.length, 11);
-    assert.equal(contentAddress(terrains), '7a76e388b254f2b145281ae409e5df959de21e6c202d8bb37e272824a2b9f4d1');
+    // Nine segments: the single ending retired the like-and-subscribe and logo slides, and their ground with them.
+    // Every remaining segment's terrain is byte-identical to main's (it was checked entry by entry when this moved).
+    assert.equal(terrains.length, 9);
+    assert.equal(contentAddress(terrains), '2be957526f16b5c476f24812e3f336b91fb20d978a58f6718aeeb11c17509e6e');
     assert.equal(contentAddress([...layouts.entries()].sort(([a], [b]) => (a < b ? -1 : 1))), '986d9087baffb1c727594416c64fb8ca8bd3ad55461fb132fddd02e9e4a02121');
   });
 });

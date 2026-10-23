@@ -4,9 +4,12 @@
 // binding (ElevenLabs, src/narration/publication.ts) into a verified narration set under dist/<videoId>/narration/,
 // which render, publish:dry-run, the public-output gate, and the proof receipt then replay from disk with
 // --narration=publication. The spec is validated (its narration budget included) and the binding resolved before any
-// key is read or request made; a current set is reused, never synthesized twice. `publication-proof` speaks only the
-// first narrated segment into dist/narration-proof/<videoId>/: the owner-run live proof of the same path.
+// key is read or request made; a current set is reused, never synthesized twice, and a stale set's lines whose audio is
+// still exactly right carry over, so only the changed lines are paid for (`publication-plan` reports them first).
+// `publication-proof` speaks only the first narrated segment into dist/narration-proof/<videoId>/: the owner-run live
+// proof of the same path.
 //
+//   node scripts/narration.ts publication-plan [videoId]     # offline: what publication would request (no key, no call)
 //   node scripts/narration.ts publication [videoId]          # needs ELEVENLABS_API_KEY unless the set is current
 //   node scripts/narration.ts publication-proof [videoId]    # the same, for one short segment
 //
@@ -43,7 +46,7 @@ import { decodePcm16Mono, encodeWavPcm16, parseWav } from '../src/narration/wav.
 import { buildCaptions, checkCaptions } from '../src/audio/captions.ts';
 import { effectiveWpm, voiceRequestFor } from '../src/audio/voice-provider.ts';
 import { IssueCollector } from '../src/core/issues.ts';
-import { loadPublicationBinding, publicationNarrationDir, type PublicationScope } from '../src/narration/publication.ts';
+import { loadPublicationBinding, planPublicationNarration, publicationExpectation, publicationNarrationDir, type PublicationScope } from '../src/narration/publication.ts';
 import { ElevenLabsPublicationVoice } from '../src/narration/providers/publication.ts';
 import { loadCommittedSpec, loadRegistry, validationContextFor } from '../src/pipeline/context.ts';
 import { synthesize as synthesizeNarration } from '../src/pipeline/render-input.ts';
@@ -634,7 +637,29 @@ async function publicationNarration(scope: PublicationScope): Promise<void> {
 const publication = (): Promise<void> => publicationNarration('video');
 const publicationProof = (): Promise<void> => publicationNarration('proof');
 
-const commands: Record<string, () => Promise<void>> = { doctor, pull, synthesize, place, transcribe, review, publication, 'publication-proof': publicationProof };
+/**
+ * What `publication` would do, decided offline before anyone pays: which lines carry over from the set on disk and
+ * which would be requested, with the request and character counts. No credential, no network, nothing written.
+ */
+async function publicationPlan(): Promise<void> {
+  const positional = args.slice(1).filter((a) => !a.startsWith('--'));
+  const unknown = args.slice(1).filter((a) => a.startsWith('--'));
+  if (unknown.length || positional.length > 1) throw new NarrationContractError(`usage: node scripts/narration.ts ${command} [videoId] (no options)`);
+  const videoId = positional[0] ?? loadRegistry()[0]!.videoId;
+  if (!loadRegistry().some((v) => v.videoId === videoId)) throw new NarrationContractError(`unknown video ${JSON.stringify(videoId)}; see config/videos.json`);
+  const pipeline = loadPipelineConfig();
+  const spec = loadCommittedSpec(videoId);
+  const gate = validateSpec(spec, validationContextFor(spec, pipeline));
+  if (!gate.ok) throw new NarrationContractError(`${videoId} fails validation (${gate.errors} errors: ${[...new Set(gate.issues.filter((i) => i.severity === 'error').map((i) => i.code))].join(', ')})`);
+  const publication = loadPublicationBinding();
+  const expect = publicationExpectation(voiceRequestFor(spec, pipeline.voice, pipeline.lexicon), publication, videoId, 'video');
+  const plan = planPublicationNarration(publicationNarrationDir(videoId), expect);
+  log(`publication narration plan for ${videoId} (binding ${publication.binding.id}, lexicon ${expect.lexicon.id} v${expect.lexicon.version}): ${plan.current ? 'the set on disk is current; nothing to synthesize' : `${plan.carried.length} lines carry over, ${plan.synthesize.length} to synthesize`}`);
+  for (const l of plan.synthesize) for (const t of l.texts) log(`  request ${l.lineId}: ${t.length} characters: ${JSON.stringify(t)}`);
+  log(`  ${plan.requests} requests, ${plan.characters} characters (nothing was requested; no credential was read)`);
+}
+
+const commands: Record<string, () => Promise<void>> = { doctor, pull, synthesize, place, transcribe, review, publication, 'publication-proof': publicationProof, 'publication-plan': publicationPlan };
 const run = command ? commands[command] : undefined;
 if (!run) {
   console.error(`usage: node scripts/narration.ts <${Object.keys(commands).join('|')}> [--option=value ...]`);

@@ -1,13 +1,10 @@
-// Fixed geometry for brand segments (CTA, docs reference, outro, end screen).
+// Fixed geometry for brand segments (the canonical page and the end screen).
 // These are WalletWall-owned templates; nothing here is planner input.
 // Isomorphic.
 
 import type { Rect } from './geometry.ts';
 
-export const CTA_TEXT: Rect = { x: 160, y: 380, w: 1040, h: 260 };
 export const DOCS_CARD: Rect = { x: 160, y: 290, w: 1220, h: 470 };
-export const OUTRO_MARK: Rect = { x: 755, y: 325, w: 190, h: 190 };
-export const OUTRO_TEXT: Rect = { x: 560, y: 560, w: 600, h: 60 };
 export const END_SCREEN_LABEL: Rect = { x: 160, y: 140, w: 900, h: 40 };
 
 /**
@@ -29,8 +26,6 @@ export const PROVENANCE_CHIP: Rect = { x: 1000, y: 106, w: 760, h: 24 };
  * subscribe zone, so the zones YouTube fills stay empty.
  */
 export const BRAND_GROUND = {
-  CTA: { x0: 0, x1: 1920 },
   DOCS_REFERENCE: { x0: 0, x1: 1920 },
-  OUTRO: { x0: 0, x1: 1920 },
   END_SCREEN: { x0: 1100, x1: 1920 },
 } as const satisfies Record<string, { x0: number; x1: number }>;

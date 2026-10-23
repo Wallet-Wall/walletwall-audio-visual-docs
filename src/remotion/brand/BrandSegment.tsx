@@ -1,11 +1,11 @@
-// WalletWall-owned brand segments. Copy comes only from config/copy-templates.json
-// and the spec's source binding; branding stays short so content dominates. The
-// outro address is set in WalletWall terracotta.
+// WalletWall-owned brand segments: the one ending, the canonical page and then the end screen. Copy comes only
+// from config/copy-templates.json and the spec's source binding; branding stays short so content dominates, and the
+// brand mark rides the fixed footer (./Footer.tsx), never a slide of its own.
 
 import React from 'react';
-import { AbsoluteFill, Img, staticFile } from 'remotion';
+import { AbsoluteFill, staticFile } from 'remotion';
 import { TOKENS } from '../../brand/tokens.ts';
-import { BRAND_GROUND, CTA_TEXT, DOCS_CARD, END_SCREEN_LABEL, END_SCREEN_ZONES, OUTRO_MARK, OUTRO_TEXT } from '../../layout/brand-layout.ts';
+import { BRAND_GROUND, DOCS_CARD, END_SCREEN_LABEL, END_SCREEN_ZONES } from '../../layout/brand-layout.ts';
 import type { CopyTemplate } from '../../config/types.ts';
 import type { VideoSpec } from '../../spec/types.ts';
 import type { TimedSegment } from '../../timeline/timeline.ts';
@@ -31,17 +31,9 @@ export function brandMark(spec: VideoSpec): string | null {
 
 export const BrandSegment: React.FC<BrandProps> = ({ seg, ms, spec, template, docTitle, provenance }) => {
   const t0 = seg.contentStartMs;
-  const mark = brandMark(spec);
   const m = useMaterial();
   const ink = m.flat.text.ink;
   switch (seg.role) {
-    case 'CTA':
-      return (
-        <AbsoluteFill>
-          <Ground {...BRAND_GROUND.CTA} />
-          <div style={{ ...rectStyle(CTA_TEXT), ...textStyle('cardHeading', false, ink), ...settle(ms, t0) }}>{template.onScreen}</div>
-        </AbsoluteFill>
-      );
     case 'DOCS_REFERENCE': {
       const url = spec.source.docUrl.replace(/^https?:\/\//, '');
       return (
@@ -59,14 +51,6 @@ export const BrandSegment: React.FC<BrandProps> = ({ seg, ms, spec, template, do
         </AbsoluteFill>
       );
     }
-    case 'OUTRO':
-      return (
-        <AbsoluteFill>
-          <Ground {...BRAND_GROUND.OUTRO} />
-          {mark ? <Img src={mark} style={{ ...rectStyle(OUTRO_MARK), objectFit: 'contain', ...settle(ms, t0, 420) }} /> : null}
-          <div style={{ ...rectStyle(OUTRO_TEXT), ...textStyle('graphCaption', false, ink), textAlign: 'center', color: TOKENS.terracotta, ...settle(ms, t0 + 200) }}>{template.onScreen}</div>
-        </AbsoluteFill>
-      );
     case 'END_SCREEN':
       return (
         <AbsoluteFill>

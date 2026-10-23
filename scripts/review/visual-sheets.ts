@@ -21,10 +21,10 @@ import { alphaBounds, blank, crop, hexRgba, over, readPng, resize, writePng, typ
 const args = process.argv.slice(2);
 const [beforeSeq, afterSeq, beforeReveal, afterReveal] = args.filter((a) => !a.startsWith('--')) as [string, string, string, string];
 const list = (name: string, fallback: number[]): number[] => (args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3).split(',').map(Number)) ?? fallback;
-const frames = list('frames', [1742, 1780, 1834, 1846, 1858, 1890]);
-const reveals = list('reveal', [1680, 1689, 1696, 1703, 1710]);
+const frames = list('frames', [1766, 1804, 1843, 1855, 1867, 1899]);
+const reveals = list('reveal', [1704, 1713, 1720, 1727, 1734]);
 const contact = args.find((a) => a.startsWith('--contact='))?.slice(10).split(',');
-const contactFrames = list('contact-frames', [1780, 1834]);
+const contactFrames = list('contact-frames', [1804, 1843]);
 if (!beforeSeq || !afterSeq || !beforeReveal || !afterReveal) throw new Error('usage: visual-sheets.ts <before seq> <after seq> <before reveal> <after reveal> [--frames=…] [--reveal=…]');
 
 const out = path.join(DIST_ROOT, 'blender-review', 'visual');

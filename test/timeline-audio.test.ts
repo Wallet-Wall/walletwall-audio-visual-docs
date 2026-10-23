@@ -18,7 +18,8 @@ describe('timeline', () => {
     for (const s of timeline.segments) {
       assert.equal(s.startMs, cursor);
       assert.ok(s.contentStartMs >= s.startMs && s.endMs > s.contentStartMs);
-      for (const l of s.lines) assert.ok(l.startMs >= s.contentStartMs && l.endMs <= s.endMs);
+      // A line may start under its segment's transition (speech owns the cadence), never before the segment begins.
+      for (const l of s.lines) assert.ok(l.startMs >= s.startMs && l.endMs <= s.endMs);
       cursor = s.endMs;
     }
     assert.equal(timeline.segments[0]!.contentStartMs, 0);
@@ -55,7 +56,7 @@ describe('timeline', () => {
 
 describe('voice and pronunciation', () => {
   test('aliases feed the TTS input, never the display text', () => {
-    assert.equal(toSpokenText('WalletWallaby reads ERC-20 and USDC on Sepolia via WalletWall.', config.lexicon), 'Wallet Wallaby reads E R C twenty and U S D C on seh POH lee uh via Wallet Wall.');
+    assert.equal(toSpokenText('WalletWallaby reads ERC-20 and USDC on Sepolia via WalletWall.', config.lexicon), 'Wallet Wallaby reads E R C twenty and U S D C on Sepolia via Wallet Wall.');
     assert.equal(toSpokenText('Dunes are not Dune.', config.lexicon), 'Dunes are not Dune.');
   });
 

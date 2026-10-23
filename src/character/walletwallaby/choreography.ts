@@ -93,9 +93,7 @@ const EXIT_APEX_Y = -60;
 
 /** Fixed brand choreography: WalletWallaby is a guide, not a mascot, so brand moments stay still. */
 const BRAND_MARKS: Partial<Record<TimedSegment['role'], { at: Point; scale: number; pose: WallabyPose; expression: WallabyExpression; lookAt: Point | null }>> = {
-  CTA: { at: { x: 1420, y: GROUND_Y }, scale: 1, pose: 'CTA', expression: 'SATISFIED', lookAt: null },
   DOCS_REFERENCE: { at: { x: 1560, y: GROUND_Y }, scale: 0.95, pose: 'POINT', expression: 'NEUTRAL', lookAt: { x: 760, y: 560 } },
-  OUTRO: { at: { x: 1380, y: GROUND_Y }, scale: 0.95, pose: 'PERCH', expression: 'SATISFIED', lookAt: { x: 900, y: 520 } },
   // The sign-off stands on the end screen's own stretch of ground (brand-layout.ts BRAND_GROUND), right of the reserved zones.
   END_SCREEN: { at: { x: 1700, y: GROUND_Y }, scale: 0.5, pose: 'PERCH', expression: 'NEUTRAL', lookAt: { x: 1300, y: 600 } },
 };

@@ -3,7 +3,10 @@
 // re-derives from the plan), so a video's own length sets them: the Rive-era absolute counts (400 grounded, 300 scene
 // holds, 300 supported holds at every 9th frame) were calibrated on the 145 wpm fixture lesson and refused the
 // qualified publication narration (153.6 wpm), whose holds are shorter. Owner decision, 2026-10-22: 0.65 / 0.5 / 0.5.
-// The lab's floors stay counts, and every threshold is unchanged.
+// Owner decision, later the same day: supported holds 0.45, when the single ending retired the like-and-subscribe and
+// logo slides and cut the end screen to 7 s (55 sampled frames of WalletWallaby standing on brand ground) and the speech
+// came to own the cadence; the teaching segments' coverage is unchanged. The lab's floors stay counts, and every
+// threshold is unchanged.
 
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
@@ -22,20 +25,28 @@ const report = (lessonFrames: number[] | undefined, counts: Record<string, numbe
 });
 /** The real publication narration run (2026-10-22): 540 checked lesson frames. */
 const PUBLICATION = { 'lesson.grounded': 501, 'lesson.sceneHolds': 381, 'lesson.supportedHolds': 287, 'lesson.heldClear': 2 };
+/** The speech-owned lesson with the single ending, measured on the production host (2026-10-22): 497 checked lesson frames. */
+const SINGLE_ENDING = { 'lesson.grounded': 456, 'lesson.sceneHolds': 385, 'lesson.supportedHolds': 242, 'lesson.heldClear': 2 };
 
 describe('the invariants coverage floors', () => {
   test('the lesson floors are the owner-approved fractions of the lesson frames checked; the lab floors stay counts', () => {
-    assert.deepEqual(LESSON_COVERAGE, { 'lesson.grounded': 0.65, 'lesson.sceneHolds': 0.5, 'lesson.supportedHolds': 0.5 });
-    assert.deepEqual(coverageMinimums(540, 1), { 'lesson.grounded': 351, 'lesson.sceneHolds': 270, 'lesson.supportedHolds': 270, 'lab.unsupportedPerch': 10, 'lab.hang': 2 });
-    assert.deepEqual(coverageMinimums(578, 1), { 'lesson.grounded': 376, 'lesson.sceneHolds': 289, 'lesson.supportedHolds': 289, 'lab.unsupportedPerch': 10, 'lab.hang': 2 });
+    assert.deepEqual(LESSON_COVERAGE, { 'lesson.grounded': 0.65, 'lesson.sceneHolds': 0.5, 'lesson.supportedHolds': 0.45 });
+    assert.deepEqual(coverageMinimums(540, 1), { 'lesson.grounded': 351, 'lesson.sceneHolds': 270, 'lesson.supportedHolds': 243, 'lab.unsupportedPerch': 10, 'lab.hang': 2 });
+    assert.deepEqual(coverageMinimums(578, 1), { 'lesson.grounded': 376, 'lesson.sceneHolds': 289, 'lesson.supportedHolds': 261, 'lab.unsupportedPerch': 10, 'lab.hang': 2 });
     // A fraction is a floor: a count just below it fails, never rounded in its favour.
-    assert.equal(coverageMinimums(541, 1)['lesson.supportedHolds'], 271);
+    assert.equal(coverageMinimums(541, 1)['lesson.supportedHolds'], 244);
+    assert.deepEqual(coverageMinimums(497, 1), { 'lesson.grounded': 324, 'lesson.sceneHolds': 249, 'lesson.supportedHolds': 224, 'lab.unsupportedPerch': 10, 'lab.hang': 2 });
     for (const v of Object.values(coverageMinimums(1, 1))) assert.ok(v >= 1);
   });
 
   test('the qualified publication narration\'s coverage passes; the Rive-era absolute floor refused it', () => {
     assert.deepEqual(invariantsBarProblems(report(stride(540), PUBLICATION)), []);
     assert.ok(PUBLICATION['lesson.supportedHolds'] < 300, 'control: the absolute floor (300) refused this run');
+  });
+
+  test('the single-ending lesson\'s coverage passes at 0.45; the 0.5 floor refused it', () => {
+    assert.deepEqual(invariantsBarProblems(report(stride(497), SINGLE_ENDING)), []);
+    assert.ok(SINGLE_ENDING['lesson.supportedHolds'] < Math.ceil(0.5 * 497), 'control: at 0.5 this run needed 249 supported holds and had 242');
   });
 
   test('positive controls: too little of any kind is refused, at the floor and one below it', () => {

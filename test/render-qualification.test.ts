@@ -42,8 +42,8 @@ const run = (environment: RenderEnvironment, sha: (role: string, refSha: string)
 
 const PINS = { environmentsSha256: 'a'.repeat(64), referenceSha256: 'b'.repeat(64), blenderConfigSha256: 'c'.repeat(64), characterPinsSha256: 'd'.repeat(64) };
 
-/** The invariants report of a passing publication-stride run in `env`, as qualification reads it (PASSING_COUNTS' 786 frames: 575 lesson frames at the stride and 211 lab frames). */
-const invariantsOf = (env: unknown) => ({ pass: true, every: 9, labEvery: 1, failureCount: 0, thresholds: { ...INVARIANT_THRESHOLDS }, counts: { ...PASSING_COUNTS }, lessonFrames: Array.from({ length: 575 }, (_, i) => i * 9), environment: structuredClone(env) });
+/** The invariants report of a passing publication-stride run in `env`, as qualification reads it (PASSING_COUNTS, measured over the plan's 497 lesson frames at the stride and the lab). */
+const invariantsOf = (env: unknown) => ({ pass: true, every: 9, labEvery: 1, failureCount: 0, thresholds: { ...INVARIANT_THRESHOLDS }, counts: { ...PASSING_COUNTS }, lessonFrames: Array.from({ length: 497 }, (_, i) => i * 9), environment: structuredClone(env) });
 
 /** The evidence of a clean qualification on the production host itself (nothing changed). */
 function inputs(over: Partial<QualificationInputs> = {}, env: RenderEnvironment = ENVIRONMENTS['production-rtx5080']): QualificationInputs {
@@ -59,7 +59,7 @@ function inputs(over: Partial<QualificationInputs> = {}, env: RenderEnvironment 
     runs: { a: run(env), b: run(env), problems: [] },
     versusReference: reference.roles.map((r) => ({ role: r.role, frame: r.frame, identical: true, measures: null })),
     invariants: invariantsOf(env),
-    lessonStrideFrames: Array.from({ length: 575 }, (_, i) => i * 9),
+    lessonStrideFrames: Array.from({ length: 497 }, (_, i) => i * 9),
     ...over,
   }) as QualificationInputs;
 }
@@ -100,7 +100,7 @@ describe('the qualification verdict', () => {
     const versus = reference.roles.map((x) => ({ role: x.role, frame: x.frame, identical: x !== peak, measures: x === peak ? { fractionOverNoise: 0.0057, meanAbsDelta: 0.05, coverageDeltaPx: 0, maxDelta: 15 } : null }));
     const r = decideQualification(inputs({ versusReference: versus }, ENVIRONMENTS['new-driver']));
     assert.equal(r.verdict, 'QUALIFICATION_FAIL');
-    assert.match(check(r, 'versus-reference').detail, /transition-peak \(frame 1690\): changed fraction 0\.570% > approved maximum 0\.500%/);
+    assert.match(check(r, 'versus-reference').detail, /transition-peak \(frame 1714\): changed fraction 0\.570% > approved maximum 0\.500%/);
     assert.ok(r.nextSteps.some((s) => /Do not raise a tolerance/.test(s)));
   });
 

@@ -56,7 +56,7 @@ const readFixture = (name: string): { input: MotionInput; plan: Uint8Array } => 
 const fixtureInput = readFixture('takeaway-hop').input;
 const fixturePlan = readFixture('takeaway-hop').plan;
 /** Every TRAVEL clip of the committed lesson that the transitional solver performs as a hop from a stance ending in a perch. */
-const HOPS_TO_PERCHES = [1, 4, 6, 27, 32, 39, 41, 43, 47, 49, 51, 53];
+const HOPS_TO_PERCHES = [1, 4, 6, 27, 32, 39, 41, 43, 47, 49];
 /** The tiers arrival: the fall that continues the previous scene's exit leap (no takeoff), which stays TypeScript. */
 const FALL = 13;
 const terrains = terrainsFor(timeline.segments, layouts);
@@ -313,7 +313,7 @@ describe('the engine performs every hop that ends in a perch, in the composition
 
   test('outside its paths every frame is the TypeScript solver without the engine\'s own follow-through; inside, the feet are exactly where the oracle puts them', () => {
     let inside = 0;
-    let tailDiffers = 0;
+    const tailDiffers = new Map<number, number>();
     const changed: number[] = [];
     for (let f = 0; f < frames; f++) {
       const ms = frameMs(f);
@@ -333,10 +333,10 @@ describe('the engine performs every hop that ends in a perch, in the composition
       assert.equal(a.motion.contact, b.motion.contact);
       assert.equal(a.motion.tail.swing, s.tailAngle, 'the tail is the engine\'s');
       assert.equal(a.motion.rotation, s.bodyPitch);
-      if (Math.abs(a.motion.tail.swing - b.motion.tail.swing) > 0.5) tailDiffers++;
+      if (Math.abs(a.motion.tail.swing - b.motion.tail.swing) > 0.5) tailDiffers.set(p.travelIndex, (tailDiffers.get(p.travelIndex) ?? 0) + 1);
     }
     // The paths plan exactly the frames the video renders, with one bounded exception: totalFrames rounds the duration
-    // (the lesson's 174,937 ms is 5,248.11 frames, of which 0..5247 render), so the LAST path may plan past the last
+    // (the lesson's 150,758 ms is 4,522.74 frames, of which 0..4522 render), so the LAST path may plan past the last
     // rendered frame, by at most the rounding gap, and only at instants still inside the video's duration.
     const last = bound.paths.length - 1;
     for (const p of bound.paths.slice(0, last)) assert.ok(p.end <= frames, `${p.travel.segmentId} clip ${p.travelIndex} plans past the video (${p.end} > ${frames})`);
@@ -344,10 +344,14 @@ describe('the engine performs every hop that ends in a perch, in the composition
     assert.ok(overrun <= Math.ceil((timeline.totalMs * fps) / 1000) - frames, `the last path runs ${overrun} frames past the video`);
     for (let f = frames; f < bound.paths[last]!.end; f++) assert.ok(frameMs(f) < timeline.totalMs, `frame ${f} lies past the video's duration`);
     assert.equal(inside, bound.paths.reduce((n, p) => n + Math.min(p.end, frames) - p.first, 0), 'paths never overlap on a rendered frame');
-    assert.ok(tailDiffers > 300, `positive control: the engine, not the transitional solver, drives the tail (${tailDiffers} frames differ)`);
-    // Only where the transitional solver would still be settling an engine landing past its path's
-    // end (the hook's short perch): the engine settled it inside its own window.
-    assert.ok(changed.length > 0, 'control: the hook hop\'s landing would outlast its perch in the transitional solver');
+    // Positive control: on every path the engine, not the transitional solver, drives the tail, for at least half a second.
+    for (const p of bound.paths) assert.ok((tailDiffers.get(p.travelIndex) ?? 0) >= 15, `clip ${p.travelIndex}: the engine drives the tail on ${tailDiffers.get(p.travelIndex) ?? 0} frames`);
+    // Only where the transitional solver would still be settling an engine landing past its path's end (a perch shorter
+    // than the follow-through window) does a frame outside the paths differ: the engine settled that landing inside its
+    // own window. The hook's perch was such a one until the opening line gave it room; the native guarantee
+    // (motion-intelligence/tests/guarantees.rs) still drives a hurried settle on a constructed short perch.
+    const shortPerches = bound.paths.filter((p) => [...p.events].some((e) => e.kind === 'LANDING' && e.atMs + maxResponseWindow > frameMs(p.end)));
+    assert.equal(changed.length > 0, shortPerches.length > 0, `${shortPerches.length} engine landings outlast their paths; ${changed.length} frames outside the paths differ`);
     for (const f of changed) {
       assert.ok(
         bound.paths.some((p) => f >= p.end && [...p.events].some((e) => e.kind === 'LANDING' && frameMs(f) < e.atMs + maxResponseWindow)),

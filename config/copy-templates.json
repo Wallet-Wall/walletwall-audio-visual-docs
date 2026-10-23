@@ -1,35 +1,23 @@
 {
   "schema": "walletwall.copy-templates/v2",
-  "note": "Brand copy is version-controlled. A planner may choose a template id; it can never write CTA, docs-reference, outro, end-screen, or footer copy itself.",
+  "note": "Brand copy is version-controlled. A planner may choose a template id; it can never write docs-reference, end-screen, or footer copy itself. One ending: the canonical page (its restrained line is the only call to action), then the end screen.",
   "templates": {
-    "cta.like-subscribe.v1": {
-      "role": "CTA",
-      "narration": "If this was useful, like the video and subscribe for more WalletWall architecture and data deep dives.",
-      "onScreen": "Like and subscribe for more WalletWall deep dives",
-      "durationMs": null
-    },
     "docs-reference.v1": {
       "role": "DOCS_REFERENCE",
       "narration": "The full page is in the WalletWall docs. The link is in the description.",
       "onScreen": "Read the canonical page",
       "durationMs": null
     },
-    "outro.v1": {
-      "role": "OUTRO",
-      "narration": null,
-      "onScreen": "walletwall.org",
-      "durationMs": 3000
-    },
-    "end-screen.v1": {
+    "end-screen.v2": {
       "role": "END_SCREEN",
       "narration": null,
       "onScreen": "Next on the route",
-      "durationMs": 12000
+      "durationMs": 7000
     }
   },
   "footer": {
     "id": "footer.v1",
-    "note": "The quiet fixed WalletWall footer (src/layout/footer.ts): the brick-wallet mark and this wordmark, bottom right, on every teaching and brand segment but the outro and end screen.",
+    "note": "The quiet fixed WalletWall footer (src/layout/footer.ts): the brick-wallet mark and this wordmark, bottom right, on every teaching and brand segment but the end screen.",
     "onScreen": "WalletWall"
   }
 }

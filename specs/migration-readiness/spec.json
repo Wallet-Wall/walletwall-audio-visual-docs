@@ -19,7 +19,7 @@
   "planner": {
     "provider": "fixture",
     "contract": "walletwall.storyboard/v1",
-    "storyboardHash": "ee789727659e29ea4a1d3e0d939b56f3183f5895473758c57da547bbfbc54129"
+    "storyboardHash": "e784d8eba6c7efa9fa91f5741e173e8d9647f0e36a00001f260a7a73f5b1a8be"
   },
   "claims": [
     {
@@ -338,7 +338,7 @@
       "kind": "BRAND_MARK",
       "path": "video/assets/brand/walletwall-brick-wallet.png",
       "sha256": "91926a2eebc1777194ecf491049b8a7af3cf0892b09b363c5b2a17cd17d5dbad",
-      "justification": "The WalletWall brick-wallet mark (reviewed and supplied by the maintainer), used only by the outro template and the brand footer."
+      "justification": "The WalletWall brick-wallet mark (reviewed and supplied by the maintainer), used only by the brand footer."
     }
   ],
   "segments": [
@@ -349,6 +349,15 @@
         "type": "CUT"
       },
       "narration": [
+        {
+          "id": "hook.open",
+          "text": "When a wallet shows risk, what comes next?",
+          "role": "CONTENT",
+          "claimIds": [
+            "c-qes",
+            "c-mr"
+          ]
+        },
         {
           "id": "hook.l1",
           "text": "WalletWall's Quantum Exposure Score answers a question: how urgent is the risk?",
@@ -402,7 +411,7 @@
         {
           "action": "HOP",
           "target": "card:heading",
-          "cue": "hook.l1",
+          "cue": "hook.open",
           "expression": "CURIOUS"
         },
         {
@@ -840,7 +849,7 @@
           "action": "INSPECT",
           "target": "node:wallet-structure",
           "cue": "signals.l1",
-          "delayMs": 2400
+          "delayMs": 3600
         },
         {
           "action": "TRACE",
@@ -1133,26 +1142,6 @@
       "sonic": []
     },
     {
-      "id": "cta",
-      "role": "CTA",
-      "transitionIn": {
-        "type": "CUT"
-      },
-      "narration": [
-        {
-          "id": "cta.line",
-          "text": "If this was useful, like the video and subscribe for more WalletWall architecture and data deep dives.",
-          "role": "TEMPLATE",
-          "claimIds": [],
-          "templateId": "cta.like-subscribe.v1"
-        }
-      ],
-      "scene": null,
-      "templateId": "cta.like-subscribe.v1",
-      "wallaby": [],
-      "sonic": []
-    },
-    {
       "id": "docs-reference",
       "role": "DOCS_REFERENCE",
       "transitionIn": {
@@ -1173,18 +1162,6 @@
       "sonic": []
     },
     {
-      "id": "outro",
-      "role": "OUTRO",
-      "transitionIn": {
-        "type": "CUT"
-      },
-      "narration": [],
-      "scene": null,
-      "templateId": "outro.v1",
-      "wallaby": [],
-      "sonic": []
-    },
-    {
       "id": "end-screen",
       "role": "END_SCREEN",
       "transitionIn": {
@@ -1192,14 +1169,14 @@
       },
       "narration": [],
       "scene": null,
-      "templateId": "end-screen.v1",
+      "templateId": "end-screen.v2",
       "wallaby": [],
       "sonic": []
     }
   ],
   "audio": {
     "voiceIdentityId": "walletwallaby-v2",
-    "pronunciationDictionaryId": "walletwall-lexicon-v1",
+    "pronunciationDictionaryId": "walletwall-lexicon",
     "sonicIdentityId": "walletwall-ident-v1",
     "musicBedId": null
   },

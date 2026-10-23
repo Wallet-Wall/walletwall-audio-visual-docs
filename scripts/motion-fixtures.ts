@@ -22,7 +22,7 @@ export const FIXTURE_DIR = path.join(MOTION_CRATE_DIR, 'tests', 'fixtures');
 /** Each fixture is the first engine path in its segment. */
 export const MOTION_FIXTURES = [
   { name: 'takeaway-hop', segmentId: 'takeaway', covers: 'the natural arc onto the summit ledge' },
-  { name: 'hook-hop', segmentId: 'hook', covers: 'the lowest arc the search offers, and a settle hurried onto a short perch' },
+  { name: 'hook-hop', segmentId: 'hook', covers: 'the lowest arc the search offers (the native guarantees hurry its settle on a constructed short perch)' },
   { name: 'reading-land', segmentId: 'reading', covers: 'a landing at a new scale whose takeoff stands on the terrain of the outgoing scene' },
   { name: 'signals-hop', segmentId: 'signals', covers: 'a perch that leans in to inspect, where the tail settles into a curl' },
 ] as const;

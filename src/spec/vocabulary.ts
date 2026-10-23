@@ -72,16 +72,16 @@ export const VIDEO_CLASSES: Readonly<Record<VideoClassKind, { maxSeconds: number
 };
 
 // No IDENT: the lesson teaches from its first frame, and WalletWall's brand rides a quiet fixed footer
-// (src/layout/footer.ts), never a standalone logo scene.
+// (src/layout/footer.ts), never a standalone logo scene. One ending: the takeaway, the canonical page, the end screen.
+// No standalone like-and-subscribe slide (CTA) and no standalone logo slide (OUTRO): the only call to action is the
+// canonical page's own restrained line, from config/copy-templates.json.
 export const SEGMENT_ROLES = [
   'HOOK',
   'QUESTION',
   'EXPLANATION',
   'IMPLICATION',
   'TAKEAWAY',
-  'CTA',
   'DOCS_REFERENCE',
-  'OUTRO',
   'END_SCREEN',
 ] as const;
 export type SegmentRole = (typeof SEGMENT_ROLES)[number];
@@ -97,9 +97,7 @@ export const CONTENT_ROLES: ReadonlySet<SegmentRole> = new Set<SegmentRole>([
 
 /** Roles rendered from version-controlled brand templates; the planner only picks the template id. */
 export const BRAND_ROLES: ReadonlySet<SegmentRole> = new Set<SegmentRole>([
-  'CTA',
   'DOCS_REFERENCE',
-  'OUTRO',
   'END_SCREEN',
 ]);
 

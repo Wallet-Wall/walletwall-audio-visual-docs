@@ -56,7 +56,7 @@ support geometry** is cut as terrain:
 
 | Support | Where | Treatment |
 |---|---|---|
-| the ground | CTA, docs reference, outro, end screen (and every scene that stands on the ground line) | a 30 px strata shelf under the ground line, its lower edge broken, its free end slanted |
+| the ground | the canonical page, the end screen (and every scene that stands on the ground line) | a 30 px strata shelf under the ground line, its lower edge broken, its free end slanted |
 | the summit ledge | the takeaway | strata under a cap stone; the sides taper below the contact zone |
 | the pillars | under each tier node | strata columns; the sides stay within 3 px of the declared face |
 | the slabs | the layered scene behind the nodes | the same strata as bands across the plane, in its own perspective |
@@ -109,10 +109,10 @@ layouts are byte-for-byte main's.
 
 ```bash
 npm run blender:build && npm run blender:review                       # the character (materials v2) and the seven-pose sheet
-npm run blender:contact -- --frames=1780,1834                         # the supports in perspective, with the shadow on them
+npm run blender:contact -- --frames=1804,1843                         # the supports in perspective, with the shadow on them
 node scripts/review/blender-transition.ts --stills-only               # the depth reveal's frames (--reuse-layers skips Remotion)
 node scripts/review/narrow-perch.ts                                   # the narrow case: the review lab's perch
-npm run render:stills migration-readiness -- --frames=1780,2830,1430  # characterless backgrounds for the final sheet
+npm run render:stills migration-readiness -- --frames=1804,2750,1471  # characterless backgrounds for the final sheet
 node scripts/review/final-sheet.ts <backgrounds> <reveal sequence> <reveal frame>
 node scripts/review/white-audit.ts --before=<main stills> --after=dist/migration-readiness/stills
 node scripts/review/visual-metrics.ts <before> <after>                # white-ish pixels and shadow weight on the character

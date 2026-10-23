@@ -7,7 +7,9 @@
 //
 // In order, failing closed at each step:
 //   1. a current, verified set already on disk is returned as is (or, left in staging by an interrupted run, put in
-//      place): no key, no call, never synthesized twice;
+//      place): no key, no call, never synthesized twice; a stale set's lines whose audio is still exactly right (the
+//      same spoken text, chunk plan, and binding, every byte verified) carry over, and when every line does, the set
+//      is rebuilt with no key and no call;
 //   2. the credential (ELEVENLABS_API_KEY, from the environment at call time) must be set;
 //   3. a voice-id override in the environment that names another voice is refused: publication speaks the bound voice;
 //   4. the binding's settings pass the adapter's own closed schema;
@@ -15,9 +17,11 @@
 //      so nothing paid for can be refused afterwards for a reason that was knowable before;
 //   6. the read-only voice preflight (one GET): the key is accepted, the voice exists, is the identity's variety, and
 //      is the voice the binding names;
-//   7. one text-to-speech request per chunk, sequential, no retry: the first failure stops the run, and nothing is left;
-//   8. the set is written to a staging directory and verified from disk; from then on it is kept even if putting it in
-//      place fails (the next run adopts it with no request), and only then does it replace the previous set.
+//   7. one text-to-speech request per chunk of the lines that do not carry over, sequential, no retry: the first
+//      failure stops the run, and nothing is left;
+//   8. the set (carried and new audio, and a record built from the current script alone) is written to a staging
+//      directory and verified from disk; from then on it is kept even if putting it in place fails (the next run
+//      adopts it with no request), and only then does it replace the previous set.
 // There is no fallback: when ElevenLabs fails, publication narration fails. Node-only.
 
 import { existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -28,6 +32,8 @@ import type { NarrationTrack } from '../../timeline/timeline.ts';
 import { VOICE_PROFILE, type NarrationLanguage, type NarrationRequest, type SynthesisContext } from '../contract.ts';
 import {
   buildPublicationRecord,
+  carryOverLines,
+  stagingDirOf,
   isLineId,
   joinChunks,
   PUBLICATION_RECORD_FILE,
@@ -36,10 +42,12 @@ import {
   readPublicationSet,
   trackFromSet,
   validatePublicationRecord,
+  type CarriedLine,
   type PublicationExpectation,
   type PublicationScope,
   type ResolvedPublication,
 } from '../publication.ts';
+import { assertLexiconPinned } from '../lexicon.ts';
 import { parseWav } from '../wav.ts';
 import type { ElevenLabsProvider } from './elevenlabs.ts';
 
@@ -93,8 +101,8 @@ function renameWithRetry(from: string, to: string): void {
 export class ElevenLabsPublicationVoice implements VoiceProvider {
   readonly id = 'elevenlabs';
   readonly synthetic = true;
-  /** What the last call did: reused a current set, or synthesized a new one. */
-  outcome: 'reused' | 'synthesized' | null = null;
+  /** What the last call did: reused a current set, rebuilt one from carried audio alone, or synthesized (some of) a new one. */
+  outcome: 'reused' | 'rebuilt' | 'synthesized' | null = null;
   private readonly o: PublicationVoiceOptions;
 
   constructor(options: PublicationVoiceOptions) {
@@ -106,10 +114,12 @@ export class ElevenLabsPublicationVoice implements VoiceProvider {
     const log = o.log ?? (() => {});
     const { binding } = o.publication;
     if (binding.provider !== this.id || o.adapter.id !== binding.provider || o.adapter.binding.voiceId !== binding.voiceId) throw new PublicationNarrationError('BINDING', 'the publication binding and the ElevenLabs adapter binding disagree');
+    // The lexicon version a set records must mean exactly one set of entries: an unversioned edit stops here, unpaid.
+    assertLexiconPinned(request.lexicon);
     const expect = publicationExpectation(request, o.publication, o.videoId, o.scope);
 
     // 1. A current set is never synthesized again; nor is one an interrupted run verified and left in staging.
-    const staging = `${o.dir}.staging`;
+    const staging = stagingDirOf(o.dir);
     try {
       const current = readPublicationSet(o.dir, expect);
       log(`reusing the verified narration set ${current.ref.identity.slice(0, 16)}: nothing requested`);
@@ -132,6 +142,24 @@ export class ElevenLabsPublicationVoice implements VoiceProvider {
       return trackFromSet(readPublicationSet(o.dir, expect));
     }
 
+    // Partial regeneration: every line of an earlier set (the set directory, or a stale set an interrupted run left in
+    // staging) whose audio is still exactly right (same spoken text, chunk plan, and binding, every byte verified)
+    // carries over, with where and when it was made; only the rest are paid for.
+    const carry = carryOverLines([o.dir, staging], expect);
+    const todo = expect.lines.filter((l) => !carry.audio.has(l.lineId));
+    const carried = expect.lines.flatMap((l) => carry.origins.get(l.lineId) ?? []);
+    if (carry.from.length) log(`carrying ${carried.length} verified lines from ${carry.from.map((id) => id.slice(0, 16)).join(', ')}; ${todo.length} to synthesize (${todo.reduce((n, l) => n + l.texts.length, 0)} requests, ${todo.reduce((n, l) => n + l.texts.reduce((m, t) => m + t.length, 0), 0)} characters)`);
+    if (todo.length === 0) {
+      // Nothing to pay for: no credential, no preflight, no request. The record is rebuilt for the current script.
+      assertSetDir(o.dir);
+      assertSetDir(staging);
+      this.assemble(expect, staging, carry.audio, 0, carried);
+      this.putInPlace(staging);
+      this.outcome = 'rebuilt';
+      log('rebuilt the narration set from carried audio: nothing requested');
+      return trackFromSet(readPublicationSet(o.dir, expect, o.env));
+    }
+
     // 2. The credential, read here and only here; never recorded, logged, or echoed.
     const keyName = o.adapter.binding.apiKeyEnv;
     if (!o.env[keyName]) throw new PublicationNarrationError('CREDENTIAL', `${keyName} is not set: publication narration needs it for this step only (it is never written anywhere); nothing was requested`);
@@ -149,22 +177,12 @@ export class ElevenLabsPublicationVoice implements VoiceProvider {
     // 6. The read-only preflight, once, before any paid call.
     const pre = await o.adapter.preflight(binding.voiceId, request.identity, ctx);
     if (pre.reportedVoiceId !== binding.voiceId) throw new PublicationNarrationError('BINDING', `the voice lookup did not report the bound voice ${binding.voiceId}: the binding is not coherent; nothing was synthesized`);
-    log(`voice ${binding.voiceId} accepted (${binding.language}); synthesizing ${expect.lines.length} lines, ${expect.lines.reduce((n, l) => n + l.texts.length, 0)} requests`);
+    log(`voice ${binding.voiceId} accepted (${binding.language}); synthesizing ${todo.length} lines, ${todo.reduce((n, l) => n + l.texts.length, 0)} requests`);
 
-    // 7. The paid requests, into staging; a set that does not verify is discarded.
-    clearSetDir(staging);
-    mkdirSync(staging, { recursive: true });
-    try {
-      const audio = await this.speakAll(request, expect, settings, ctx, staging);
-      const record = buildPublicationRecord({ expectation: expect, videoId: o.videoId, audio: audio.wavs, generatedAt: new Date().toISOString(), requests: audio.requests });
-      const problems = validatePublicationRecord(record, o.env);
-      if (problems.length) throw new PublicationNarrationError('INVALID', `the new narration record is not valid: ${problems.slice(0, 4).join('; ')}`);
-      writeFileSync(path.join(staging, PUBLICATION_RECORD_FILE), prettyJson(record));
-      readPublicationSet(staging, expect, o.env);
-    } catch (err) {
-      clearSetDir(staging);
-      throw err;
-    }
+    // 7. The paid requests (only the lines that do not carry over); a set that does not verify is discarded.
+    const spoken = await this.speakAll(request, todo, settings, ctx);
+    const audio = new Map<string, Uint8Array>([...carry.audio, ...spoken.wavs]);
+    this.assemble(expect, staging, audio, spoken.requests, carried);
     // 8. Verified and paid for: kept whatever happens next.
     try {
       this.putInPlace(staging);
@@ -182,11 +200,32 @@ export class ElevenLabsPublicationVoice implements VoiceProvider {
     renameWithRetry(staging, this.o.dir);
   }
 
-  private async speakAll(request: VoiceRequest, expect: PublicationExpectation, settings: ReturnType<ElevenLabsProvider['validateSettings']>, ctx: SynthesisContext, staging: string): Promise<{ wavs: Map<string, Uint8Array>; requests: number }> {
+  /** Write every line's WAV and the record built from the current script alone into staging, and verify it from disk. */
+  private assemble(expect: PublicationExpectation, staging: string, audio: ReadonlyMap<string, Uint8Array>, requests: number, carried: readonly CarriedLine[]): void {
+    clearSetDir(staging);
+    mkdirSync(staging, { recursive: true });
+    try {
+      for (const line of expect.lines) {
+        const wav = audio.get(line.lineId);
+        if (!wav) throw new PublicationNarrationError('AUDIO', `no audio for line ${line.lineId}`);
+        writeFileSync(path.join(staging, `${line.lineId}.wav`), wav);
+      }
+      const record = buildPublicationRecord({ expectation: expect, videoId: this.o.videoId, audio, generatedAt: new Date().toISOString(), requests, carried });
+      const problems = validatePublicationRecord(record, this.o.env);
+      if (problems.length) throw new PublicationNarrationError('INVALID', `the new narration record is not valid: ${problems.slice(0, 4).join('; ')}`);
+      writeFileSync(path.join(staging, PUBLICATION_RECORD_FILE), prettyJson(record));
+      readPublicationSet(staging, expect, this.o.env);
+    } catch (err) {
+      clearSetDir(staging);
+      throw err;
+    }
+  }
+
+  private async speakAll(request: VoiceRequest, lines: PublicationExpectation['lines'], settings: ReturnType<ElevenLabsProvider['validateSettings']>, ctx: SynthesisContext): Promise<{ wavs: Map<string, Uint8Array>; requests: number }> {
     const { binding } = this.o.publication;
     const wavs = new Map<string, Uint8Array>();
     let requests = 0;
-    for (const line of expect.lines) {
+    for (const line of lines) {
       const pcm: Uint8Array[] = [];
       for (const text of line.texts) {
         const chunk: NarrationRequest = { passageId: line.lineId, displayText: text, spokenText: text, language: binding.language as NarrationLanguage, voiceProfile: VOICE_PROFILE, identity: request.identity };
@@ -196,9 +235,7 @@ export class ElevenLabsPublicationVoice implements VoiceProvider {
         if (info.sampleRate !== this.o.publication.sampleRate || info.channels !== 1) throw new PublicationNarrationError('AUDIO', `line ${line.lineId}: ElevenLabs returned ${info.sampleRate} Hz x${info.channels}, not the bound ${this.o.publication.sampleRate} Hz mono`);
         pcm.push(result.wav.subarray(info.dataOffset, info.dataOffset + info.dataLength));
       }
-      const wav = joinChunks(pcm, this.o.publication.sampleRate, binding.chunking);
-      writeFileSync(path.join(staging, `${line.lineId}.wav`), wav);
-      wavs.set(line.lineId, wav);
+      wavs.set(line.lineId, joinChunks(pcm, this.o.publication.sampleRate, binding.chunking));
     }
     return { wavs, requests };
   }
