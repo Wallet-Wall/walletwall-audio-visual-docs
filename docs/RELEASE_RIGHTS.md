@@ -45,12 +45,12 @@ Rules that keep a status honest (the schema enforces them):
 
 - An item that is not `CLEARED` carries a `resolution`: the owner action that would clear it and the event that would reopen it.
 - A basis of `UNDETERMINED` can only be `UNKNOWN` or `UNVERIFIED`, never `CLEARED`.
-- A `VENDOR_LICENSE`, `PROVIDER_TERMS`, or `THIRD_PARTY_ATTRIBUTION_ONLY` basis is `CLEARED` only with a `clearance` record (`clearedBy: "OWNER"`, the date, and why). An owner-authored or generated item needs none.
-- An asset cannot be `CLEARED` while the component it is bound to is not, and a component cannot be `CLEARED` while a component it is `producedBy` or `dependsOn` is not. For example the character model depends on the attributed signed-distance primitives, and the Blender frames depend on the model.
+- A `VENDOR_LICENSE`, `PROVIDER_TERMS`, or `THIRD_PARTY_ATTRIBUTION_ONLY` basis is `CLEARED` only with a `clearance` record (`clearedBy: "OWNER"`, the date, and why). An owner-authored or generated item takes none: it is `CLEARED` only on its `provenance` record ([Owner-authored and generated items](#owner-authored-and-generated-items)).
+- An asset cannot be `CLEARED` while the component it is bound to is not, and a component cannot be `CLEARED` while a component it is `producedBy` or `dependsOn` is not. For example the Blender character frames depend on the model, and the depth-reveal frames on Remotion's output.
 - An open-source basis names only recognised SPDX identifiers (`RECOGNISED_SPDX_IDS` in `src/rights/vocabulary.ts`), so a made-up identifier cannot stand in for a license.
 - A non-commercial or network-copyleft license (`CC-BY-NC-*`, `AGPL-*`; `RESTRICTED_SPDX_IDS`) cannot be the whole basis of a `CLEARED` open-source item. Such an item is recorded `NONCOMMERCIAL`, `INCOMPATIBLE`, or `OWNER_CONFIRMATION_PENDING`, or its expression names an alternative the owner can take with `OR`. Other copyleft licenses (GPL, LGPL, MPL, OFL, CC-BY-SA) attach their duties to distribution, so a component records `distribution` and its notice, and the review of the manifest is the control on whether that is enough.
-- **Who clears what.** A vendor's, a provider's, or a third party's terms are cleared only by a `clearance` record naming the owner. An owner-authored or generated item is cleared by a status edit, as the lane brief's own example shows, and the control on that edit is review of it: the pull request that flips `brand-mark` to `CLEARED` is the owner stating that WalletWall holds the rights.
-- **The media inventory is by exact path.** Every tracked image, audio, video, font, 3D, WebAssembly, Python bytecode or extension module, shared library, and zip or wheel archive is listed in `mediaFiles`, each entry naming one `path` or an exact `paths` list and the component or video asset whose rights cover it. There is no directory form: a file dropped beside an inventoried one is unrecorded (`MEDIA_FILE_UNRECORDED`), and an entry that lists a file that is gone is stale (`MEDIA_ENTRY_STALE`).
+- **Who clears what.** A vendor's, a provider's, or a third party's terms are cleared only by a `clearance` record naming the owner. An owner-authored or generated item is cleared on a `provenance` record: the owner's statement, and the exact committed bytes it is about, which the check hashes. Review of that edit is the control on the statement; the check holds the bytes.
+- **The media inventory is by exact path.** Every tracked image, audio, video, font, 3D model, texture, material, stored array, WebAssembly, Python bytecode or extension module, shared library, and zip or wheel archive is listed in `mediaFiles`, once, each entry naming one `path` or an exact `paths` list and the component or video asset whose rights cover it. There is no directory form: a file dropped beside an inventoried one is unrecorded (`MEDIA_FILE_UNRECORDED`), and an entry that lists a file that is gone is stale (`MEDIA_ENTRY_STALE`).
 
 ## Four layers, kept apart
 
@@ -63,7 +63,7 @@ One status never stands for another, so the manifest keeps four things separate:
 | Generated-media rights | Who holds the rights in what the tools produced (frames, the `.blend`, the MP4, narration audio)? | `GENERATED_MEDIA` components, each naming the tools that produced it |
 | Per-video asset rights | Do the specific assets this video shows and plays have rights recorded against their exact bytes? | `videos[].assets` |
 
-For example, Blender's GPL is `CLEARED` as a tool (it may be used for any purpose) while the character frames it produces are the creator's, and the GPL on the scripts says nothing about the video's license. Remotion's eligibility is a separate question from who owns the frames it renders.
+For example, Blender's GPL is `CLEARED` as a tool (it may be used for any purpose) while the character frames it produces are the creator's, and the GPL on the scripts says nothing about the video's license. Remotion's eligibility is a separate question from who owns the frames it renders. The schema holds the line: generated media is never recorded as authored, or under the license of the tool or the scripts that made it (`GENERATED_MEDIA_BASES` in `src/rights/vocabulary.ts`).
 
 ## Asset categories
 
@@ -78,12 +78,66 @@ Every video must account for every category below: either it has an asset of tha
 | `font` | Bound to its font component and license (OFL-1.1 today). An asset that binds a font-package component is recorded as `font`. |
 | `screenshot` | A captured image of a product or a chain explorer. Needs the right to show it. None today. |
 | `ui-capture` | A capture of a real UI. Needs the right to show it and no private data. None today. |
-| `logo-trademark` | A brand mark, recorded against its bytes. Needs the owner's record of how it was made and who holds it. |
+| `logo-trademark` | A brand mark, recorded against its bytes. Needs the owner's provenance record: who states that WalletWall made it, and the sha256 of the bytes the spec uses. |
 | `illustration` | Drawn artwork shipped as a file. Art drawn by code is owner-authored and has no file to record. None today. |
 | `third-party-media` | Third-party video or images. The pipeline has no asset kind for stock footage, generated imagery, or presenters. None today, and a new one would need a new kind. |
-| `three-d-asset` | 3D models and materials. The character is generated from owner code (and the attributed signed-distance primitives it depends on); nothing external is imported. A repository with a Blender lane (`config/blender.json`) must record the character as a `generated-model` component on the release path, and every video binds it under this category (`CHARACTER_UNRECORDED`, `COMPONENT_UNBOUND`, `COMPONENT_CATEGORY_MISMATCH`). |
+| `three-d-asset` | 3D models and materials. The character is generated from owner code; nothing external is imported, and an imported mesh or texture could not be folded into the owner's record (a media file is never a provenance `SOURCE`). The signed-distance primitives credited to a third party are code the build runs, recorded as their own item. A repository with a Blender lane (`config/blender.json`) must record the character as a `generated-model` component on the release path, and every video binds it under this category (`CHARACTER_UNRECORDED`, `COMPONENT_UNBOUND`, `COMPONENT_CATEGORY_MISMATCH`). |
 
 The other two categories the policy names, `source-script` and `software-dependency`, are not per-video: they are the source-code license map and the dependency components.
+
+## Owner-authored and generated items
+
+**Policy (owner, 2026-10-25).** An item WalletWall authored (`OWNER_AUTHORED`) or generated from what it authored (`GENERATED_FROM_OWNER_INPUTS`) is cleared on the owner's word, and only for what WalletWall made. It never covers the idea of a wallaby, generic anatomy or geometric primitives, Blender, Remotion, a font, a library, a third party's mathematical implementation, a narrator's voice or likeness, or a mathematical idea.
+
+The word is recorded with what it is about, in a `provenance` record on the item. The basis says whether the clearance is about the asset itself (`OWNER_AUTHORED`) or about output generated from owner inputs (`GENERATED_FROM_OWNER_INPUTS`).
+
+| Field | Question it answers |
+|---|---|
+| `attestation` | Who states it (`attestedBy: "OWNER"`, no name), the day, and what the statement rests on. |
+| `files` | The exact committed bytes the record is about, each by path, sha256, and role: `ASSET` (the item's own bytes, authored items only), `SOURCE` (what it is authored in or generated from, never a media file), `OUTPUT` (what it generated that the repository keeps, generated items only). |
+| `thirdPartyCodeInSources` | Third-party-derived code those sources carry, which the item is computed with but does not contain. |
+
+Three relations stay apart, because none stands for another:
+
+| Relation | Means | Effect |
+|---|---|---|
+| `dependsOn` | The item contains the other (the frames show the model). | The item is not `CLEARED` above it. |
+| `producedBy` | A tool made it (Blender). | The item is not `CLEARED` above the tool, which is judged as a tool. |
+| `thirdPartyCodeInSources` | Code that computes the item carries third-party-derived source, which is not in the item. | The item may be `CLEARED`. The code stays its own item on the release path and blocks a public release by itself. |
+
+What the check enforces:
+
+- An owner item is `CLEARED` only with a provenance record; a status edit alone is refused. A docs page bound to its published blob is the one exception: that binding is its provenance.
+- Every bound file is a file of the repository and still those bytes. Changing one (a lane module, the rig contract, `versions.ts`, the brand mark, a reference frame) makes the record stale in either mode (`PROVENANCE_STALE`, `PROVENANCE_FILE_MISSING`) until the owner re-establishes it and the new sha256 is recorded, or the item goes back to `OWNER_CONFIRMATION_PENDING` without the record (a record is checked whatever the item's status). A spec asset's record binds the bytes the spec uses.
+- Nothing rides on a record. A media file the inventory gives the item is one the record binds (`PROVENANCE_MEDIA_UNBOUND`), and an owner item cleared without a record (the docs page) carries no media at all. A file the record binds as the item's own belongs to no other record (`PROVENANCE_MEDIA_ELSEWHERE`), and a file is inventoried once. A media file is never a `SOURCE`: an imported mesh, texture, or sound has rights of its own, so it is recorded as its own item and depended on. An `OUTPUT` is the kind of file the item's generator makes (a model's is a model file, a render's an image or video), never code.
+- Third-party code is named, never hidden. A third-party-derived source component that cites any file the record binds, under any role, is named in `thirdPartyCodeInSources` or depended on; nothing else can be named there, and an item never names itself.
+- Only an owner basis carries a provenance record. Third-party-derived source never takes an owner basis, an asset bound to generated media is never recorded under an open-source license, and a docs page is cleared on its blob only as the page the video is made from, recorded as `authored-content`.
+
+What the check cannot see, and review must: whether a file bound as an `OUTPUT` really came from the generator and not from elsewhere (the label is the owner's declaration); an item moved to another basis or deleted outright (the repository's tests pin these records, `test/rights-owner-assets.test.ts`, and that the lane modules each record binds are every module its entry script loads); and the frames inside a release, which this record covers as a class and the publication receipt binds by hash.
+
+### Blender: script license, owner inputs, rendered output
+
+- The **scripts** that call the Blender Python API are `GPL-3.0-or-later` in the source-code map. The repository stays MIT around them, and `rights:check` refuses relabelling either way.
+- The **inputs** WalletWall supplies (the character, its rig and materials, the scene code) are the owner's, on provenance records.
+- The **frames** are output. Blender's license page says what you create with Blender is your sole property, its FAQ that a `.blend` is program output and the user's, and the GNU GPL FAQ that a program's license does not reach its output unless the output copies the program's own text or art (all read 2026-10-25). A frame's rights follow its inputs, so the character frames are the owner's, while the depth-reveal frames project Remotion's own frames and wait for `remotion-render-output`.
+
+### The items cleared on 2026-10-25
+
+| Item | Basis | What its record binds | What it does not cover |
+|---|---|---|---|
+| `brand-mark` | `OWNER_AUTHORED` | the committed mark (`91926a2e…`), the bytes the footer stages | a trademark search or registration; the fonts and Remotion frames it is drawn in |
+| `character` | `OWNER_AUTHORED` | the rig contract, the poses and palette, the body design, the declared versions | the idea of a wallaby, anatomy, primitives, Blender, Remotion, the Quilez-credited code |
+| `walletwallaby-character-model` | `GENERATED_FROM_OWNER_INPUTS` | every lane module `build.py` loads, and `versions.ts` (the canonical model pin) | the Quilez-credited code it runs (`quilez-sdf-forms`) |
+| `blender-render-output` | `GENERATED_FROM_OWNER_INPUTS` | every lane module `render.py` loads, the two job writers that give a character job no image, and the seven character reference frames | Blender, the GPL scripts, the depth-reveal frames (`blender-depth-reveal-output`) |
+
+The evidence: the brand mark entered in one commit by the maintainer and changed since only by a recorded deterministic polish, which is consistent with the owner's statement and all the repository can say (it does not record the tool the artwork was made with); `build.py` builds the model from an empty factory scene and the frames are rendered in a scene the lane's code builds around it, and no version of the lane in the history imports, downloads, or links a mesh, texture, rig, or material library, or credits anyone but Inigo Quilez. The records are the owner's declarations bound to the bytes they are about, not authentication; review of the edit is the control.
+
+### What this does not establish
+
+- Anything about `quilez-sdf-forms`, `remotion`, `remotion-render-output`, or `blender-depth-reveal-output`. Each stays pending, and each still blocks a public release.
+- That WalletWall owns Blender, Remotion, the fonts, a library, Inigo Quilez's work, a narrator's voice or likeness, or a mathematical idea.
+- A trademark clearance for the brand mark.
+- Any future output made with material these records do not bind: it is not covered until a record of its own says so.
 
 ## Voice rights
 
@@ -210,6 +264,7 @@ The finding codes, grouped:
 | Dependencies | `NPM_LOCK_UNREADABLE`, `NPM_LOCK_OUT_OF_SYNC`, `NPM_LICENSE_UNCLASSIFIED`, `NPM_RULE_MISMATCH`, `NPM_RULE_COMPONENT_MISMATCH`, `FONT_PACKAGE_UNRECORDED`, `NPM_RULE_AMBIGUOUS`, `NPM_RULE_UNUSED`, `NPM_RULE_LICENSE_NOT_ACCEPTABLE`, `CARGO_LOCK_UNREADABLE`, `CARGO_CRATE_UNLISTED`, `CARGO_CRATE_STALE`, `CARGO_CHECKSUM_MISMATCH`, `CARGO_LICENSE_NOT_ACCEPTABLE`, `REASSESSMENT_REQUIRED` |
 | Media | `VIDEO_REGISTRY_UNREADABLE`, `VIDEO_NOT_IN_MANIFEST`, `VIDEO_ENTRY_STALE`, `SPEC_UNREADABLE`, `SPEC_ASSET_UNCOVERED`, `SPEC_ASSET_HASH_MISMATCH`, `SPEC_ASSET_KIND_UNKNOWN`, `SPEC_ASSET_CATEGORY_MISMATCH`, `ASSET_BINDING_STALE`, `SONIC_ASSET_UNCOVERED`, `NARRATION_UNCOVERED`, `DOCS_SOURCE_UNCOVERED`, `COMPONENT_UNBOUND`, `COMPONENT_CATEGORY_MISMATCH`, `ASSET_ABOVE_COMPONENT`, `COMPONENT_ABOVE_DEPENDENCY`, `MEDIA_FILE_UNRECORDED`, `MEDIA_ENTRY_STALE` |
 | Voice rights | `VOICE_RIGHTS_MISSING`, `VOICE_RIGHTS_UNBOUND`, `VOICE_BINDING_STALE`, `VOICE_SOURCE_PROVIDER_MISMATCH` (the record's own rules are manifest problems, `MANIFEST_INVALID`) |
+| Owner provenance | `PROVENANCE_FILE_MISSING`, `PROVENANCE_STALE`, `PROVENANCE_MEDIA_UNBOUND`, `PROVENANCE_MEDIA_ELSEWHERE` (the record's own rules are manifest problems, `MANIFEST_INVALID`) |
 | Release | `RELEASE_STATE_UNSUPPORTED`, `RIGHTS_BLOCKING_STATUS` |
 
 ## Where it runs
@@ -218,7 +273,7 @@ The finding codes, grouped:
 - **Before a release leaves `LOCAL_PROOF`.** `npm run rights:check -- --public-release` must pass. It is a check a person runs, like the publication proof: no script refuses to upload or publish without it, and CI cannot clear anything.
 - **Not (yet) bound into the publication proof receipt.** The receipt ([PUBLICATION.md](PUBLICATION.md)) does not yet carry the rights manifest's identity, and `publication:proof` does not run the rights check. That is the immediate follow-up, and it needs a decision first (below). Until then the binding runs the other way: a `PUBLIC` record in the manifest names the `receiptSha256` it authorizes.
 
-Recording or clearing a rights item therefore moves no frame, no build identity, and no receipt: `config/release-rights.json`, these documents, and `src/rights/` are outside both (`test/rights-voice.test.ts` holds that), so clearing the narration voice did not invalidate a whole-video proof and needed no re-render.
+Recording or clearing a rights item therefore moves no frame, no build identity, and no receipt: `config/release-rights.json`, these documents, and `src/rights/` are outside both (`test/rights-voice.test.ts` holds that), so clearing the narration voice, and on 2026-10-25 the brand mark, the character, its model, and its frames, did not invalidate a whole-video proof and needed no re-render. A provenance record reads the files it binds and changes none of them.
 
 ### The follow-up: binding the rights manifest into the receipt
 

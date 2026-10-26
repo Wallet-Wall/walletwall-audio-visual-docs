@@ -519,11 +519,12 @@ describe('this repository', () => {
     for (const wanted of ['https://elevenlabs.io/vla', 'https://elevenlabs.io/use-policy', 'https://elevenlabs.io/docs/eleven-creative/voices/voice-library', 'https://elevenlabs.io/docs/eleven-creative/voices/voice-cloning/professional-voice-cloning', 'https://elevenlabs.io/elevenapi-terms']) assert.ok(urls.includes(wanted), wanted);
   });
 
-  test('development passes, and the strict check fails on exactly the seven items this policy does not touch', () => {
+  test('development passes, and the strict check fails only on items outside the voice record, none of them a voice item', () => {
     const d = checkRights(repo, { mode: 'development' });
     assert.deepEqual(d.findings, []);
     assert.equal(d.result, 'PASS');
-    const unrelated = ['blender-render-output', 'migration-readiness/brand-mark', 'migration-readiness/character', 'quilez-sdf-forms', 'remotion', 'remotion-render-output', 'walletwallaby-character-model'];
+    // The owner-asset lane (test/rights-owner-assets.test.ts) cleared the brand mark, the character, the model, and the character frames.
+    const unrelated = ['blender-depth-reveal-output', 'quilez-sdf-forms', 'remotion', 'remotion-render-output'];
     assert.deepEqual(d.pending.map((p) => p.id).sort(), unrelated);
     const s = checkRights(repo, { mode: 'public-release' });
     assert.equal(s.result, 'FAIL');
@@ -531,15 +532,16 @@ describe('this repository', () => {
     assert.ok(s.findings.every((f) => f.code === 'RIGHTS_BLOCKING_STATUS'));
   });
 
-  test('Remotion, the Quilez primitives, the character, the brand mark and their outputs are as they were: pending, with their owner actions', () => {
-    for (const id of ['remotion', 'remotion-render-output', 'quilez-sdf-forms', 'walletwallaby-character-model', 'blender-render-output']) {
+  test('Remotion, its output, and the Quilez primitives are as they were: pending, with their owner actions', () => {
+    for (const id of ['remotion', 'remotion-render-output', 'quilez-sdf-forms']) {
       assert.equal(find(id).status, 'OWNER_CONFIRMATION_PENDING', id);
       assert.equal(find(id).clearance, undefined, id);
     }
-    for (const id of ['character', 'brand-mark']) {
-      const a = manifest.videos[0].assets.find((x: Json) => x.id === id);
-      assert.equal(a.status, 'OWNER_CONFIRMATION_PENDING', id);
-      assert.equal(a.clearance, undefined, id);
+    // What the owner-asset lane cleared, it cleared on provenance records, never on a voice or vendor-style clearance.
+    for (const item of [find('walletwallaby-character-model'), find('blender-render-output'), ...['character', 'brand-mark'].map((id) => manifest.videos[0].assets.find((x: Json) => x.id === id))]) {
+      assert.equal(item.clearance, undefined, item.id);
+      assert.equal(item.voiceRights, undefined, item.id);
+      assert.equal(item.provenance.attestation.attestedBy, 'OWNER', item.id);
     }
   });
 

@@ -11,7 +11,7 @@ import { sha256Hex } from '../src/core/hash.ts';
 import { checkRights, renderReport, type RightsReport } from '../src/rights/check.ts';
 import { fsRepo } from '../src/rights/repo.ts';
 import { RIGHTS_STATUSES, STATUSES_PERMITTED_IN } from '../src/rights/vocabulary.ts';
-import { baseFiles, baseManifest, BLOB, component, component as component_, designedVoice, dropCharacter, GPL_TEXT, memoryRepo, MIT_TEXT, repoWith, withNarration, type Json } from './rights-fixtures.ts';
+import { baseFiles, baseManifest, BLOB, BODY_SOURCE, bound, BRAND_SHA, component, component as component_, designedVoice, dropCharacter, GPL_TEXT, memoryRepo, MIT_TEXT, ownerAttestation, repoWith, withNarration, type Json } from './rights-fixtures.ts';
 
 const dev = (repo = repoWith()): RightsReport => checkRights(repo, { mode: 'development' });
 const strict = (repo = repoWith()): RightsReport => checkRights(repo, { mode: 'public-release' });
@@ -208,7 +208,8 @@ describe('development mode and public-release mode', () => {
   });
 
   test('9. NONCOMMERCIAL blocks a public release (and is only recorded in development)', () => {
-    const change = (x: { manifest: Json }): void => { cleared(x); Object.assign(x.manifest.videos[0].assets[0], { rightsBasis: 'THIRD_PARTY_ATTRIBUTION_ONLY', status: 'NONCOMMERCIAL', resolution: { ownerAction: 'Replace the asset.', reassessmentTrigger: 'A new asset is supplied.' } }); };
+    // A third party's asset carries no owner provenance record, so the re-filed brand mark drops it.
+    const change = (x: { manifest: Json }): void => { cleared(x); Object.assign(x.manifest.videos[0].assets[0], { rightsBasis: 'THIRD_PARTY_ATTRIBUTION_ONLY', status: 'NONCOMMERCIAL', resolution: { ownerAction: 'Replace the asset.', reassessmentTrigger: 'A new asset is supplied.' } }); delete x.manifest.videos[0].assets[0].provenance; };
     assert.equal(dev(repoWith(change)).result, 'PASS');
     const r = strict(repoWith(change));
     assert.deepEqual(paths(r, 'RIGHTS_BLOCKING_STATUS'), ['demo/brand-mark']);
@@ -216,13 +217,13 @@ describe('development mode and public-release mode', () => {
   });
 
   test('10. UNKNOWN blocks a public release', () => {
-    const r = strict(repoWith((x) => { cleared(x); Object.assign(x.manifest.videos[0].assets[0], { rightsBasis: 'UNDETERMINED', status: 'UNKNOWN', resolution: { ownerAction: 'Find where this came from.', reassessmentTrigger: 'The source is identified.' } }); }));
+    const r = strict(repoWith((x) => { cleared(x); Object.assign(x.manifest.videos[0].assets[0], { rightsBasis: 'UNDETERMINED', status: 'UNKNOWN', resolution: { ownerAction: 'Find where this came from.', reassessmentTrigger: 'The source is identified.' } }); delete x.manifest.videos[0].assets[0].provenance; }));
     assert.deepEqual(paths(r, 'RIGHTS_BLOCKING_STATUS'), ['demo/brand-mark']);
   });
 
   test('every status other than CLEARED blocks a public release, whichever one it is', () => {
     for (const status of RIGHTS_STATUSES.filter((s) => s !== 'CLEARED')) {
-      const r = strict(repoWith((x) => { cleared(x); Object.assign(x.manifest.videos[0].assets[0], { rightsBasis: 'UNDETERMINED', status: status === 'UNKNOWN' || status === 'UNVERIFIED' ? status : 'UNKNOWN', resolution: { ownerAction: 'x', reassessmentTrigger: 'y' } }); if (status !== 'UNKNOWN' && status !== 'UNVERIFIED') Object.assign(x.manifest.videos[0].assets[0], { rightsBasis: 'THIRD_PARTY_ATTRIBUTION_ONLY', status }); }));
+      const r = strict(repoWith((x) => { cleared(x); Object.assign(x.manifest.videos[0].assets[0], { rightsBasis: 'UNDETERMINED', status: status === 'UNKNOWN' || status === 'UNVERIFIED' ? status : 'UNKNOWN', resolution: { ownerAction: 'x', reassessmentTrigger: 'y' } }); delete x.manifest.videos[0].assets[0].provenance; if (status !== 'UNKNOWN' && status !== 'UNVERIFIED') Object.assign(x.manifest.videos[0].assets[0], { rightsBasis: 'THIRD_PARTY_ATTRIBUTION_ONLY', status }); }));
       assert.deepEqual(paths(r, 'RIGHTS_BLOCKING_STATUS'), ['demo/brand-mark'], status);
     }
   });
@@ -272,7 +273,7 @@ describe('release states cannot claim more than the rights support', () => {
 
   test('an asset cannot be CLEARED while the component it is bound to is not', () => {
     const r = dev(repoWith((x) => {
-      x.manifest.videos[0].assets.push({ id: 'three-d', category: 'illustration', binding: { type: 'COMPONENT', componentId: 'remotion' }, rightsBasis: 'OWNER_AUTHORED', status: 'CLEARED', licenseExpression: null, evidence: [{ type: 'FILE', ref: 'docs/LICENSING.md' }] });
+      x.manifest.videos[0].assets.push({ id: 'three-d', category: 'illustration', binding: { type: 'COMPONENT', componentId: 'remotion' }, rightsBasis: 'OWNER_AUTHORED', status: 'CLEARED', licenseExpression: null, evidence: [{ type: 'FILE', ref: 'docs/LICENSING.md' }], provenance: { attestation: ownerAttestation(), files: [bound('src/character/body.ts', BODY_SOURCE, 'SOURCE')] } });
       x.manifest.videos[0].absent.splice(x.manifest.videos[0].absent.indexOf('illustration'), 1);
     }));
     assert.deepEqual(paths(r, 'ASSET_ABOVE_COMPONENT'), ['demo/three-d']);
@@ -320,7 +321,7 @@ describe('dependencies cannot drift', () => {
 describe('media assets are part of the rights, not only the dependencies', () => {
   test('a new spec asset with no rights entry fails, and so does one recorded against other bytes or the wrong category', () => {
     const spec = (assets: Json[]): ((x: { files: Record<string, string> }) => void) => (x) => (x.files['specs/demo/spec.json'] = JSON.stringify({ assets, source: { docPath: 'docs/demo.mdx', blob: BLOB }, audio: { voiceIdentityId: null, sonicIdentityId: 'i', musicBedId: null } }));
-    const brand = { id: 'brand-mark', kind: 'BRAND_MARK', path: 'video/assets/brand/mark.png', sha256: 'c'.repeat(64) };
+    const brand = { id: 'brand-mark', kind: 'BRAND_MARK', path: 'video/assets/brand/mark.png', sha256: BRAND_SHA };
     const added = dev(repoWith(spec([brand, { id: 'shot', kind: 'REAL_UI_CAPTURE', path: 'video/assets/ui-captures/a.png', sha256: 'd'.repeat(64) }])));
     assert.deepEqual(paths(added, 'SPEC_ASSET_UNCOVERED'), ['demo/shot']);
     const moved = dev(repoWith(spec([{ ...brand, sha256: 'f'.repeat(64) }])));
@@ -332,7 +333,7 @@ describe('media assets are part of the rights, not only the dependencies', () =>
   });
 
   test('an unknown spec asset kind is refused rather than guessed', () => {
-    const r = dev(repoWith((x) => (x.files['specs/demo/spec.json'] = JSON.stringify({ assets: [{ id: 'brand-mark', kind: 'STOCK_FOOTAGE', path: 'v/a.mp4', sha256: 'c'.repeat(64) }], source: { docPath: 'docs/demo.mdx', blob: BLOB }, audio: { voiceIdentityId: null, sonicIdentityId: 'i', musicBedId: null } }))));
+    const r = dev(repoWith((x) => (x.files['specs/demo/spec.json'] = JSON.stringify({ assets: [{ id: 'brand-mark', kind: 'STOCK_FOOTAGE', path: 'v/a.mp4', sha256: BRAND_SHA }], source: { docPath: 'docs/demo.mdx', blob: BLOB }, audio: { voiceIdentityId: null, sonicIdentityId: 'i', musicBedId: null } }))));
     assert.ok(codes(r).includes('SPEC_ASSET_KIND_UNKNOWN'));
   });
 
@@ -346,7 +347,10 @@ describe('media assets are part of the rights, not only the dependencies', () =>
   test('a recorded sonic asset covers its id, in the category of its use', () => {
     const r = dev(repoWith((x) => {
       x.files['config/sonic-identity.json'] = JSON.stringify({ ident: { id: 'i', asset: null }, musicBeds: { bed: { asset: 'bed-v1' } }, events: { TICK: { asset: null } } });
-      x.manifest.videos[0].assets.push({ id: 'bed', category: 'music', binding: { type: 'SONIC_ASSET', sonicAssetId: 'bed-v1' }, rightsBasis: 'OWNER_AUTHORED', status: 'CLEARED', licenseExpression: null, evidence: [{ type: 'FILE', ref: 'docs/LICENSING.md' }] });
+      // An owner-made bed is recorded against its own bytes, which the inventory gives to it.
+      x.files['assets/sonic/bed.wav'] = 'an owner-made bed';
+      x.manifest.mediaFiles.push({ id: 'bed', match: { path: 'assets/sonic/bed.wav' }, covers: { asset: 'demo/bed' } });
+      x.manifest.videos[0].assets.push({ id: 'bed', category: 'music', binding: { type: 'SONIC_ASSET', sonicAssetId: 'bed-v1' }, rightsBasis: 'OWNER_AUTHORED', status: 'CLEARED', licenseExpression: null, evidence: [{ type: 'FILE', ref: 'docs/LICENSING.md' }], provenance: { attestation: ownerAttestation(), files: [bound('assets/sonic/bed.wav', 'an owner-made bed', 'ASSET')] } });
       x.manifest.videos[0].absent.splice(x.manifest.videos[0].absent.indexOf('music'), 1);
     }));
     assert.deepEqual(codes(r), []);
@@ -355,7 +359,7 @@ describe('media assets are part of the rights, not only the dependencies', () =>
   test('a provider-narrated video needs the provider component and a narration asset bound to it', () => {
     const narrated = (x: { files: Record<string, string> }): void => {
       x.files['config/narration-providers.json'] = JSON.stringify({ publication: { id: 'demo-publication-v1', provider: 'elevenlabs' }, providers: { elevenlabs: { voiceId: 'fixture-voice-0001' } } });
-      x.files['specs/demo/spec.json'] = JSON.stringify({ assets: [{ id: 'brand-mark', kind: 'BRAND_MARK', path: 'p.png', sha256: 'c'.repeat(64) }], source: { docPath: 'docs/demo.mdx', blob: BLOB }, audio: { voiceIdentityId: 'v2', sonicIdentityId: 'i', musicBedId: null } });
+      x.files['specs/demo/spec.json'] = JSON.stringify({ assets: [{ id: 'brand-mark', kind: 'BRAND_MARK', path: 'p.png', sha256: BRAND_SHA }], source: { docPath: 'docs/demo.mdx', blob: BLOB }, audio: { voiceIdentityId: 'v2', sonicIdentityId: 'i', musicBedId: null } });
     };
     const bare = dev(repoWith(narrated));
     assert.ok(paths(bare, 'REQUIRED_COMPONENT_MISSING').includes('elevenlabs-service'));
@@ -367,7 +371,7 @@ describe('media assets are part of the rights, not only the dependencies', () =>
   });
 
   test('the docs the video is made from are recorded against the exact blob the spec names', () => {
-    const r = dev(repoWith((x) => (x.files['specs/demo/spec.json'] = JSON.stringify({ assets: [{ id: 'brand-mark', kind: 'BRAND_MARK', path: 'p.png', sha256: 'c'.repeat(64) }], source: { docPath: 'docs/demo.mdx', blob: '2'.repeat(40) }, audio: { voiceIdentityId: null, sonicIdentityId: 'i', musicBedId: null } }))));
+    const r = dev(repoWith((x) => (x.files['specs/demo/spec.json'] = JSON.stringify({ assets: [{ id: 'brand-mark', kind: 'BRAND_MARK', path: 'p.png', sha256: BRAND_SHA }], source: { docPath: 'docs/demo.mdx', blob: '2'.repeat(40) }, audio: { voiceIdentityId: null, sonicIdentityId: 'i', musicBedId: null } }))));
     assert.deepEqual(paths(r, 'DOCS_SOURCE_UNCOVERED'), ['demo']);
   });
 
@@ -474,18 +478,18 @@ describe('media files are inventoried, not only the ones a spec names', () => {
   });
 
   test('an entry covers a path or an exact list of paths, and an entry that matches no file is stale', () => {
-    const r = dev(repoWith((x) => { x.files['more/a.png'] = 'x'; x.files['more/b.mp3'] = 'x'; x.manifest.mediaFiles.push({ id: 'more', match: { paths: ['more/a.png', 'more/b.mp3'] }, covers: { component: 'blender-render-output' } }); }));
+    const r = dev(repoWith((x) => { x.files['more/a.png'] = 'x'; x.files['more/b.mp3'] = 'x'; x.manifest.mediaFiles.push({ id: 'more', match: { paths: ['more/a.png', 'more/b.mp3'] }, covers: { component: 'remotion' } }); }));
     assert.deepEqual(codes(r), []);
-    const stale = dev(repoWith((x) => x.manifest.mediaFiles.push({ id: 'ghost', match: { path: 'assets/ghost.png' }, covers: { component: 'blender-render-output' } })));
+    const stale = dev(repoWith((x) => x.manifest.mediaFiles.push({ id: 'ghost', match: { path: 'assets/ghost.png' }, covers: { component: 'remotion' } })));
     assert.deepEqual(paths(stale, 'MEDIA_ENTRY_STALE'), ['ghost']);
     // One listed path that no longer exists leaves the entry stale for that path, so a deleted file cannot linger in the record.
-    const partly = dev(repoWith((x) => { x.files['more/a.png'] = 'x'; x.manifest.mediaFiles.push({ id: 'more', match: { paths: ['more/a.png', 'more/gone.png'] }, covers: { component: 'blender-render-output' } }); }));
+    const partly = dev(repoWith((x) => { x.files['more/a.png'] = 'x'; x.manifest.mediaFiles.push({ id: 'more', match: { paths: ['more/a.png', 'more/gone.png'] }, covers: { component: 'remotion' } }); }));
     assert.deepEqual(paths(partly, 'MEDIA_ENTRY_STALE'), ['more']);
     assert.match(partly.findings.find((f) => f.code === 'MEDIA_ENTRY_STALE')!.message, /more\/gone\.png/);
   });
 
   test('a new file dropped beside inventoried ones is not covered by them: coverage is by exact path', () => {
-    const r = dev(repoWith((x) => { x.files['more/a.png'] = 'x'; x.files['more/new.png'] = 'x'; x.manifest.mediaFiles.push({ id: 'more', match: { paths: ['more/a.png'] }, covers: { component: 'blender-render-output' } }); }));
+    const r = dev(repoWith((x) => { x.files['more/a.png'] = 'x'; x.files['more/new.png'] = 'x'; x.manifest.mediaFiles.push({ id: 'more', match: { paths: ['more/a.png'] }, covers: { component: 'remotion' } }); }));
     assert.deepEqual(paths(r, 'MEDIA_FILE_UNRECORDED'), ['more/new.png']);
   });
 

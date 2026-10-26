@@ -116,17 +116,53 @@ export const RECOGNISED_SPDX_IDS: ReadonlySet<string> = new Set([
 export const RESTRICTED_SPDX_IDS: ReadonlySet<string> = new Set(['CC-BY-NC-4.0', 'CC-BY-NC-SA-4.0', 'AGPL-3.0-only', 'AGPL-3.0-or-later']);
 
 /**
- * File types that carry rights of their own (images, audio, video, fonts, 3D) and the compiled or archived code a
- * program can import or load (WebAssembly, Python bytecode and extension modules, shared libraries, zip and wheel
- * archives); every tracked one must be inventoried.
+ * File types that carry rights of their own (images, audio, video, fonts, 3D models with their textures and materials,
+ * and the arrays a mesh or texture can be stored as) and the compiled or archived code a program can import or load
+ * (WebAssembly, Python bytecode and extension modules, shared libraries, zip and wheel archives); every tracked one must
+ * be inventoried.
  */
-export const MEDIA_EXTENSIONS = /\.(?:png|jpe?g|gif|webp|avif|svg|bmp|tiff?|ico|heic|mp3|wav|ogg|oga|flac|m4a|aac|opus|mp4|mov|webm|mkv|avi|m4v|woff2?|ttf|otf|eot|blend|glb|gltf|fbx|obj|stl|usdz?|exr|hdr|wasm|riv|pyc|pyd|pyz|zip|whl|dll|dylib|so(?:\.\d+)*)$/i;
+export const MEDIA_EXTENSIONS = /\.(?:png|jpe?g|gif|webp|avif|svg|bmp|tiff?|ico|heic|jxl|jp2|tga|dds|ktx2?|basis|psd|psb|kra|xcf|mp3|wav|ogg|oga|flac|m4a|aac|opus|mp4|mov|webm|mkv|avi|m4v|woff2?|ttf|otf|eot|blend|glb|gltf|fbx|obj|mtl|stl|ply|dae|abc|3ds|bvh|x3d|vox|usd[acz]?|sbsar|sbs|ies|cube|exr|hdr|npy|npz|wasm|riv|pyc|pyd|pyz|zip|whl|dll|dylib|so(?:\.\d+)*)$/i;
 
 /** The asset category an asset that binds a component of this kind must be recorded as, so a video cannot file it elsewhere and declare the category absent. */
 export const CATEGORY_OF_COMPONENT_KIND: Readonly<Record<string, AssetCategory>> = Object.freeze({ 'generated-model': 'three-d-asset', 'font-package': 'font' });
 
 /** The license files the source-code license map may name, with the SPDX identifier each one holds. */
 export const KNOWN_LICENSE_FILES: Readonly<Record<string, string>> = Object.freeze({ MIT: 'LICENSES/MIT.txt', 'GPL-3.0-or-later': 'LICENSES/GPL-3.0-or-later.txt' });
+
+// ── Owner-authored and generated items ──────────────────────────────────────────────────────────────────────────────────
+// An item WalletWall authored, or generated from what it authored, is cleared on the owner's word, so the word is
+// recorded with what it is about (docs/RELEASE_RIGHTS.md, "Owner-authored and generated items"): a provenance record that
+// names who states it and binds the exact bytes, which the check hashes. It establishes the item's own rights and nothing
+// else: what the item incorporates keeps its own record (dependsOn), and so does third-party code its sources carry.
+
+/** The bases a provenance record is for, and that an item needs one on to be CLEARED. */
+export const OWNER_BASES: readonly RightsBasis[] = ['OWNER_AUTHORED', 'GENERATED_FROM_OWNER_INPUTS'];
+
+/** What a bound file is to the item: its own bytes, a source it is authored in or generated from, or an output it generated that the repository keeps. */
+export const PROVENANCE_ROLES = ['ASSET', 'SOURCE', 'OUTPUT'] as const;
+export type ProvenanceRole = (typeof PROVENANCE_ROLES)[number];
+
+/** An authored item is its own bytes and may name its sources; a generated item has sources and outputs, never bytes it authored. */
+export const PROVENANCE_ROLES_BY_BASIS: Readonly<Record<string, readonly ProvenanceRole[]>> = Object.freeze({ OWNER_AUTHORED: ['ASSET', 'SOURCE'], GENERATED_FROM_OWNER_INPUTS: ['SOURCE', 'OUTPUT'] });
+
+export const MAX_PROVENANCE_FILES = 64;
+
+/**
+ * What a generator of each kind makes, so an OUTPUT is the kind of file its item produces: a texture is not a model's
+ * output, and code is nobody's. An output of anything else (an asset, another kind) is at least a media file.
+ */
+export const OUTPUT_FORMATS_BY_KIND: Readonly<Record<string, RegExp>> = Object.freeze({
+  'generated-model': /\.(?:blend|glb|gltf|fbx|obj|stl|ply|dae|abc|3ds|x3d|usd[acz]?)$/i,
+  'generated-render': /\.(?:png|jpe?g|webp|avif|exr|tiff?|bmp|gif|mp4|mov|webm|mkv|avi|m4v)$/i,
+  'generated-audio': /\.(?:wav|mp3|ogg|oga|flac|m4a|aac|opus)$/i,
+});
+
+/**
+ * What generated media may rest on: the inputs it was generated from, or a vendor's, provider's, or third party's terms
+ * for it. Never the license of the tool or the scripts that made it (a program's license does not reach what it outputs
+ * unless the output copies the program's own text or art), and never authorship: generated media is generated.
+ */
+export const GENERATED_MEDIA_BASES: readonly RightsBasis[] = ['GENERATED_FROM_OWNER_INPUTS', 'VENDOR_LICENSE', 'PROVIDER_TERMS', 'THIRD_PARTY_ATTRIBUTION_ONLY', 'UNDETERMINED'];
 
 // ── Voice rights ────────────────────────────────────────────────────────────────────────────────────────────────────────
 // A narration voice is used on a rights-and-consent basis (docs/RELEASE_RIGHTS.md, "Voice rights"), not on a blanket ban
