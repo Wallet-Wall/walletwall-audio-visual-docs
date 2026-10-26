@@ -89,6 +89,20 @@ Every action is pinned to a full commit SHA, and the comment names the release t
 
 It sets no license policy of its own. The repository is MIT and the locked tree is mostly MIT, ISC, BSD, and Apache-2.0, but the renderer is not: nine Remotion packages carry Remotion's own source-available license (not an SPDX identifier), eight Remotion packages declare no license field, and the tree also includes MPL-2.0 (`mediabunny`), OFL-1.1 (the bundled fonts), and CC-BY-4.0 (`caniuse-lite`). A plain SPDX allowlist would either block the renderer or admit everything, so the license policy is `npm run rights:check` instead (below), which admits a permissive license without a record and fails on any other until a rule and a component cover it. Remotion's company license is an owner decision, recorded as `OWNER_CONFIRMATION_PENDING` in [config/release-rights.json](../config/release-rights.json) ([LICENSING.md](LICENSING.md#remotion)), not a CI rule.
 
+### Dependency overrides
+
+An npm `overrides` entry replaces a version that a dependency declares, so `package.json` uses one only as a security exception. Each is listed here with the advisory it answers and the condition that removes it. `test/guards.test.ts` holds this table, `package.json`, the lockfile, and the installed tree to each other, and fails when the overridden package gains a dependent outside the scope below, Remotion declares or embeds a different version of it, or a module in `src/` or `scripts/` starts importing it.
+
+| Package | Forced to | Declared by | Advisory | Remove when |
+|---|---|---|---|---|
+| `zod` | `4.6.6` | `4.5.4`, exactly, by `@remotion/elevenlabs`, `@remotion/media`, `@remotion/openai-whisper`, `@remotion/studio`, `@remotion/studio-protocol`, and `@remotion/studio-server` | GHSA-mrhx-c7xc-m3w5 (high; every release before 4.6.6) | the Remotion versions used by WalletWall natively resolve a non-vulnerable Zod version and the replacement passes WalletWall's renderer proof |
+
+The override is WalletWall's exception, not something Remotion's dependency contract allows: Remotion declares `zod` `4.5.4` exactly, and `npm ls zod` reports the installed 4.6.6 as overridden. What WalletWall relies on is that its render path never runs Zod. No module in `src/` or `scripts/` imports Zod, or any Remotion package but `remotion`, `@remotion/bundler`, and `@remotion/renderer`, and none of those three loads Zod in Node; in the browser, Zod is bundled only into the asynchronous chunks of the read-only Studio, which the render bundle loads only on a page that Remotion's renderer did not open. Removing or changing the override is proved like a renderer change: the review stills and the Blender proof set stay byte-identical, and the whole-video publication proof passes again.
+
+What the override cannot reach: Remotion's prebuilt files also carry their own copy of Zod 4.5.4, bundled into `@remotion/studio-protocol`, `@remotion/codemods`, and one chunk of `@remotion/studio` rather than installed as a package. No override replaces it, and `npm audit` does not see it. Those copies run, with the npm package, only in Remotion's own tooling (`npm run studio`, through `@remotion/studio-server`), never on the render path, so the Studio still runs vulnerable Zod 4.5.4 code. The guard pins where the copies are and their version, so a Remotion release that rebuilds them is noticed.
+
+`fast-uri` (through `webpack`, `schema-utils`, and `ajv`) needed no override: its fixed release, 3.1.9, is inside the range `ajv` declares, so the lockfile resolves it normally.
+
 ## Licenses and release rights
 
 `npm run rights:check` runs in the required `Verify pipeline` job ([LICENSING.md](LICENSING.md), [RELEASE_RIGHTS.md](RELEASE_RIGHTS.md)). It reads only the committed files (no network, no environment, no credential) and fails when:
