@@ -10,9 +10,20 @@ export type Json = any; // deliberately loose: a test must be able to break any 
 
 export const MIT_TEXT = 'MIT License\n\nCopyright (c) 2026 WalletWall\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software.\n';
 export const GPL_TEXT = '                    GNU GENERAL PUBLIC LICENSE\n                       Version 3, 29 June 2007\n\n Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>\n';
-export const BRAND_SHA = 'c'.repeat(64);
+/** The fixture brand mark's bytes. Its rights record binds them by sha256, so the hash is the real one. */
+export const BRAND_BYTES = 'not really a png';
+export const BRAND_SHA = sha256Hex(BRAND_BYTES);
 export const BLOB = '1'.repeat(40);
 export const CRATE_SUM = '3'.repeat(64);
+
+/** The fixture character's sources: the body its model is generated from, and the scene its frames are rendered in. */
+export const BODY_SOURCE = 'export const BODY = { rump: [33, 31, 32], belly: [42, 36, 40] };\n';
+export const SCENE_SOURCE = "export const SCENE = { world: 'flat', sun: 1 };\n";
+
+/** The owner's statement behind an owner-authored or owner-generated item. */
+export const ownerAttestation = (basis = 'The owner states that WalletWall made this and that nothing of a third party is in it.'): Json => ({ attestedBy: 'OWNER', attestedOn: '2026-10-25', basis });
+/** A provenance file entry bound to the exact text given. */
+export const bound = (path: string, text: string, role: 'ASSET' | 'SOURCE' | 'OUTPUT'): Json => ({ path, sha256: sha256Hex(text), role });
 
 export function baseManifest(): Json {
   return {
@@ -72,6 +83,7 @@ export function baseManifest(): Json {
         summary: 'The character .blend generated from this repository code.',
         evidence: [{ type: 'URL', ref: 'https://www.blender.org/support/faq/', retrievedOn: '2026-10-22' }],
         producedBy: ['blender-runtime'],
+        provenance: { attestation: ownerAttestation(), files: [bound('src/character/body.ts', BODY_SOURCE, 'SOURCE')] },
       },
       {
         id: 'blender-render-output',
@@ -85,6 +97,7 @@ export function baseManifest(): Json {
         summary: "Frames Blender renders from this repository's code; Blender output is the creator's.",
         evidence: [{ type: 'URL', ref: 'https://www.blender.org/support/faq/', retrievedOn: '2026-10-22' }],
         producedBy: ['blender-runtime'],
+        provenance: { attestation: ownerAttestation(), files: [bound('src/character/scene.ts', SCENE_SOURCE, 'SOURCE')] },
       },
     ],
     dependencies: {
@@ -113,15 +126,17 @@ export function baseManifest(): Json {
             status: 'CLEARED',
             licenseExpression: null,
             evidence: [{ type: 'FILE', ref: 'assets/brand/mark.png' }],
+            provenance: { attestation: ownerAttestation(), files: [{ path: 'assets/brand/mark.png', sha256: BRAND_SHA, role: 'ASSET' }] },
           },
           {
             id: 'character',
             category: 'three-d-asset',
             binding: { type: 'COMPONENT', componentId: 'character-model' },
-            rightsBasis: 'GENERATED_FROM_OWNER_INPUTS',
+            rightsBasis: 'OWNER_AUTHORED',
             status: 'CLEARED',
             licenseExpression: null,
             evidence: [{ type: 'FILE', ref: 'docs/LICENSING.md' }],
+            provenance: { attestation: ownerAttestation(), files: [bound('src/character/body.ts', BODY_SOURCE, 'SOURCE')] },
           },
           {
             id: 'docs-page',
@@ -166,7 +181,9 @@ export function baseFiles(): Record<string, string> {
       source: { docPath: 'docs/demo.mdx', blob: BLOB },
       audio: { voiceIdentityId: null, sonicIdentityId: 'i', musicBedId: null },
     }),
-    'assets/brand/mark.png': 'not really a png',
+    'assets/brand/mark.png': BRAND_BYTES,
+    'src/character/body.ts': BODY_SOURCE,
+    'src/character/scene.ts': SCENE_SOURCE,
     'fixtures/canonical/MANIFEST.json': '{}',
     'config/release-rights.json': prettyJson(manifest),
   };

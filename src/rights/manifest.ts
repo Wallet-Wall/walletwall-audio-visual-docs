@@ -11,8 +11,9 @@
 // any other and cannot ride along. A status cannot claim more than its basis supports: UNKNOWN never becomes CLEARED,
 // and a vendor's, provider's, or third party's terms are cleared only by a record the owner makes. The provider service
 // a narration is made with also records its voice (`voiceRights`): a rights-and-consent record that keeps the right to
-// the voice apart from the right to its output and from anything WalletWall owns. The manifest is a public file, so it
-// may hold no local path, secret, or personal address. No I/O, no environment.
+// the voice apart from the right to its output and from anything WalletWall owns. An item WalletWall authored or
+// generated is CLEARED only on its `provenance`: the owner's statement and the exact bytes it is about. The manifest is a
+// public file, so it may hold no local path, secret, or personal address. No I/O, no environment.
 
 import { canonicalJson } from '../core/canonical-json.ts';
 import { contentAddress } from '../core/hash.ts';
@@ -29,11 +30,18 @@ import {
   COMPONENT_SCOPES,
   DISTRIBUTIONS,
   EVIDENCE_TYPES,
+  GENERATED_MEDIA_BASES,
   GPL_COMPATIBLE_LICENSES,
   KINDS_BY_LAYER,
   LINKAGES,
   COMPLIANCE_THAT_CLEARS,
   MAX_NOTICE_PERIOD_DAYS,
+  MAX_PROVENANCE_FILES,
+  MEDIA_EXTENSIONS,
+  OUTPUT_FORMATS_BY_KIND,
+  OWNER_BASES,
+  PROVENANCE_ROLES,
+  PROVENANCE_ROLES_BY_BASIS,
   PROVIDER_CONTROL_COMPLIANCE,
   PROVIDER_CONTROL_KINDS,
   PROVIDER_CONTROL_STATES,
@@ -61,6 +69,7 @@ import {
   type CommercialOutputBasis,
   type ComponentLayer,
   type ComponentScope,
+  type ProvenanceRole,
   type ProviderControlKind,
   type ReleaseState,
   type RightsBasis,
@@ -98,6 +107,27 @@ export interface RightsClaim {
   evidence: Evidence[];
   resolution?: Resolution;
   clearance?: Clearance;
+  /** Only on an owner-authored or generated item, and needed for it to be CLEARED. */
+  provenance?: Provenance;
+}
+
+/** One committed file a provenance record binds, by the sha256 of its bytes. */
+export interface ProvenanceFile {
+  path: string;
+  sha256: string;
+  role: ProvenanceRole;
+}
+
+/**
+ * The record behind an owner-authored or owner-generated item (docs/RELEASE_RIGHTS.md, "Owner-authored and generated
+ * items"): who states it (the owner), the day, and what that rests on; the exact committed bytes it is about, which the
+ * check hashes; and the third-party code those sources carry that the item is computed with but does not contain. It
+ * establishes the item's own rights and nothing else: what the item incorporates is a dependsOn, judged as itself.
+ */
+export interface Provenance {
+  attestation: { attestedBy: 'OWNER'; attestedOn: string; basis: string };
+  files: ProvenanceFile[];
+  thirdPartyCodeInSources?: string[];
 }
 
 /** One provider control on a narration voice, as found or as undetermined with the exact uncertainty in `note`. */
@@ -630,13 +660,121 @@ function readVoiceRights(r: Reader, v: unknown, path: string, owner: { path: str
   }
 }
 
-function readComponents(r: Reader, v: unknown): Set<string> {
+/** What a provenance record says that the rest of the manifest is checked against, once every component is read. */
+interface ProvenanceFacts {
+  path: string;
+  /** The component the record is on (null for a video asset), which it can never name as its own third-party code. */
+  self: string | null;
+  /** Every file the record binds, whatever its role, so no label can take a file out of the third-party cross-check. */
+  files: string[];
+  /** The sha256 of each file bound as the item's own bytes (an ASSET or an OUTPUT). */
+  ownShas: string[];
+  named: string[];
+  dependsOn: string[];
+}
+
+/**
+ * An owner item's provenance (docs/RELEASE_RIGHTS.md, "Owner-authored and generated items"): only an owner basis carries
+ * one, the owner states it, and each file it binds is a plain path, a sha256, and a role the basis admits. A media file
+ * is never a source: an image, a mesh, or a sound an item is made from is material with rights of its own, recorded as
+ * its own item and depended on, never folded into the owner's word. An output is what the item's generator makes (a
+ * model's is a model file), never code and never an imported texture relabelled.
+ */
+function readProvenance(r: Reader, v: unknown, path: string, basis: RightsBasis | null, owner: { self: string | null; kind: string | null; dependsOn: unknown }): ProvenanceFacts | null {
+  const rec = r.shape(v, path, ['attestation', 'files'], ['thirdPartyCodeInSources']);
+  if (!rec) return null;
+  if (basis !== null && !OWNER_BASES.includes(basis)) r.bad(path, `only an ${OWNER_BASES.join(' or ')} item carries one: a vendor's, provider's, or third party's terms are cleared by the owner's clearance record`);
+  const a = r.shape(own(rec, 'attestation'), `${path}.attestation`, ['attestedBy', 'attestedOn', 'basis']);
+  if (a) {
+    r.exactly(own(a, 'attestedBy'), `${path}.attestation.attestedBy`, 'OWNER');
+    r.date(own(a, 'attestedOn'), `${path}.attestation.attestedOn`);
+    r.str(own(a, 'basis'), `${path}.attestation.basis`);
+  }
+
+  const roles = (basis === null ? undefined : PROVENANCE_ROLES_BY_BASIS[basis]) ?? PROVENANCE_ROLES;
+  const dependsOn = owner.dependsOn;
+  const facts: ProvenanceFacts = { path, self: owner.self, files: [], ownShas: [], named: [], dependsOn: Array.isArray(dependsOn) ? dependsOn.filter((d): d is string => typeof d === 'string') : [] };
+  const seen = new Set<string>();
+  const outputs = owner.kind === null ? undefined : OUTPUT_FORMATS_BY_KIND[owner.kind];
+  const files = r.array(own(rec, 'files'), `${path}.files`, 1, MAX_PROVENANCE_FILES);
+  files?.forEach((f, i) => {
+    const p = `${path}.files[${i}]`;
+    const e = r.shape(f, p, ['path', 'sha256', 'role']);
+    if (!e) return;
+    const file = r.path(own(e, 'path'), `${p}.path`);
+    const sha = r.hex64(own(e, 'sha256'), `${p}.sha256`);
+    const role = r.oneOf(own(e, 'role'), `${p}.role`, roles);
+    if (file !== null) {
+      if (seen.has(file)) r.bad(`${path}.files`, `duplicate path ${file}`);
+      seen.add(file);
+      facts.files.push(file);
+      if (role === 'SOURCE' && MEDIA_EXTENSIONS.test(file)) r.bad(`${p}.path`, `${file} is a media file, which is never a SOURCE an item is authored in or generated from: record it as its own asset or component, with its own rights, and depend on it`);
+      if (role === 'OUTPUT') {
+        if (outputs !== undefined && !outputs.test(file)) r.bad(`${p}.path`, `${file} is not a file a ${owner.kind} makes: an OUTPUT is what the item's generator produced, never code or an imported file relabelled`);
+        else if (outputs === undefined && !MEDIA_EXTENSIONS.test(file)) r.bad(`${p}.path`, `${file} is not a media file: an OUTPUT is media the item generated, and code is a SOURCE`);
+      }
+    }
+    if ((role === 'ASSET' || role === 'OUTPUT') && sha !== null) facts.ownShas.push(sha);
+  });
+  if (basis === 'GENERATED_FROM_OWNER_INPUTS' && files !== null && !files.some((f) => isRec(f) && own(f, 'role') === 'SOURCE')) {
+    r.bad(`${path}.files`, 'a GENERATED_FROM_OWNER_INPUTS item names at least one SOURCE file it is generated from');
+  }
+
+  const named = own(rec, 'thirdPartyCodeInSources');
+  if (named !== undefined) {
+    const ids = new Set<string>();
+    r.array(named, `${path}.thirdPartyCodeInSources`, 1, 20)?.forEach((id) => {
+      if (typeof id !== 'string' || !ID.test(id)) r.bad(`${path}.thirdPartyCodeInSources`, `${String(id)} is not a component`);
+      else if (ids.has(id)) r.bad(`${path}.thirdPartyCodeInSources`, `duplicate ${id}`);
+      else ids.add(id);
+    });
+    facts.named = [...ids];
+  }
+  return facts;
+}
+
+/**
+ * Third-party code in an owner item's sources is named, and only that is: what a record names is third-party-derived
+ * source that cites a file the record binds, and every such component that does is named, or depended on as part of the
+ * item, whatever role the file is bound under. The item is what the code computes or describes, not the code, so naming
+ * it does not clear it, and it stays a release item of its own (a SOURCE_CODE component on the release path).
+ */
+function crossCheckProvenance(r: Reader, components: unknown, facts: readonly ProvenanceFacts[]): void {
+  const recs = Array.isArray(components) ? components.filter(isRec) : [];
+  const byId = new Map(recs.filter((c) => typeof own(c, 'id') === 'string').map((c) => [own(c, 'id') as string, c]));
+  const cites = (c: Rec): string[] => (Array.isArray(own(c, 'evidence')) ? (own(c, 'evidence') as unknown[]) : []).filter((e): e is Rec => isRec(e) && own(e, 'type') === 'FILE' && typeof own(e, 'ref') === 'string').map((e) => own(e, 'ref') as string);
+  const isThirdPartyCode = (c: Rec): boolean => own(c, 'layer') === 'SOURCE_CODE' && own(c, 'kind') === 'third-party-derived-source' && own(c, 'scope') === 'RELEASE_PATH';
+  for (const f of facts) {
+    const at = `${f.path}.thirdPartyCodeInSources`;
+    for (const id of f.named) {
+      const c = byId.get(id);
+      if (id === f.self) r.bad(at, `${id} is this item itself: an item never names its own rights as third-party code it is computed with`);
+      else if (c === undefined) r.bad(at, `${id} is not a component`);
+      else if (!isThirdPartyCode(c)) r.bad(at, `${id} is not third-party-derived source on the release path (a SOURCE_CODE third-party-derived-source component): only code an item's own sources carry is named here; a tool is producedBy, and what is inside the item is dependsOn`);
+      else if (!cites(c).some((ref) => f.files.includes(ref))) r.bad(at, `${id} cites none of the files this record binds, so this record has no code of it to name`);
+    }
+    for (const [id, c] of byId) {
+      if (!isThirdPartyCode(c) || id === f.self || f.named.includes(id) || f.dependsOn.includes(id)) continue;
+      const file = cites(c).find((ref) => f.files.includes(ref));
+      if (file !== undefined) r.bad(at, `${id} credits third-party code in ${file}, a file this record binds: name it here (code the item is computed with, not part of it), or depend on it (part of the item)`);
+    }
+  }
+}
+
+/** An owner item is CLEARED on its provenance; a docs page bound to its published blob carries its provenance in that binding. */
+function requireProvenance(r: Reader, rec: Rec, path: string, canonicalDocs: boolean): void {
+  const basis = pick(own(rec, 'rightsBasis'), RIGHTS_BASES);
+  if (own(rec, 'status') !== 'CLEARED' || basis === null || !OWNER_BASES.includes(basis) || own(rec, 'provenance') !== undefined || canonicalDocs) return;
+  r.bad(`${path}.provenance`, `required to clear an item on the ${basis} basis: who states it, the day, and the exact bytes it is about (a status edit alone clears nothing)`);
+}
+
+function readComponents(r: Reader, v: unknown, provenanced: ProvenanceFacts[]): Set<string> {
   const ids = new Set<string>();
   const list = r.array(v, 'components', 1, 200);
   if (!list) return ids;
   const toolIds = new Set<string>();
   const recs: (Rec | null)[] = list.map((c, i) => {
-    const rec = r.shape(c, `components[${i}]`, ['id', 'layer', 'kind', 'scope', 'rightsBasis', 'status', 'licenseExpression', 'distribution', 'summary', 'evidence'], ['resolution', 'clearance', 'assessedVersions', 'producedBy', 'dependsOn', 'voiceRights']);
+    const rec = r.shape(c, `components[${i}]`, ['id', 'layer', 'kind', 'scope', 'rightsBasis', 'status', 'licenseExpression', 'distribution', 'summary', 'evidence'], ['resolution', 'clearance', 'assessedVersions', 'producedBy', 'dependsOn', 'voiceRights', 'provenance']);
     if (!rec) return null;
     const id = own(rec, 'id');
     if (typeof id === 'string' && ID.test(id)) {
@@ -662,6 +800,19 @@ function readComponents(r: Reader, v: unknown): Set<string> {
     readClaim(r, rec, p);
     const voiceRights = own(rec, 'voiceRights');
     if (voiceRights !== undefined) readVoiceRights(r, voiceRights, `${p}.voiceRights`, { path: p, kind, rightsBasis: pick(own(rec, 'rightsBasis'), RIGHTS_BASES), status: pick(own(rec, 'status'), RIGHTS_STATUSES) });
+    const basis = pick(own(rec, 'rightsBasis'), RIGHTS_BASES);
+    if (layer === 'GENERATED_MEDIA' && basis !== null && !GENERATED_MEDIA_BASES.includes(basis)) {
+      r.bad(`${p}.rightsBasis`, `generated media takes its rights from its inputs, or from a vendor's, provider's, or third party's terms for it, never from the license of the tool or the scripts that made it, and it is generated, not authored: ${GENERATED_MEDIA_BASES.join(', ')}, not ${basis}`);
+    }
+    if (kind === 'third-party-derived-source' && basis !== null && OWNER_BASES.includes(basis)) {
+      r.bad(`${p}.rightsBasis`, `third-party-derived source is never ${basis}: its rights are the third party's terms (an attribution, a license, a vendor's terms) or undetermined`);
+    }
+    if (own(rec, 'provenance') !== undefined) {
+      const id = own(rec, 'id');
+      const facts = readProvenance(r, own(rec, 'provenance'), `${p}.provenance`, basis, { self: typeof id === 'string' ? id : null, kind, dependsOn: own(rec, 'dependsOn') });
+      if (facts) provenanced.push(facts);
+    }
+    requireProvenance(r, rec, p, false);
 
     const versions = own(rec, 'assessedVersions');
     if (versions !== undefined) {
@@ -704,6 +855,8 @@ function readMediaFiles(r: Reader, v: unknown, componentIds: ReadonlySet<string>
   const list = r.array(v, 'mediaFiles', 0, 500);
   if (!list) return;
   const entryIds = new Set<string>();
+  // A file is inventoried once, so it has one rights record: a second entry could otherwise overrule the first.
+  const inventoried = new Map<string, string>();
   list.forEach((entry, i) => {
     const p = `mediaFiles[${i}]`;
     const rec = r.shape(entry, p, ['id', 'match', 'covers']);
@@ -714,17 +867,25 @@ function readMediaFiles(r: Reader, v: unknown, componentIds: ReadonlySet<string>
       entryIds.add(id);
     }
     const match = own(rec, 'match');
+    let listed: string[] = [];
     if (!isRec(match)) r.bad(`${p}.match`, 'must be an object');
     else {
       const keys = Object.keys(match);
       if (keys.length !== 1 || (keys[0] !== 'path' && keys[0] !== 'paths')) r.bad(`${p}.match`, 'must be exactly one of path or paths');
-      else if (keys[0] === 'path') r.path(own(match, 'path'), `${p}.match.path`);
-      else {
+      else if (keys[0] === 'path') {
+        const one = r.path(own(match, 'path'), `${p}.match.path`);
+        if (one !== null) listed = [one];
+      } else {
         const list = own(match, 'paths');
         if (!Array.isArray(list) || list.length < 1 || list.length > 200 || !list.every((x) => typeof x === 'string' && plainPath(x)) || new Set(list).size !== list.length) {
           r.bad(`${p}.match.paths`, 'must be a list of 1 to 200 distinct plain repo-relative paths');
-        }
+        } else listed = list as string[];
       }
+    }
+    for (const file of listed) {
+      const first = inventoried.get(file);
+      if (first !== undefined) r.bad(`${p}.match`, `${file} is already inventoried by ${first}: a file has one inventory entry, and so one rights record`);
+      else inventoried.set(file, id ?? p);
     }
     const covers = own(rec, 'covers');
     if (!isRec(covers)) r.bad(`${p}.covers`, 'must be an object');
@@ -770,7 +931,7 @@ function readBinding(r: Reader, v: unknown, path: string): void {
 }
 
 /** Reads the videos and returns the `videoId/assetId` key of every asset, for the media inventory to be checked against. */
-function readVideos(r: Reader, v: unknown, componentIds: ReadonlySet<string>): Set<string> {
+function readVideos(r: Reader, v: unknown, componentIds: ReadonlySet<string>, generatedIds: ReadonlySet<string>, provenanced: ProvenanceFacts[]): Set<string> {
   const assetKeys = new Set<string>();
   const list = r.array(v, 'videos', 1, 100);
   if (!list) return assetKeys;
@@ -806,7 +967,7 @@ function readVideos(r: Reader, v: unknown, componentIds: ReadonlySet<string>): S
     const assetIds = new Set<string>();
     r.array(own(rec, 'assets'), `${p}.assets`, 0, 500)?.forEach((asset, j) => {
       const ap = `${p}.assets[${j}]`;
-      const a = r.shape(asset, ap, ['id', 'category', 'binding', 'rightsBasis', 'status', 'licenseExpression', 'evidence'], ['resolution', 'clearance']);
+      const a = r.shape(asset, ap, ['id', 'category', 'binding', 'rightsBasis', 'status', 'licenseExpression', 'evidence'], ['resolution', 'clearance', 'provenance']);
       if (!a) return;
       const id = r.id(own(a, 'id'), `${ap}.id`);
       if (id) {
@@ -821,8 +982,22 @@ function readVideos(r: Reader, v: unknown, componentIds: ReadonlySet<string>): S
       if (isRec(binding) && own(binding, 'type') === 'COMPONENT') {
         const cid = own(binding, 'componentId');
         if (typeof cid === 'string' && ID.test(cid) && !componentIds.has(cid)) r.bad(`${ap}.binding.componentId`, `${cid} is not a component`);
+        // What generated media shows is never licensed by the tool that generated it (GENERATED_MEDIA_BASES, for its asset too).
+        if (typeof cid === 'string' && generatedIds.has(cid) && own(a, 'rightsBasis') === 'OPEN_SOURCE_LICENSE') r.bad(`${ap}.rightsBasis`, `an asset bound to generated media is never recorded under an open-source license: the license of the tool or the scripts that made ${cid} is not the license of what it shows`);
       }
+      const canonicalDocs = isRec(binding) && own(binding, 'type') === 'CANONICAL_DOCS';
+      if (canonicalDocs && category !== null && category !== 'authored-content') r.bad(`${ap}.category`, `a docs page is authored-content, not ${category}`);
       readClaim(r, a, ap);
+      if (own(a, 'provenance') !== undefined) {
+        const facts = readProvenance(r, own(a, 'provenance'), `${ap}.provenance`, pick(own(a, 'rightsBasis'), RIGHTS_BASES), { self: null, kind: null, dependsOn: undefined });
+        if (facts) {
+          provenanced.push(facts);
+          // The record is about the bytes the spec uses: one of the item's own files (an ASSET or an OUTPUT) is the asset the binding names.
+          const sha = isRec(binding) && own(binding, 'type') === 'SPEC_ASSET' ? own(binding, 'sha256') : undefined;
+          if (typeof sha === 'string' && HEX64.test(sha) && !facts.ownShas.includes(sha)) r.bad(`${ap}.binding.sha256`, `the provenance binds no ASSET or OUTPUT file with these bytes (${sha.slice(0, 12)}…): the record must be about the bytes the spec uses`);
+        }
+      }
+      requireProvenance(r, a, ap, canonicalDocs);
     });
 
     const seen = new Set<string>();
@@ -985,9 +1160,13 @@ export function validateManifest(value: unknown): { problems: string[]; manifest
     const docs = r.shape(own(rec, 'documents'), 'documents', ['notices', 'licensing', 'policy']);
     if (docs) for (const k of ['notices', 'licensing', 'policy']) r.path(own(docs, k), `documents.${k}`);
     readSourceCode(r, own(rec, 'sourceCode'));
-    const ids = readComponents(r, own(rec, 'components'));
+    const provenanced: ProvenanceFacts[] = [];
+    const ids = readComponents(r, own(rec, 'components'), provenanced);
     readDependencies(r, own(rec, 'dependencies'), ids);
-    const assetKeys = readVideos(r, own(rec, 'videos'), ids);
+    const raw = own(rec, 'components');
+    const generatedIds = new Set((Array.isArray(raw) ? raw : []).filter((c): c is Rec => isRec(c) && own(c, 'layer') === 'GENERATED_MEDIA' && typeof own(c, 'id') === 'string').map((c) => own(c, 'id') as string));
+    const assetKeys = readVideos(r, own(rec, 'videos'), ids, generatedIds, provenanced);
+    crossCheckProvenance(r, own(rec, 'components'), provenanced);
     readMediaFiles(r, own(rec, 'mediaFiles'), ids, assetKeys);
     scanPrivacy(r, value);
   }

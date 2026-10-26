@@ -1,7 +1,7 @@
 {
   "schema": "walletwall.release-rights/v1",
   "project": "walletwall-audio-visual-docs",
-  "verifiedOn": "2026-10-22",
+  "verifiedOn": "2026-10-25",
   "documents": {
     "notices": "THIRD_PARTY_NOTICES.md",
     "licensing": "docs/LICENSING.md",
@@ -498,19 +498,161 @@
       "scope": "RELEASE_PATH",
       "distribution": "IN_REPOSITORY_AND_RELEASE_OUTPUT",
       "rightsBasis": "GENERATED_FROM_OWNER_INPUTS",
-      "status": "OWNER_CONFIRMATION_PENDING",
+      "status": "CLEARED",
       "licenseExpression": null,
-      "summary": "The PNG frames Blender renders from this repository's code: the committed proof reference frames and the character frames inside a release. Blender's FAQ treats a .blend and the other output of Blender as program output and the sole copyright of the user, and its license page says what you create with Blender is your sole property. The GPL covers the scripts that call Blender's Python API, not the images they produce. The frames show the character model, so they are not cleared before it is.",
+      "summary": "The character frames: what Blender renders of the cleared model in a scene the lane builds from code (a flat world colour, one sun, the teaching or depth camera, the contact shadow, and declared terrain blocks), with no image loaded into it. They are the seven committed character reference frames (idle, crouch, airborne, landing, perch, inspect, tail-brace) and the character crops inside a release, which Remotion composites. Blender's license page says what you create with Blender is your sole property, and its FAQ that its output is program output and the user's; the GNU GPL FAQ says a program's license does not reach its output unless the output copies the program's own text or art. So the GPL on the eight Blender-API scripts says nothing about these frames. Frames that project a Remotion frame (the depth reveal) are not this item: they are blender-depth-reveal-output.",
       "evidence": [
         {
           "type": "URL",
           "ref": "https://www.blender.org/support/faq/",
-          "retrievedOn": "2026-10-22"
+          "retrievedOn": "2026-10-25"
         },
         {
           "type": "URL",
           "ref": "https://www.blender.org/about/license/",
-          "retrievedOn": "2026-10-22"
+          "retrievedOn": "2026-10-25"
+        },
+        {
+          "type": "URL",
+          "ref": "https://www.gnu.org/licenses/gpl-faq.html#WhatCaseIsOutputGPL",
+          "retrievedOn": "2026-10-25"
+        },
+        {
+          "type": "FILE",
+          "ref": "blender/proof/reference/proof.json"
+        },
+        {
+          "type": "FILE",
+          "ref": "blender/walletwallaby/render.py"
+        }
+      ],
+      "producedBy": [
+        "blender-runtime"
+      ],
+      "dependsOn": [
+        "walletwallaby-character-model"
+      ],
+      "provenance": {
+        "attestation": {
+          "attestedBy": "OWNER",
+          "attestedOn": "2026-10-25",
+          "basis": "The owner states, 2026-10-25, that WalletWall owns the composition and the character and assets it supplies to these renders, subject to third-party rights in the tools. The code shows this class: the job writers (scripts/blender-proof.ts, src/blender/production.ts) give a character job no image, and render.py and the lane modules it loads build its scene from code and load an image only for a depth reveal (transition.py), which is not this item. The record covers the rendered frames, not Blender (blender-runtime) or the GPL scripts; the primitives in geometry.py stay the quilez-sdf-forms item."
+        },
+        "files": [
+          {
+            "path": "blender/walletwallaby/common.py",
+            "sha256": "1e1f46c597f097fbadf61657c886dbb270c7da2685886dc8e33a1c8f5c7bc966",
+            "role": "SOURCE"
+          },
+          {
+            "path": "blender/walletwallaby/controls.py",
+            "sha256": "004707b6e5b20b9ad1744bf1fb74915761504f2cab24f354987980dd7e3dbae9",
+            "role": "SOURCE"
+          },
+          {
+            "path": "blender/walletwallaby/geometry.py",
+            "sha256": "0e99514477329726666b471007bcf067b238da3ff3dc5b6551867d8ce0adb524",
+            "role": "SOURCE"
+          },
+          {
+            "path": "blender/walletwallaby/materials.py",
+            "sha256": "1a0d8cdc1a4be97d51d0b6888608a68ef002280c454202478c58e80cbab484ac",
+            "role": "SOURCE"
+          },
+          {
+            "path": "blender/walletwallaby/render.py",
+            "sha256": "b4760bfe2f8a024312c05a40b77fd6ea79e46f3a4d8dbb434c08c0d9c160d50d",
+            "role": "SOURCE"
+          },
+          {
+            "path": "blender/walletwallaby/rig.py",
+            "sha256": "837e5483ae8c62147f3e950729caa89f3d9213bcab7983a4c42ba7ed174f6d6b",
+            "role": "SOURCE"
+          },
+          {
+            "path": "blender/walletwallaby/scene.py",
+            "sha256": "b4c15a6033d856731bee7d826eeb92b6b1184cb8df0b9ba6dd337651e119ca8b",
+            "role": "SOURCE"
+          },
+          {
+            "path": "blender/walletwallaby/terrain.py",
+            "sha256": "f73e0ec793ff2a821bca815e697ff832273788669a60d48453728aa9cb8ae0aa",
+            "role": "SOURCE"
+          },
+          {
+            "path": "blender/walletwallaby/transition.py",
+            "sha256": "90c5a19b88e54b11c8b4af87340f9c56405b177263cba1ebe377369f3eecf978",
+            "role": "SOURCE"
+          },
+          {
+            "path": "scripts/blender-proof.ts",
+            "sha256": "201ee998b93d5a4853e3fd5b5141dbc9608da0e7b0012d13a7d4b0cefc9d8695",
+            "role": "SOURCE"
+          },
+          {
+            "path": "src/blender/production.ts",
+            "sha256": "110e3cdf6e742234c27876754701a02f38b73ec6c1890f9ce1fc7babbd76619a",
+            "role": "SOURCE"
+          },
+          {
+            "path": "blender/proof/reference/idle.png",
+            "sha256": "3a74a33557d1425f917424f1e68b1b3e8b264910cd59ec2632d79d38ac847540",
+            "role": "OUTPUT"
+          },
+          {
+            "path": "blender/proof/reference/crouch.png",
+            "sha256": "5ed6f9fc38377c5706882f122f29397e0f6e0d260e4f57934509b7cc8db040d0",
+            "role": "OUTPUT"
+          },
+          {
+            "path": "blender/proof/reference/airborne.png",
+            "sha256": "166f479f2219932541ab477b05bff7870c267204e6d6f3fcd22d08ac7cc8ef93",
+            "role": "OUTPUT"
+          },
+          {
+            "path": "blender/proof/reference/landing.png",
+            "sha256": "5fc4d888b046a26332c198c8ed7fcc283f90a23ca23f76a3407ccffaf07c6e06",
+            "role": "OUTPUT"
+          },
+          {
+            "path": "blender/proof/reference/perch.png",
+            "sha256": "6ad13b9b2addf9c86d90f2c19e67971a69938270182b59b8673452df74aa32ad",
+            "role": "OUTPUT"
+          },
+          {
+            "path": "blender/proof/reference/inspect.png",
+            "sha256": "f9297b6979ce72661fc2dbe16e6b02138410e93b13e406648cee3579893c6463",
+            "role": "OUTPUT"
+          },
+          {
+            "path": "blender/proof/reference/tail-brace.png",
+            "sha256": "37d7f7567568e5b1a41b137a9e7730116505e5fd70921753ec61824a6e5fd6a2",
+            "role": "OUTPUT"
+          }
+        ],
+        "thirdPartyCodeInSources": [
+          "quilez-sdf-forms"
+        ]
+      }
+    },
+    {
+      "id": "blender-depth-reveal-output",
+      "layer": "GENERATED_MEDIA",
+      "kind": "generated-render",
+      "scope": "RELEASE_PATH",
+      "distribution": "IN_REPOSITORY_AND_RELEASE_OUTPUT",
+      "rightsBasis": "GENERATED_FROM_OWNER_INPUTS",
+      "status": "OWNER_CONFIRMATION_PENDING",
+      "licenseExpression": null,
+      "summary": "The depth-reveal frames: Blender's render of the lesson's 2D-to-3D transition, in which every pixel of text, card, and route is a Remotion frame (rendered characterless, with captions and the footer off) projected onto lane-built blocks and a paper sheet, with the character where it is in view (blender/walletwallaby/transition.py). They are the three committed transition reference frames (transition-entry, transition-peak, transition-exit) and the reveal frames inside a release. They incorporate Remotion's output, so they are not cleared before remotion-render-output is, whatever the Blender side establishes.",
+      "evidence": [
+        {
+          "type": "FILE",
+          "ref": "blender/walletwallaby/transition.py"
+        },
+        {
+          "type": "FILE",
+          "ref": "scripts/blender-proof.ts"
         },
         {
           "type": "FILE",
@@ -521,11 +663,12 @@
         "blender-runtime"
       ],
       "dependsOn": [
-        "walletwallaby-character-model"
+        "walletwallaby-character-model",
+        "remotion-render-output"
       ],
       "resolution": {
-        "ownerAction": "Clear the walletwallaby-character-model item; the Blender side of these frames raises no question.",
-        "reassessmentTrigger": "That item changes status."
+        "ownerAction": "Resolve remotion-render-output (these frames carry Remotion's own frames as textures), then record this class's provenance and clear it.",
+        "reassessmentTrigger": "The remotion-render-output item changes status, or the depth reveal stops projecting Remotion frames."
       }
     },
     {
@@ -535,9 +678,9 @@
       "scope": "RELEASE_PATH",
       "distribution": "IN_RELEASE_OUTPUT",
       "rightsBasis": "GENERATED_FROM_OWNER_INPUTS",
-      "status": "OWNER_CONFIRMATION_PENDING",
+      "status": "CLEARED",
       "licenseExpression": null,
-      "summary": "The WalletWallaby .blend and its canonical model, generated by blender/walletwallaby/build.py from code. The .blend is data only: it embeds no scripts and is always reopened with scripts disabled. The geometry code includes signed-distance primitives credited to Inigo Quilez (the quilez-sdf-forms item), so this item is not cleared before that one.",
+      "summary": "The WalletWallaby .blend and its canonical model (BLENDER_CHARACTER in src/character/walletwallaby/versions.ts: model v1 f8124e59, materials v2 de8c55f5), generated by blender/walletwallaby/build.py from an empty factory scene. The body, limbs, ears, face, and claws are surface-nets meshes of signed-distance volumes whose placements and sizes the lane authors (geometry.py, and build.py for the ears, face, and claws); the contact shadow is a disc from Blender's built-in circle primitive; the armature is built from the rig contract; the materials are node trees in exact brand colours; and the one image, the belly's mortar map, is computed in materials.py and packed. Nothing is imported, downloaded, appended, or linked: no mesh, texture, rig, material library, model fragment, or reference asset, in the code or in its history. The .blend is data only, with no scripts, and is reopened with scripts disabled. The signed-distance primitives geometry.py credits to Inigo Quilez are code the build runs, not part of the model: they are the quilez-sdf-forms item, which this record does not clear.",
       "evidence": [
         {
           "type": "FILE",
@@ -546,18 +689,63 @@
         {
           "type": "URL",
           "ref": "https://www.blender.org/support/faq/",
-          "retrievedOn": "2026-10-22"
+          "retrievedOn": "2026-10-25"
+        },
+        {
+          "type": "URL",
+          "ref": "https://www.blender.org/about/license/",
+          "retrievedOn": "2026-10-25"
+        },
+        {
+          "type": "URL",
+          "ref": "https://www.gnu.org/licenses/gpl-faq.html#WhatCaseIsOutputGPL",
+          "retrievedOn": "2026-10-25"
         }
       ],
       "producedBy": [
         "blender-runtime"
       ],
-      "dependsOn": [
-        "quilez-sdf-forms"
-      ],
-      "resolution": {
-        "ownerAction": "Resolve the quilez-sdf-forms item, then clear this one.",
-        "reassessmentTrigger": "The quilez-sdf-forms item changes status, or the primitives in geometry.py change."
+      "provenance": {
+        "attestation": {
+          "attestedBy": "OWNER",
+          "attestedOn": "2026-10-25",
+          "basis": "The owner states, 2026-10-25, that the canonical WalletWallaby model was created for WalletWall from repository-owned source. The code shows how it is made, as the summary sets out: build.py and the lane modules it loads generate every part of it, and none of them imports, downloads, or loads a mesh, texture, rig, material library, model fragment, or reference asset, now or in their history. The record covers the generated model; the third-party-derived primitives in geometry.py are code the build runs and stay the quilez-sdf-forms item."
+        },
+        "files": [
+          {
+            "path": "blender/walletwallaby/build.py",
+            "sha256": "5750f568b81c1976c79b97f7039989f77254eda93852ca3e9b22876e4fae6f48",
+            "role": "SOURCE"
+          },
+          {
+            "path": "blender/walletwallaby/common.py",
+            "sha256": "1e1f46c597f097fbadf61657c886dbb270c7da2685886dc8e33a1c8f5c7bc966",
+            "role": "SOURCE"
+          },
+          {
+            "path": "blender/walletwallaby/geometry.py",
+            "sha256": "0e99514477329726666b471007bcf067b238da3ff3dc5b6551867d8ce0adb524",
+            "role": "SOURCE"
+          },
+          {
+            "path": "blender/walletwallaby/materials.py",
+            "sha256": "1a0d8cdc1a4be97d51d0b6888608a68ef002280c454202478c58e80cbab484ac",
+            "role": "SOURCE"
+          },
+          {
+            "path": "blender/walletwallaby/rig.py",
+            "sha256": "837e5483ae8c62147f3e950729caa89f3d9213bcab7983a4c42ba7ed174f6d6b",
+            "role": "SOURCE"
+          },
+          {
+            "path": "src/character/walletwallaby/versions.ts",
+            "sha256": "832b15cb1329b3e93754a963e2f565038632c2a52d199851dfef623b2f9c2f1b",
+            "role": "SOURCE"
+          }
+        ],
+        "thirdPartyCodeInSources": [
+          "quilez-sdf-forms"
+        ]
       }
     },
     {
@@ -990,7 +1178,7 @@
       }
     },
     {
-      "id": "blender-proof-reference",
+      "id": "blender-proof-reference-characters",
       "match": {
         "paths": [
           "blender/proof/reference/airborne.png",
@@ -999,14 +1187,24 @@
           "blender/proof/reference/inspect.png",
           "blender/proof/reference/landing.png",
           "blender/proof/reference/perch.png",
-          "blender/proof/reference/tail-brace.png",
+          "blender/proof/reference/tail-brace.png"
+        ]
+      },
+      "covers": {
+        "component": "blender-render-output"
+      }
+    },
+    {
+      "id": "blender-proof-reference-reveal",
+      "match": {
+        "paths": [
           "blender/proof/reference/transition-entry.png",
           "blender/proof/reference/transition-exit.png",
           "blender/proof/reference/transition-peak.png"
         ]
       },
       "covers": {
-        "component": "blender-render-output"
+        "component": "blender-depth-reveal-output"
       }
     },
     {
@@ -1035,7 +1233,7 @@
             "sha256": "91926a2eebc1777194ecf491049b8a7af3cf0892b09b363c5b2a17cd17d5dbad"
           },
           "rightsBasis": "OWNER_AUTHORED",
-          "status": "OWNER_CONFIRMATION_PENDING",
+          "status": "CLEARED",
           "licenseExpression": null,
           "evidence": [
             {
@@ -1043,9 +1241,19 @@
               "ref": "assets/brand/README.md"
             }
           ],
-          "resolution": {
-            "ownerAction": "Record how the WalletWall brick-wallet mark was made (own work, commissioned, or generated with a tool), that WalletWall holds the rights, and that no third-party terms attach to it. The repository records only that the maintainer supplied it and how it was edge-polished.",
-            "reassessmentTrigger": "A new or edited brand mark, or a claim from a third party."
+          "provenance": {
+            "attestation": {
+              "attestedBy": "OWNER",
+              "attestedOn": "2026-10-25",
+              "basis": "The owner states, 2026-10-25, that the WalletWall brick-wallet mark is a WalletWall-authored project asset and that WalletWall is not knowingly incorporating a third-party logo or trademark into it. The repository is consistent with that: the mark entered in one commit by the maintainer on 2026-10-17, supplied as a 496 x 496 PNG cut out of an earlier render, and changed only by a recorded, deterministic edge polish (assets/brand/README.md); nothing names another origin, and nothing records the tool the artwork was made with. The record is about the mark's own artwork, not a trademark search, and claims nothing in the fonts or frames it is drawn in."
+            },
+            "files": [
+              {
+                "path": "assets/brand/walletwall-brick-wallet.png",
+                "sha256": "91926a2eebc1777194ecf491049b8a7af3cf0892b09b363c5b2a17cd17d5dbad",
+                "role": "ASSET"
+              }
+            ]
           }
         },
         {
@@ -1128,18 +1336,59 @@
             "type": "COMPONENT",
             "componentId": "walletwallaby-character-model"
           },
-          "rightsBasis": "GENERATED_FROM_OWNER_INPUTS",
-          "status": "OWNER_CONFIRMATION_PENDING",
+          "rightsBasis": "OWNER_AUTHORED",
+          "status": "CLEARED",
           "licenseExpression": null,
           "evidence": [
             {
               "type": "FILE",
               "ref": "blender/walletwallaby/build.py"
+            },
+            {
+              "type": "FILE",
+              "ref": "docs/MOTION_ARCHITECTURE.md"
+            },
+            {
+              "type": "FILE",
+              "ref": "docs/BLENDER.md"
             }
           ],
-          "resolution": {
-            "ownerAction": "Clear the walletwallaby-character-model item.",
-            "reassessmentTrigger": "That item changes status."
+          "provenance": {
+            "attestation": {
+              "attestedBy": "OWNER",
+              "attestedOn": "2026-10-25",
+              "basis": "The owner states, 2026-10-25, that WalletWallaby is a WalletWall-created fictional character: its visual identity, design direction, brick belly, body language, motion semantics, and canonical representation were developed for WalletWall. The record covers that WalletWall-authored expression as the repository defines it: the rig contract, the poses and palette, the body design, and the declared versions. It claims nothing in the idea of a wallaby, generic anatomy or geometric primitives, Blender, Remotion, or any third-party mathematical implementation; the primitives geometry.py credits to Inigo Quilez stay the quilez-sdf-forms item."
+            },
+            "files": [
+              {
+                "path": "blender/walletwallaby/geometry.py",
+                "sha256": "0e99514477329726666b471007bcf067b238da3ff3dc5b6551867d8ce0adb524",
+                "role": "SOURCE"
+              },
+              {
+                "path": "blender/walletwallaby/materials.py",
+                "sha256": "1a0d8cdc1a4be97d51d0b6888608a68ef002280c454202478c58e80cbab484ac",
+                "role": "SOURCE"
+              },
+              {
+                "path": "src/character/walletwallaby/rig.ts",
+                "sha256": "9c224a97e9de71d7d0993e8536f4083586417b1cc91426c7c126252e185590b7",
+                "role": "SOURCE"
+              },
+              {
+                "path": "src/character/walletwallaby/rig/rig-source.ts",
+                "sha256": "b4555c9975bb40ade3cf8b6edb0dd2d96e059c54e995873b29ab6b211827db10",
+                "role": "SOURCE"
+              },
+              {
+                "path": "src/character/walletwallaby/versions.ts",
+                "sha256": "832b15cb1329b3e93754a963e2f565038632c2a52d199851dfef623b2f9c2f1b",
+                "role": "SOURCE"
+              }
+            ],
+            "thirdPartyCodeInSources": [
+              "quilez-sdf-forms"
+            ]
           }
         },
         {

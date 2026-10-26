@@ -85,6 +85,8 @@ describe('reading a file', () => {
   test('returns the text of a regular file inside the root', () => {
     put('a/b.txt', 'hello');
     assert.equal(fsRepo(root).read('a/b.txt'), 'hello');
+    put('a/u.txt', 'naïve — 496 × 496 …');
+    assert.equal(fsRepo(root).read('a/u.txt'), 'naïve — 496 × 496 …', 'read as UTF-8');
   });
 
   test('returns null for a missing file, a directory, or a path that is not plainly relative', () => {
@@ -119,5 +121,20 @@ describe('reading a file', () => {
   test('refuses a file larger than the bound', () => {
     put('big.txt', 'x'.repeat(17 * 1024 * 1024));
     assert.equal(fsRepo(root).read('big.txt'), null);
+  });
+
+  test('reads a file\'s exact bytes, binary ones included, under the same refusals as its text', () => {
+    // Not valid UTF-8: decoding to text and encoding back would change these bytes, so a hash of the text would lie.
+    const bytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0xc3]);
+    mkdirSync(path.join(root, 'a'), { recursive: true });
+    writeFileSync(path.join(root, 'a', 'mark.png'), bytes);
+    const repo = fsRepo(root);
+    assert.deepEqual([...(repo.bytes('a/mark.png') ?? [])], [...bytes]);
+    assert.notDeepEqual([...new TextEncoder().encode(repo.read('a/mark.png') ?? '')], [...bytes], 'positive control: the text view is lossy for these bytes');
+    const outside = path.join(outer, 'outside');
+    mkdirSync(outside);
+    writeFileSync(path.join(outside, 'secret.png'), bytes);
+    link(outside, path.join(root, 'linked'));
+    for (const bad of ['nope.png', 'a', '../outside/secret.png', 'linked/secret.png', 'a\\mark.png']) assert.equal(repo.bytes(bad), null, bad);
   });
 });

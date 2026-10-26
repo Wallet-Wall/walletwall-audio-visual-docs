@@ -3,8 +3,9 @@
 // policy encoded in src/rights/vocabulary.ts. Two modes:
 //
 //   development     the repository check. Source-code licensing, the Blender boundary, the lockfiles, the media
-//                   assets, and the manifest's own consistency must all hold; items whose rights are an open owner
-//                   decision may be recorded as pending, because they are not falsely cleared.
+//                   assets, the bytes an owner item's provenance binds, and the manifest's own consistency must all
+//                   hold; items whose rights are an open owner decision may be recorded as pending, because they are
+//                   not falsely cleared.
 //   public-release  the same, and every material item must be CLEARED. Any other status, a review-required Python
 //                   file, anything the owner has not confirmed, fails.
 //
@@ -14,11 +15,11 @@
 import { sha256Hex } from '../core/hash.ts';
 import { sortFindings, type Finding } from './findings.ts';
 import { assessedVersionFindings, cargoFindings, npmFindings, readCargoLock, readNpmLock, rulesFor, type NpmPackage } from './lockfiles.ts';
-import { rightsManifestSha256, validateManifest, type Asset, type Component, type RightsManifest } from './manifest.ts';
+import { rightsManifestSha256, validateManifest, type Asset, type Component, type RightsClaim, type RightsManifest } from './manifest.ts';
 import type { RepoView } from './repo.ts';
 import { classifyPython, embeddedBlenderPython, hasPythonShebang, isPythonPath, scanPython, type PythonClassification } from './python-boundary.ts';
 import { parseSpdx, spdxIds } from './spdx.ts';
-import { BLENDER_COUPLED_LICENSE, CATEGORY_OF_COMPONENT_KIND, CATEGORY_OF_SPEC_ASSET_KIND, KNOWN_LICENSE_FILES, MEDIA_EXTENSIONS, STATUSES_PERMITTED_IN, VOICE_SOURCE_PROVIDER, type AssetCategory } from './vocabulary.ts';
+import { BLENDER_COUPLED_LICENSE, CATEGORY_OF_COMPONENT_KIND, CATEGORY_OF_SPEC_ASSET_KIND, KNOWN_LICENSE_FILES, MEDIA_EXTENSIONS, OWNER_BASES, STATUSES_PERMITTED_IN, VOICE_SOURCE_PROVIDER, type AssetCategory } from './vocabulary.ts';
 
 export const MANIFEST_PATH = 'config/release-rights.json';
 export const REPORT_SCHEMA = 'walletwall.rights-check-report/v1';
@@ -185,6 +186,9 @@ export function checkRights(repo: RepoView, options: { mode: RightsMode }): Righ
     const missing = listedBy(e).filter((p) => !trackedMedia.has(p));
     if (missing.length > 0) add('MEDIA_ENTRY_STALE', e.id, `the mediaFiles entry ${e.id} lists ${missing.join(', ')}, which ${missing.length === 1 ? 'is' : 'are'} not tracked media or compiled file${missing.length === 1 ? '' : 's'}; remove or update it`);
   }
+
+  // 6e. Owner-authored and generated items: their provenance is about exact committed bytes, and no media rides on it.
+  checkProvenance(m, repo, trackedMedia, add);
 
   // 7. Components the detected tooling requires.
   checkRequiredComponents(m, repo, componentById, add);
@@ -376,6 +380,45 @@ function checkLockfiles(m: RightsManifest, repo: RepoView, add: (code: string, p
   return locked;
 }
 
+/**
+ * An owner item's provenance binds exact bytes (docs/RELEASE_RIGHTS.md, "Owner-authored and generated items"): every file
+ * it names is a file of the repository and still those bytes, every media file the inventory gives the item is one it
+ * binds as its own, and a file it binds as its own belongs to no other record. A record for other bytes is a finding in
+ * either mode, whatever the status, because it no longer says anything about what is there.
+ */
+function checkProvenance(m: RightsManifest, repo: RepoView, trackedMedia: ReadonlySet<string>, add: (code: string, path: string, message: string) => void): void {
+  const tracked = new Set(repo.files());
+  const bytesOf = (rel: string): Uint8Array | null => {
+    if (repo.bytes) return repo.bytes(rel);
+    const text = repo.read(rel);
+    return text === null ? null : new TextEncoder().encode(text);
+  };
+  const holderOf = new Map<string, string>();
+  for (const e of m.mediaFiles) for (const p of 'path' in e.match ? [e.match.path] : e.match.paths) holderOf.set(p, 'component' in e.covers ? e.covers.component : e.covers.asset);
+  const items = [
+    ...m.components.map((c) => ({ key: c.id, claim: c as RightsClaim })),
+    ...m.videos.flatMap((v) => v.assets.map((a) => ({ key: `${v.videoId}/${a.id}`, claim: a as RightsClaim }))),
+  ];
+  for (const { key, claim } of items) {
+    const provenance = claim.provenance;
+    // An owner item cleared without a record of its own (a docs page, on its published blob) binds no media either.
+    const owner = OWNER_BASES.includes(claim.rightsBasis);
+    if (provenance === undefined && !(owner && claim.status === 'CLEARED')) continue;
+    for (const f of provenance?.files ?? []) {
+      const bytes = tracked.has(f.path) ? bytesOf(f.path) : null;
+      const actual = bytes === null ? null : sha256Hex(bytes);
+      if (actual === null) add('PROVENANCE_FILE_MISSING', key, `${key} binds ${f.path}, which is not a readable file of the repository: there are no bytes for its rights to be about`);
+      else if (actual !== f.sha256) add('PROVENANCE_STALE', key, `${key} binds ${f.path} as sha256 ${f.sha256.slice(0, 12)}…, and the file is now ${actual.slice(0, 12)}…: its rights were established for other bytes. Until the owner re-establishes them (a new attestation) and the new sha256 is recorded, set the item back to OWNER_CONFIRMATION_PENDING and remove this record (a record is checked whatever the item's status)`);
+      const holder = holderOf.get(f.path);
+      if (f.role !== 'SOURCE' && holder !== undefined && holder !== key) add('PROVENANCE_MEDIA_ELSEWHERE', f.path, `${key} binds ${f.path} as its own ${f.role}, but the media inventory gives it to ${holder}: a file has one rights record`);
+    }
+    const ownFiles = new Set((provenance?.files ?? []).filter((f) => f.role !== 'SOURCE').map((f) => f.path));
+    for (const [p, holder] of holderOf) {
+      if (holder === key && trackedMedia.has(p) && !ownFiles.has(p)) add('PROVENANCE_MEDIA_UNBOUND', p, `${p} is covered by ${key}, whose ${provenance === undefined ? 'clearance has no provenance record to' : 'provenance does not'} bind it: a file cannot ride on a record that was not made for it. Bind it (as an ASSET or OUTPUT, with its sha256) or give it its own rights record`);
+    }
+  }
+}
+
 /** The provider the publication narration binding names, or null. */
 function narrationProvider(repo: RepoView): string | null {
   const cfg = readJson(repo, 'config/narration-providers.json');
@@ -510,6 +553,12 @@ function checkVideos(m: RightsManifest, repo: RepoView, byId: Map<string, Compon
     const blob = own(source, 'blob');
     if (!v.assets.some((a) => a.binding.type === 'CANONICAL_DOCS' && a.binding.docPath === docPath && a.binding.blob === blob)) {
       add('DOCS_SOURCE_UNCOVERED', v.videoId, `${v.videoId} is made from ${String(docPath)} at blob ${String(blob)}, which has no rights entry bound to exactly that page`);
+    }
+    // A docs page is cleared on its published blob only as the page the video is made from: any other is bound to nothing.
+    for (const a of v.assets) {
+      if (a.binding.type === 'CANONICAL_DOCS' && (a.binding.docPath !== docPath || a.binding.blob !== blob)) {
+        add('ASSET_BINDING_STALE', at(a.id), `the rights entry ${a.id} is bound to ${a.binding.docPath} at blob ${a.binding.blob.slice(0, 12)}…, which is not the page ${v.videoId} is made from; a docs page is recorded only as the video's own source`);
+      }
     }
 
     for (const c of m.components) {

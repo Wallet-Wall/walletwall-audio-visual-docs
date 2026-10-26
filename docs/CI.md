@@ -111,9 +111,10 @@ What the override cannot reach: Remotion's prebuilt files also carry their own c
 - a license text is missing or is not the pinned bytes, or the top-level `LICENSE` stops being MIT;
 - a locked npm package or Cargo crate has a license nobody has recorded, or an assessment pinned to a version (Remotion's) no longer matches the lockfile;
 - a spec asset, sonic asset, narration, font, or source page of a video has no rights entry against its exact bytes;
+- an owner-authored or generated item's provenance record binds bytes that are no longer there (a pull request that edits a bound file, such as a Blender lane module, fails until the record is re-established), or a media file rides on a record that does not bind it;
 - a release state claims more than the rights support.
 
-Owner decisions that are still open (Remotion's eligibility, the narration provider's plan, the brand mark's provenance, the attributed signed-distance primitives) are recorded as pending and pass, listed, because they are not falsely cleared. The job then runs `npm run rights:check -- --public-release` informationally, like the freshness report: the strict check lists every item the owner has not cleared in the step summary and never fails the build. Passing it is the precondition for a video to leave `LOCAL_PROOF`, and CI cannot clear anything.
+Owner decisions that are still open (Remotion's eligibility and its output, the depth-reveal frames that carry that output, the attributed signed-distance primitives) are recorded as pending and pass, listed, because they are not falsely cleared. The job then runs `npm run rights:check -- --public-release` informationally, like the freshness report: the strict check lists every item the owner has not cleared in the step summary and never fails the build. Passing it is the precondition for a video to leave `LOCAL_PROOF`, and CI cannot clear anything.
 
 ## Branch protection
 

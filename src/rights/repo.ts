@@ -1,7 +1,7 @@
-// The repository as the rights check sees it: a sorted list of files and a bounded text reader. The real view walks a
-// checkout (skipping dependency, build-output, and virtual-environment directories, and never following a link) and
-// reads each file through one open handle, refusing anything that resolves outside the root. Tests use an in-memory
-// view. Nothing here reads the environment or the network.
+// The repository as the rights check sees it: a sorted list of files and a bounded reader of their text and bytes. The
+// real view walks a checkout (skipping dependency, build-output, and virtual-environment directories, and never following
+// a link) and reads each file through one open handle, refusing anything that resolves outside the root. Tests use an
+// in-memory view. Nothing here reads the environment or the network.
 
 import { lstatSync, readdirSync, realpathSync } from 'node:fs';
 import path from 'node:path';
@@ -12,6 +12,11 @@ export interface RepoView {
   files(): string[];
   /** The file's UTF-8 text, or null when it is absent, not a regular file, too large, or outside the repository. */
   read(rel: string): string | null;
+  /**
+   * The file's exact bytes, under the same refusals, for a hash that must be of the bytes and not of their text (a PNG is
+   * not UTF-8). A view without it (an in-memory one, whose files are text) is read as the UTF-8 encoding of `read`.
+   */
+  bytes?(rel: string): Uint8Array | null;
 }
 
 /**
@@ -26,7 +31,7 @@ export const EXCLUDED_PATHS: ReadonlySet<string> = new Set(['motion-intelligence
 
 const MAX_FILE_BYTES = 16 * 1024 * 1024;
 
-export function fsRepo(root: string): RepoView {
+export function fsRepo(root: string): Required<RepoView> {
   const realRoot = realpathSync(root);
   let listing: string[] | null = null;
 
@@ -44,6 +49,20 @@ export function fsRepo(root: string): RepoView {
     }
   };
 
+  const bytes = (rel: string): Buffer | null => {
+    if (rel.split('/').some((s) => s === '' || s === '.' || s === '..') || rel.includes('\\') || path.isAbsolute(rel)) return null;
+    const abs = path.join(realRoot, ...rel.split('/'));
+    try {
+      if (lstatSync(abs).isSymbolicLink()) return null;
+    } catch {
+      return null;
+    }
+    return readContainedFile(abs, (real) => {
+      const inside = path.relative(realRoot, real);
+      return inside !== '' && !inside.startsWith('..') && !path.isAbsolute(inside);
+    }, MAX_FILE_BYTES);
+  };
+
   return {
     files(): string[] {
       if (listing === null) {
@@ -54,18 +73,8 @@ export function fsRepo(root: string): RepoView {
       return listing;
     },
     read(rel: string): string | null {
-      if (rel.split('/').some((s) => s === '' || s === '.' || s === '..') || rel.includes('\\') || path.isAbsolute(rel)) return null;
-      const abs = path.join(realRoot, ...rel.split('/'));
-      try {
-        if (lstatSync(abs).isSymbolicLink()) return null;
-      } catch {
-        return null;
-      }
-      const bytes = readContainedFile(abs, (real) => {
-        const inside = path.relative(realRoot, real);
-        return inside !== '' && !inside.startsWith('..') && !path.isAbsolute(inside);
-      }, MAX_FILE_BYTES);
-      return bytes === null ? null : bytes.toString('utf8');
+      return bytes(rel)?.toString('utf8') ?? null;
     },
+    bytes,
   };
 }
