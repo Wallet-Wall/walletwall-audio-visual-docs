@@ -24,61 +24,94 @@ import math
 
 import numpy as np
 
-# ── Signed distance primitives (Inigo Quilez's forms, vectorised) ─────────────
+# ── Signed distance primitives and operators ──────────────────────────────────
+# Each is written from its geometric definition (docs/LICENSING.md, "Signed-distance code"); the property tests in
+# test/python/sdf_properties.py check them against oracles built from those definitions.
 
 
 def sd_ellipsoid(p, c, r):
-    q = p - np.asarray(c, dtype=np.float64)
+    """Distance estimate to the ellipsoid with centre c and semi-axes r. The implicit function f(x) = |(x - c) / r| - 1
+    is zero exactly on the surface; dividing it by the length of its gradient gives the first-order distance estimate of
+    an implicit surface, exact on the principal axes and for a sphere. At the centre the gradient vanishes, and the
+    depth there is the shortest semi-axis."""
     r = np.asarray(r, dtype=np.float64)
-    k0 = np.linalg.norm(q / r, axis=1)
-    k1 = np.linalg.norm(q / (r * r), axis=1)
-    return k0 * (k0 - 1.0) / np.maximum(k1, 1e-12)
+    s = (p - np.asarray(c, dtype=np.float64)) / r  # the point where the ellipsoid is the unit sphere
+    radial = np.linalg.norm(s, axis=1)
+    centre = radial == 0.0
+    grad = (s / r) / np.where(centre, 1.0, radial)[:, None]  # df/dx: the unit-sphere direction, mapped back through r
+    slope = np.linalg.norm(grad, axis=1)
+    return np.where(centre, -float(r.min()), (radial - 1.0) / np.where(centre, 1.0, slope))
 
 
 def sd_round_cone(p, a, b, r1, r2):
+    """Signed distance to the convex hull of the balls (a, r1) and (b, r2), exact inside and out. The hull is the union of
+    the balls whose centres and radii run linearly from the first to the second, so the distance is the least, over the
+    spine parameter u in [0, 1], of |p - c(u)| - r(u). With x the point's position along the axis from a, rho its
+    distance from the axis, and tan = (r1 - r2) / sqrt(L^2 - (r1 - r2)^2) the tangent of the cone's half-angle, that
+    least value is at u = (x - rho * tan) / L, clamped to the spine. Plain arithmetic and square roots only, which round
+    the same on every platform (the canonical model is the same on every host)."""
     a = np.asarray(a, dtype=np.float64)
     b = np.asarray(b, dtype=np.float64)
-    ba = b - a
-    l2 = float(ba @ ba)
-    rr = r1 - r2
-    a2 = l2 - rr * rr
-    il2 = 1.0 / l2
-    pa = p - a
-    y = pa @ ba
-    z = y - l2
-    x2v = pa * l2 - np.outer(y, ba)
-    x2 = np.einsum("ij,ij->i", x2v, x2v)
-    y2 = y * y * l2
-    z2 = z * z * l2
-    k = math.copysign(1.0, rr) * rr * rr * x2
-    out = (np.sqrt(np.maximum(x2 * a2 * il2, 0.0)) + y * rr) * il2 - r1
-    c2 = np.sign(y) * a2 * y2 < k
-    out = np.where(c2, np.sqrt(x2 + y2) * il2 - r1, out)
-    c1 = np.sign(z) * a2 * z2 > k
-    out = np.where(c1, np.sqrt(x2 + z2) * il2 - r2, out)
-    return out
+    axis = b - a
+    length = math.sqrt(float(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]))
+    if length <= abs(r1 - r2):
+        # One ball holds the other (coincident ends included): the hull is the larger ball.
+        centre, radius = (a, r1) if r1 >= r2 else (b, r2)
+        d = p - centre
+        return np.sqrt(d[:, 0] * d[:, 0] + d[:, 1] * d[:, 1] + d[:, 2] * d[:, 2]) - radius
+    unit = axis / length
+    rel = p - a
+    x = rel[:, 0] * unit[0] + rel[:, 1] * unit[1] + rel[:, 2] * unit[2]
+    off = rel - x[:, None] * unit
+    rho = np.sqrt(off[:, 0] * off[:, 0] + off[:, 1] * off[:, 1] + off[:, 2] * off[:, 2])
+    drop = r1 - r2
+    tan = drop / math.sqrt(length * length - drop * drop)
+    u = np.clip((x - rho * tan) / length, 0.0, 1.0)
+    along = x - u * length
+    return np.sqrt(along * along + rho * rho) - (r1 - u * drop)
 
 
 def smin(a, b, k):
-    """Polynomial smooth minimum: a fillet of about k px where two volumes meet."""
+    """Smooth minimum, a fillet of width k where two volumes meet. With m the operands' mean and d their difference,
+    min(a, b) = m - |d| / 2, whose kink at d = 0 is the seam. For |d| < k it is replaced by the even quadratic
+    m - d^2 / (4k) - k / 4, the one that meets m - |d| / 2 with the same value and slope at |d| = k; elsewhere the result
+    is min(a, b) itself. The fillet is deepest, k / 4, where the operands are equal, and never above min(a, b)."""
+    low = np.minimum(a, b)
     if k <= 0:
-        return np.minimum(a, b)
-    h = np.maximum(k - np.abs(a - b), 0.0) / k
-    return np.minimum(a, b) - h * h * k * 0.25
+        return low
+    d = a - b
+    blend = (a + b) * 0.5 - d * d / (4.0 * k) - k * 0.25
+    return np.where(np.abs(d) < k, np.minimum(blend, low), low)
 
 
 def smax(a, b, k):
-    return -smin(-a, -b, k)
+    """Smooth maximum: with m and d as for smin, max(a, b) = m + |d| / 2, and within |d| < k the even quadratic
+    m + d^2 / (4k) + k / 4 takes its place (the smooth minimum's mirror image); never below max(a, b)."""
+    high = np.maximum(a, b)
+    if k <= 0:
+        return high
+    d = a - b
+    blend = (a + b) * 0.5 + d * d / (4.0 * k) + k * 0.25
+    return np.where(np.abs(d) < k, np.maximum(blend, high), high)
 
 
 def scaled(fn, axis_scale):
-    """Evaluate a primitive in a space squashed along Y (depth) by axis_scale (a flatter or rounder cross-section)."""
-    s = np.array([1.0, axis_scale, 1.0])
+    """A primitive stretched along Y (depth) by axis_scale, for a flatter or rounder cross-section: fn read through the
+    inverse stretch, which carries its zero set over exactly. That inverse map lengthens no distance by more than its
+    largest factor, so dividing by that factor (multiplying by min(1, axis_scale)) keeps the value a distance bound."""
+    stretch = np.array([1.0, axis_scale, 1.0])
+    gain = 1.0 / float(np.max(1.0 / stretch))
 
     def f(p):
-        return fn(p / s) * min(1.0, axis_scale)
+        return fn(p / stretch) * gain
 
     return f
+
+
+def shell(d, half):
+    """A band of thickness 2 * half around a surface whose signed distance is d: the points inside the outer offset
+    surface (d <= half) and outside the inner one (d >= -half), so the larger of those two regions' distances."""
+    return np.maximum(d - half, -d - half)
 
 
 # ── The design (rig px; the 2D rig contract's rest pose, given volume) ───────

@@ -524,7 +524,8 @@ describe('this repository', () => {
     assert.deepEqual(d.findings, []);
     assert.equal(d.result, 'PASS');
     // The owner-asset lane (test/rights-owner-assets.test.ts) cleared the brand mark, the character, the model, and the character frames.
-    const unrelated = ['blender-depth-reveal-output', 'quilez-sdf-forms', 'remotion', 'remotion-render-output'];
+    // The Quilez lane retired quilez-sdf-forms: its code was replaced (docs/LICENSING.md, "Signed-distance code").
+    const unrelated = ['blender-depth-reveal-output', 'remotion', 'remotion-render-output'];
     assert.deepEqual(d.pending.map((p) => p.id).sort(), unrelated);
     const s = checkRights(repo, { mode: 'public-release' });
     assert.equal(s.result, 'FAIL');
@@ -532,8 +533,8 @@ describe('this repository', () => {
     assert.ok(s.findings.every((f) => f.code === 'RIGHTS_BLOCKING_STATUS'));
   });
 
-  test('Remotion, its output, and the Quilez primitives are as they were: pending, with their owner actions', () => {
-    for (const id of ['remotion', 'remotion-render-output', 'quilez-sdf-forms']) {
+  test('Remotion and its output are as they were: pending, with their owner actions', () => {
+    for (const id of ['remotion', 'remotion-render-output']) {
       assert.equal(find(id).status, 'OWNER_CONFIRMATION_PENDING', id);
       assert.equal(find(id).clearance, undefined, id);
     }

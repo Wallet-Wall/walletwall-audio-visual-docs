@@ -170,7 +170,7 @@ describe('the Blender bridge carries the decisions, not new ones', () => {
   test('production draws only the pinned character: another model or materials is refused (positive control: the pin passes)', () => {
     const pinned = { schema: 'walletwall.blender-model/v1' as const, modelVersion: BLENDER_CHARACTER.modelVersion, materialsVersion: BLENDER_CHARACTER.materialsVersion, modelSha256: BLENDER_CHARACTER.modelSha256, modelRealizationSha256: 'f'.repeat(64), materialsSha256: BLENDER_CHARACTER.materialsSha256, blenderVersion: '5.2.2 LTS', blenderBuildHash: 'd13f752e3b9c' };
     assert.doesNotThrow(() => assertPinnedCharacter(pinned));
-    for (const change of [{ modelSha256: 'a'.repeat(64) }, { modelVersion: 2 }, { materialsSha256: 'b'.repeat(64) }, { materialsVersion: 1 }]) {
+    for (const change of [{ modelSha256: 'a'.repeat(64) }, { modelVersion: BLENDER_CHARACTER.modelVersion + 1 }, { materialsSha256: 'b'.repeat(64) }, { materialsVersion: 1 }]) {
       assert.throws(() => assertPinnedCharacter({ ...pinned, ...change }), BlenderProductionError, JSON.stringify(change));
     }
   });

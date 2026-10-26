@@ -32,7 +32,7 @@ import materials as M  # noqa: E402
 import rig as R  # noqa: E402
 from common import UNITS, fail, job_from_argv, log, out_path  # noqa: E402
 
-LANE_VERSION = {"model": 1, "materials": 2}
+LANE_VERSION = {"model": 2, "materials": 2}
 
 
 def new_mesh_object(name, verts_px, faces, arm=None, groups=None):
@@ -223,8 +223,8 @@ def build_face_and_ears(arm, rig, parts, mats, outline_w, outline_mat):
         objs.append(o)
         # The lid: a coat shell over the eye's upper half; its bone turns it down over the eye as it closes.
         def lid_fn(p, c=c):
-            shell = np.abs(G.sd_ellipsoid(p, c, (8.4, 5.4, 9.0))) - 0.55
-            return G.smax(shell, -(p[:, 2] - c[2]) - 0.0, 0.6)
+            coat = G.shell(G.sd_ellipsoid(p, c, (8.4, 5.4, 9.0)), 0.55)
+            return G.smax(coat, -(p[:, 2] - c[2]) - 0.0, 0.6)
 
         v, f = G.mesh_from_sdf(lid_fn, (c[0] - 10, c[1] - 8, c[2] - 2), (c[0] + 10, c[1] + 8, c[2] + 10), 0.35, 1)
         o = new_mesh_object(f"WalletWallaby.Lid_{side}", v, f, arm, [f"lid_{side}"])

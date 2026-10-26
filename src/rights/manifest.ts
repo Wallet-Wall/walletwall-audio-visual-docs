@@ -54,6 +54,7 @@ import {
   SPEAKER_AUTHORIZATION_SCOPES,
   SPEAKER_OWNERSHIP,
   SPEAKER_SCOPE_NEEDED,
+  THIRD_PARTY_SCAN_EXTENSIONS,
   USE_RESTRICTING_CONTROLS,
   VOICE_AUTHORIZATION_BASES,
   VOICE_SOURCE_TYPES,
@@ -451,11 +452,17 @@ function readClaim(r: Reader, rec: Rec, path: string): void {
     r.bad(`${path}.resolution`, `required while the status is ${status} (the owner action and the reassessment trigger)`);
   }
 
+  // Third-party code carried in this repository's own source files is the third party's whatever license it is said to
+  // have, so only the owner clears it; the repository's license, or the license of the file it sits in, is never its
+  // license. (Packages compiled into a committed artifact cite the lockfile and the artifact instead, and each one's
+  // license is read from its registry record by the lockfile check.)
+  const citesSource = (Array.isArray(own(rec, 'evidence')) ? (own(rec, 'evidence') as unknown[]) : []).some((e) => isRec(e) && own(e, 'type') === 'FILE' && typeof own(e, 'ref') === 'string' && THIRD_PARTY_SCAN_EXTENSIONS.test(own(e, 'ref') as string));
+  const thirdPartyCode = own(rec, 'kind') === 'third-party-derived-source' && citesSource;
   const clearance = own(rec, 'clearance');
-  const needsOwner = basis !== null && BASES_NEEDING_OWNER_CLEARANCE.includes(basis);
+  const needsOwner = basis !== null && (BASES_NEEDING_OWNER_CLEARANCE.includes(basis) || thirdPartyCode);
   if (clearance !== undefined) {
     if (status !== null && status !== 'CLEARED') r.bad(`${path}.clearance`, 'only a CLEARED item has one');
-    else if (!needsOwner) r.bad(`${path}.clearance`, 'only a VENDOR_LICENSE, PROVIDER_TERMS, or THIRD_PARTY_ATTRIBUTION_ONLY basis takes a clearance record');
+    else if (!needsOwner) r.bad(`${path}.clearance`, 'only a VENDOR_LICENSE, PROVIDER_TERMS, or THIRD_PARTY_ATTRIBUTION_ONLY basis, or third-party code carried in this repository\'s source files, takes a clearance record');
     const c = r.shape(clearance, `${path}.clearance`, ['clearedBy', 'clearedOn', 'basis']);
     if (c) {
       r.exactly(own(c, 'clearedBy'), `${path}.clearance.clearedBy`, 'OWNER');
@@ -463,7 +470,12 @@ function readClaim(r: Reader, rec: Rec, path: string): void {
       r.str(own(c, 'basis'), `${path}.clearance.basis`);
     }
   } else if (status === 'CLEARED' && needsOwner) {
-    r.bad(`${path}.clearance`, `required to clear a ${basis} basis (the owner's record)`);
+    if (thirdPartyCode) r.bad(`${path}.clearance`, `required: third-party code carried in this repository's source files is CLEARED only on the owner's clearance record, whatever license (${basis}${typeof expression === 'string' ? `, ${expression}` : ''}) it is said to carry`);
+    else r.bad(`${path}.clearance`, `required to clear a ${basis} basis (the owner's record)`);
+  }
+  if (thirdPartyCode && basis === 'OPEN_SOURCE_LICENSE') {
+    const urls = (Array.isArray(own(rec, 'evidence')) ? (own(rec, 'evidence') as unknown[]) : []).filter((e) => isRec(e) && own(e, 'type') === 'URL');
+    if (urls.length === 0) r.bad(`${path}.evidence`, 'the license of third-party-derived source is the third party\'s own statement: cite it where it is published (a URL), not this repository\'s license or the file the code sits in');
   }
 }
 

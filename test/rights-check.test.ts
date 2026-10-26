@@ -724,7 +724,7 @@ describe('this repository', () => {
     assert.deepEqual(r.findings, []);
     assert.equal(r.result, 'PASS');
     assert.match(r.manifestSha256 ?? '', /^[0-9a-f]{64}$/);
-    assert.deepEqual(r.counts, { components: r.counts.components, assets: r.counts.assets, videos: 1, npmPackages: r.counts.npmPackages, cargoCrates: 12, pythonFiles: 11 });
+    assert.deepEqual(r.counts, { components: r.counts.components, assets: r.counts.assets, videos: 1, npmPackages: r.counts.npmPackages, cargoCrates: 12, pythonFiles: 12 });
     assert.ok(r.counts.npmPackages > 250, 'the whole lockfile is accounted for, not a sample');
   });
 
@@ -746,10 +746,13 @@ describe('this repository', () => {
     }
     // The ones this lane found open, by id: if the owner clears one, this list shrinks with the clearance record present.
     const open = new Set(items.filter((i) => i.status !== 'CLEARED').map((i) => i.id));
-    for (const id of ['remotion', 'elevenlabs-service', 'quilez-sdf-forms']) {
+    for (const id of ['remotion', 'elevenlabs-service']) {
       const item = items.find((i) => i.id === id)!;
       assert.ok(open.has(id) || item.clearance?.clearedBy === 'OWNER', `${id} was left open for the owner`);
     }
+    // quilez-sdf-forms was not cleared but retired: the code it recorded was replaced, and rights:check would refuse its
+    // return unrecorded (THIRD_PARTY_CODE_UNRECORDED).
+    assert.equal(items.find((i) => i.id === 'quilez-sdf-forms'), undefined);
   });
 
   test('the top-level MIT license is intact and is the default', () => {

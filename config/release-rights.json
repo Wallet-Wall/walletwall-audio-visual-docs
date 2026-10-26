@@ -50,7 +50,7 @@
         "path": "blender/walletwallaby/geometry.py",
         "classification": "BLENDER_INDEPENDENT",
         "license": "MIT",
-        "reason": "Imports only math and numpy. Loaded inside Blender by GPL-3.0-or-later files; MIT is GPL-compatible. See quilez-sdf-forms for its attributed primitives."
+        "reason": "Imports only math and numpy. Loaded inside Blender by GPL-3.0-or-later files; MIT is GPL-compatible. Its signed-distance code is written here from the definitions (docs/LICENSING.md, \"Signed-distance code\")."
       },
       {
         "path": "blender/walletwallaby/materials.py",
@@ -87,6 +87,12 @@
         "classification": "BLENDER_API_COUPLED",
         "license": "GPL-3.0-or-later",
         "reason": "Imports bpy and mathutils; the 2D to 3D depth reveal."
+      },
+      {
+        "path": "test/python/sdf_properties.py",
+        "classification": "BLENDER_INDEPENDENT",
+        "license": "MIT",
+        "reason": "Imports only os, sys, math, unittest, numpy, and geometry.py (math and numpy): the signed-distance property tests, run outside Blender with a Python that has numpy."
       },
       {
         "path": "tools/chatterbox/synthesize.py",
@@ -326,32 +332,6 @@
       ]
     },
     {
-      "id": "quilez-sdf-forms",
-      "layer": "SOURCE_CODE",
-      "kind": "third-party-derived-source",
-      "scope": "RELEASE_PATH",
-      "distribution": "IN_REPOSITORY",
-      "rightsBasis": "THIRD_PARTY_ATTRIBUTION_ONLY",
-      "status": "OWNER_CONFIRMATION_PENDING",
-      "licenseExpression": null,
-      "summary": "blender/walletwallaby/geometry.py credits Inigo Quilez's forms for its signed-distance primitives (sd_ellipsoid and sd_round_cone, vectorised in numpy). The source article (iquilezles.org/articles/distfunctions) states no license, copyright, or reuse terms, and its reference implementations live on Shadertoy, whose per-shader licenses were not reviewed. The functions are short mathematical formulas re-expressed in numpy; whether anything further is owed is not decided here.",
-      "evidence": [
-        {
-          "type": "FILE",
-          "ref": "blender/walletwallaby/geometry.py"
-        },
-        {
-          "type": "URL",
-          "ref": "https://iquilezles.org/articles/distfunctions/",
-          "retrievedOn": "2026-10-22"
-        }
-      ],
-      "resolution": {
-        "ownerAction": "Decide whether the attribution comment is enough, obtain the author's license statement, or replace the two primitives with independently derived formulas; then record the outcome as this item's clearance or replace the code.",
-        "reassessmentTrigger": "A license statement is found for the source, or the primitives in geometry.py change."
-      }
-    },
-    {
       "id": "elevenlabs-service",
       "layer": "TOOL_RUNTIME",
       "kind": "provider-service",
@@ -535,8 +515,8 @@
       "provenance": {
         "attestation": {
           "attestedBy": "OWNER",
-          "attestedOn": "2026-10-25",
-          "basis": "The owner states, 2026-10-25, that WalletWall owns the composition and the character and assets it supplies to these renders, subject to third-party rights in the tools. The code shows this class: the job writers (scripts/blender-proof.ts, src/blender/production.ts) give a character job no image, and render.py and the lane modules it loads build its scene from code and load an image only for a depth reveal (transition.py), which is not this item. The record covers the rendered frames, not Blender (blender-runtime) or the GPL scripts; the primitives in geometry.py stay the quilez-sdf-forms item."
+          "attestedOn": "2026-10-26",
+          "basis": "The owner states, 2026-10-26, that WalletWall owns the composition and the character and assets it supplies to these renders, subject to third-party rights in the tools. The code shows this class: the job writers (scripts/blender-proof.ts, src/blender/production.ts) give a character job no image, and render.py and the lane modules it loads build its scene from code and load an image only for a depth reveal (transition.py), which is not this item. The record covers the rendered frames, not Blender (blender-runtime) or the GPL scripts. The lane's code carries no third-party code, and the seven reference frames are byte-identical to those attested on 2026-10-25."
         },
         "files": [
           {
@@ -551,7 +531,7 @@
           },
           {
             "path": "blender/walletwallaby/geometry.py",
-            "sha256": "0e99514477329726666b471007bcf067b238da3ff3dc5b6551867d8ce0adb524",
+            "sha256": "111a3f7ab3f629806760a0e64ca32ca560ea07002bf28d3dfa7c33de5c6c92d7",
             "role": "SOURCE"
           },
           {
@@ -629,9 +609,6 @@
             "sha256": "37d7f7567568e5b1a41b137a9e7730116505e5fd70921753ec61824a6e5fd6a2",
             "role": "OUTPUT"
           }
-        ],
-        "thirdPartyCodeInSources": [
-          "quilez-sdf-forms"
         ]
       }
     },
@@ -680,7 +657,7 @@
       "rightsBasis": "GENERATED_FROM_OWNER_INPUTS",
       "status": "CLEARED",
       "licenseExpression": null,
-      "summary": "The WalletWallaby .blend and its canonical model (BLENDER_CHARACTER in src/character/walletwallaby/versions.ts: model v1 f8124e59, materials v2 de8c55f5), generated by blender/walletwallaby/build.py from an empty factory scene. The body, limbs, ears, face, and claws are surface-nets meshes of signed-distance volumes whose placements and sizes the lane authors (geometry.py, and build.py for the ears, face, and claws); the contact shadow is a disc from Blender's built-in circle primitive; the armature is built from the rig contract; the materials are node trees in exact brand colours; and the one image, the belly's mortar map, is computed in materials.py and packed. Nothing is imported, downloaded, appended, or linked: no mesh, texture, rig, material library, model fragment, or reference asset, in the code or in its history. The .blend is data only, with no scripts, and is reopened with scripts disabled. The signed-distance primitives geometry.py credits to Inigo Quilez are code the build runs, not part of the model: they are the quilez-sdf-forms item, which this record does not clear.",
+      "summary": "The WalletWallaby .blend and its canonical model (BLENDER_CHARACTER in src/character/walletwallaby/versions.ts: model v2 2c92f3c3, materials v2 de8c55f5), generated by blender/walletwallaby/build.py from an empty factory scene. The body, limbs, ears, face, and claws are surface-nets meshes of signed-distance volumes whose placements and sizes the lane authors (geometry.py, and build.py for the ears, face, and claws); the contact shadow is a disc from Blender's built-in circle primitive; the armature is built from the rig contract; the materials are node trees in exact brand colours; and the one image, the belly's mortar map, is computed in materials.py and packed. Nothing is imported, downloaded, appended, or linked: no mesh, texture, rig, material library, model fragment, or reference asset, in the code or in its history. The .blend is data only, with no scripts, and is reopened with scripts disabled. Its signed-distance code is written in this repository from the definitions; until 2026-10-26 it was translated from Inigo Quilez's articles (the retired quilez-sdf-forms item, docs/LICENSING.md, \"Signed-distance code\").",
       "evidence": [
         {
           "type": "FILE",
@@ -708,13 +685,13 @@
       "provenance": {
         "attestation": {
           "attestedBy": "OWNER",
-          "attestedOn": "2026-10-25",
-          "basis": "The owner states, 2026-10-25, that the canonical WalletWallaby model was created for WalletWall from repository-owned source. The code shows how it is made, as the summary sets out: build.py and the lane modules it loads generate every part of it, and none of them imports, downloads, or loads a mesh, texture, rig, material library, model fragment, or reference asset, now or in their history. The record covers the generated model; the third-party-derived primitives in geometry.py are code the build runs and stay the quilez-sdf-forms item."
+          "attestedOn": "2026-10-26",
+          "basis": "The owner states, 2026-10-26, that the canonical WalletWallaby model (v2) was created for WalletWall from repository-owned source. The code shows how it is made, as the summary sets out: build.py and the lane modules it loads generate every part of it, and none of them imports, downloads, or loads a mesh, texture, rig, material library, model fragment, or reference asset, now or in their history. The signed-distance code they run is written in this repository from its definitions and carries no third-party code; against v1 the model differs only by an enclosed shell removed from each eye glint and a sub-pixel change in the chin's tessellation."
         },
         "files": [
           {
             "path": "blender/walletwallaby/build.py",
-            "sha256": "5750f568b81c1976c79b97f7039989f77254eda93852ca3e9b22876e4fae6f48",
+            "sha256": "8dd0918cfada0ea17e1282fd3142076fd1d4f6cf54f25ca917d4efc16d4ddd6a",
             "role": "SOURCE"
           },
           {
@@ -724,7 +701,7 @@
           },
           {
             "path": "blender/walletwallaby/geometry.py",
-            "sha256": "0e99514477329726666b471007bcf067b238da3ff3dc5b6551867d8ce0adb524",
+            "sha256": "111a3f7ab3f629806760a0e64ca32ca560ea07002bf28d3dfa7c33de5c6c92d7",
             "role": "SOURCE"
           },
           {
@@ -739,12 +716,9 @@
           },
           {
             "path": "src/character/walletwallaby/versions.ts",
-            "sha256": "832b15cb1329b3e93754a963e2f565038632c2a52d199851dfef623b2f9c2f1b",
+            "sha256": "56d6ddf4094381bd81a584c5f7836eb98857f91ad01d47c30fe57ab9d2a0b159",
             "role": "SOURCE"
           }
-        ],
-        "thirdPartyCodeInSources": [
-          "quilez-sdf-forms"
         ]
       }
     },
@@ -1356,13 +1330,13 @@
           "provenance": {
             "attestation": {
               "attestedBy": "OWNER",
-              "attestedOn": "2026-10-25",
-              "basis": "The owner states, 2026-10-25, that WalletWallaby is a WalletWall-created fictional character: its visual identity, design direction, brick belly, body language, motion semantics, and canonical representation were developed for WalletWall. The record covers that WalletWall-authored expression as the repository defines it: the rig contract, the poses and palette, the body design, and the declared versions. It claims nothing in the idea of a wallaby, generic anatomy or geometric primitives, Blender, Remotion, or any third-party mathematical implementation; the primitives geometry.py credits to Inigo Quilez stay the quilez-sdf-forms item."
+              "attestedOn": "2026-10-26",
+              "basis": "The owner states, 2026-10-26, that WalletWallaby is a WalletWall-created fictional character: its visual identity, design direction, brick belly, body language, motion semantics, and canonical representation were developed for WalletWall. The record covers that WalletWall-authored expression as the repository defines it: the rig contract, the poses and palette, the body design, and the declared versions (canonical model v2). It claims nothing in the idea of a wallaby, generic anatomy or geometric primitives, Blender, Remotion, or a mathematical idea. The signed-distance code these files use is written in this repository from its definitions and carries no third-party code."
             },
             "files": [
               {
                 "path": "blender/walletwallaby/geometry.py",
-                "sha256": "0e99514477329726666b471007bcf067b238da3ff3dc5b6551867d8ce0adb524",
+                "sha256": "111a3f7ab3f629806760a0e64ca32ca560ea07002bf28d3dfa7c33de5c6c92d7",
                 "role": "SOURCE"
               },
               {
@@ -1382,12 +1356,9 @@
               },
               {
                 "path": "src/character/walletwallaby/versions.ts",
-                "sha256": "832b15cb1329b3e93754a963e2f565038632c2a52d199851dfef623b2f9c2f1b",
+                "sha256": "56d6ddf4094381bd81a584c5f7836eb98857f91ad01d47c30fe57ab9d2a0b159",
                 "role": "SOURCE"
               }
-            ],
-            "thirdPartyCodeInSources": [
-              "quilez-sdf-forms"
             ]
           }
         },

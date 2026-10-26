@@ -49,10 +49,17 @@ export const MOTION_PINS: Readonly<Record<number, string>> = {
  * position, the same on every host that builds this source) and its materials, as built from blender/walletwallaby/
  * by the pinned Blender. A render refuses a built character whose hashes differ, so a change to the body or its
  * materials is declared here, deliberately, together with its model or materials version.
+ *
+ * Model v2: the signed-distance code in geometry.py written from its definitions (docs/LICENSING.md, "Signed-distance
+ * code"). Every volume and the body mesh are the same to floating-point rounding, and two things change: each eye glint
+ * loses an enclosed 8-vertex shell that the old ellipsoid left at the exact centre its grid lands on (it read zero, not
+ * negative, there; no frame shows it), and on eight chin grid points that lie exactly on its surface the tie between
+ * inside and outside breaks the other way, so some chin vertices settle up to 0.083 px apart (three review stills
+ * differ by a few pixels at the chin). Windows and Linux builds give this same canonical model. v1 was f8124e59.
  */
 export const BLENDER_CHARACTER = {
-  modelVersion: 1,
-  modelSha256: 'f8124e59dab3bcf578f62db4cbe20fec12be7ee78e3a13701df45d6bc0118a1a',
+  modelVersion: 2,
+  modelSha256: '2c92f3c32aa06f35ec6153010e6a8a5985a0a6f585a50a3119cbf655468797e1',
   materialsVersion: 2,
   materialsSha256: 'de8c55f5725372035b3358311fe07d9096d60e8ca6cefbc9281e51222f421db3',
 } as const;

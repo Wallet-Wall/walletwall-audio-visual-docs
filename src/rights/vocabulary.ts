@@ -258,3 +258,91 @@ export const voiceFactEstablished = (v: string | null): boolean => v !== null &&
 export const LINKAGES = ['COMPILED_INTO_COMMITTED_ARTIFACT', 'BUILD_TIME_ONLY'] as const;
 
 export const EVIDENCE_TYPES = ['FILE', 'URL', 'PACKAGE'] as const;
+
+/**
+ * Third-party code this repository has carried, known by how it shows in a source file: a credit (the author's name or
+ * site) and fingerprints, the sha256 of distinctive statements with every whitespace character removed, both as the
+ * author published them and as they were once translated here. A source file that shows either must be cited by a
+ * third-party-derived-source component (check.ts, THIRD_PARTY_CODE_UNRECORDED), so a component cannot be removed or
+ * retired while any of its code remains, credited or not. Fingerprints are a tripwire for copies, not a proof of
+ * independence: renamed or reflowed statements pass them, which review and the property tests answer instead.
+ */
+export interface ThirdPartyCodeSign {
+  source: string;
+  credits: readonly RegExp[];
+  fingerprints: readonly string[];
+}
+
+export const THIRD_PARTY_CODE_SIGNS: readonly ThirdPartyCodeSign[] = Object.freeze([
+  {
+    // Inigo Quilez's signed-distance articles (iquilezles.org/articles: distfunctions, smin, ellipsoids). Their code
+    // was translated into blender/walletwallaby/geometry.py and build.py (2026-10-18, 1e893e5) and replaced with code
+    // written from the definitions (docs/LICENSING.md, "Signed-distance code"). The fingerprints cover the retired
+    // translation, the published statements it and its replacement could follow (the round cone in both published
+    // forms, the smooth operators), and a first replacement drafted and withdrawn before commit because it followed
+    // the vertical round cone and the smooth union statement by statement.
+    source: 'Inigo Quilez',
+    credits: [/\bQuilez\b/i, /iquilezles/i],
+    fingerprints: [
+    'e5e9c0919002270ebb3c0cafd6a919f9f77dd4bc2077488ba5099c1e799cc582', // retired sd_ellipsoid: the first radial term
+    'cf6fa923c83b719865bc80841c7290ac86969f6cc4e9f7cf64531c3d515a9d58', // retired sd_ellipsoid: the second radial term
+    '7221771ab0246907d643dbbb38aaea5f1f273eb26cd64eb9e2a7c7134fc3f999', // retired sd_ellipsoid: the estimate
+    '395ae82ffaed99ca8e80299b4124a7600c2144ea96db4b007b4e38a0ec56af8e', // retired sd_round_cone: a2
+    '48d4131e5dae988f5f6b1381701de591f73370a166d5d0ad7802f9f3f82bbb08', // retired sd_round_cone: il2
+    '786c7cc0d9489726a8d84f9447cbfe2353a3c62f0990d491f58270d6cf665301', // retired sd_round_cone: the scaled radial vector
+    '4f8f19b58dece0f865836adfc12f2e8faed31ad37f2f1c644f7080d3046cc2af', // retired sd_round_cone: x2
+    '9d10777dd4d9cda2478f04f4caf91c201bc45ac57a077330e29d283e067b0f52', // retired sd_round_cone: y2
+    '976c70401ae4dbf880da4130093569b37fe0ccb6eb30177f1f9ebed41aa1bd28', // retired sd_round_cone: z2
+    '76836839e590792aa01bdeebb1793aaf84eccec7560e299b67bf0b3686fc647c', // retired sd_round_cone: the branch threshold
+    '05fefd38fe2981baee2530d1b78804d45700d30206224165a8dd2f06b8f94e2d', // retired sd_round_cone: the side distance
+    '2602cc8f1b47153c944090fb0c586438e582e573601c6a0863132afef2eee765', // retired sd_round_cone: the first-cap test
+    '8172b1a498987a003dab9c8172a2d25580be06d3d0a4ad79f5645724aadcdc86', // retired sd_round_cone: the first-cap distance
+    '3a1e83c591dddd384e8ea2d39c0aad832729802ea9d6dbe276259ad910dbfacb', // retired sd_round_cone: the second-cap test
+    '163393d0d8077e2cf2c65b11f59b5d491b7fa092e81ee329f85f92fec1e4690f', // retired sd_round_cone: the second-cap distance
+    '4fb2d3972873589b63da320ee129a8e7ca5d7d810eb60a832b812c0e3037445e', // retired smin: the normalised overlap
+    '88bbc018f0c32c6afe75cc00a09d0ecb18fa5a4eeb806ef6d1d2b3d4c49a8a00', // retired smin: the blend
+    'bb3e2e672755e7f24a0b1d251adfca518f880dae17ea4c0b8aacf8c34fce9226', // retired smax: the reflection
+    '5aa36c90a022153b0442cf0408c7a1f53be73accd87996378e01e3dbc26e2f18', // retired scaled: the scaled evaluation
+    '8153c070bfe65c701c15309b91d553e3518524fa1022e0a9c0003550f0e15337', // retired lid shell (build.py)
+    '50262a5a323151d87f580ddfe404fffeb70e7caff7ec8f44b98544b501592364', // published sdEllipsoid: k0
+    'c50e3d41c10dfb58bb22c880f4a3a897ac07a2c4bbc606306e6b5a4a200b9a35', // published sdEllipsoid: k1
+    '002ed8db11f828084c69bb7eb3c02558a674b0911af8155b814f7fdf056e62cd', // published sdEllipsoid: the estimate
+    '3fd325b6e574aa976a9a9348a6940551e763fc198921253fe88fc75eca07ccc1', // published sdRoundCone: a2
+    '90b75337b0cf198af0a2d2f34fa8c35dcfcdb2e1e335512e038dd0dc3789e1e8', // published sdRoundCone: il2
+    'dd66d2a9eb037ffc0c94a1453820b87ed96d20803cc3d89e1f9338f8f7b04c1f', // published sdRoundCone: x2
+    'a4a6a32d3f4dec3ec85b570f26a2c185db719521ee6e8bb8b856d93733f657b1', // published sdRoundCone: y2
+    'c991e6004aae0d70f904bd7ab6b515d8a75b24f13024fbf80cc2ae3ef26f0a07', // published sdRoundCone: z2
+    '5003ffdc1d1b4cfa7c1658cfeabdc4ed9b2455b39b00bdadda2157805c339780', // published sdRoundCone: the branch threshold
+    'bfa51968028d74b5fc0962910d8999f9f87e068f86ac1739a950d3e24a9e5107', // published sdRoundCone: the second-cap branch
+    'f49d1edd1e7dfa925224ef7590e30d3c14db9f2f4595769f008587182df194bf', // published sdRoundCone: the first-cap branch
+    '342d234b650c8d7ad4a319913854e4bc553b9c9bd6c4cc40f24321f854181803', // published sdRoundCone: the side
+    'a4a5a14aba4f6b2fcfd9c912140c5d845538b78287cd576a20c27ab92319da8f', // published smin (quadratic polynomial): the normalised overlap
+    '22780cea09c1d02c417ecd44688d984343f96fd19a8cfe5b726e92ed62605ecb', // published smin (quadratic polynomial): the blend
+    '7e3b8320bbeb0f3e4838bf47b593aa834d2d02dbff6c4274213579fc89a7a4e0', // published opSmoothUnion: the overlap
+    '9a04f7d954d6f2c28616420ab1c96ac01039e07936651cefa4f0762ec87944dc', // published opSmoothUnion: the blend
+    'ecb1eae1cf10d2328d7b4c28c33faa893b0ec4cfbbf99be4c2ca5369f53af0fd', // published opOnion
+    'f654c41cdfff9706ca27e852fa43ffce6b00e30b1bd1e973929f9f4bb6798b57', // published opScale
+    '72642d65eafc77a71d6b3d4a09947481bda23350939677ca9652b5328605147f', // published sdRoundCone (vertical): the taper
+    '72f9f3b56248479e9af8e029abd4117b88245f48cb53ff8ca7e65bc87ff7324c', // published sdRoundCone (vertical): its cosine
+    '72944e21f730ff2e223b417b3d5cff869450b80603589c2a69baf7fd98871910', // published sdRoundCone (vertical): the half-plane point
+    'ffceaef643be0fce573bd52e19cf553abd6d35113c39a299c4f971d66971bb89', // published sdRoundCone (vertical): the foot
+    'bd47a3b296f061ce94ebeb906f873e9dad15e598d555081bcf94c74585064148', // published sdRoundCone (vertical): the first-cap branch
+    '7fbaea6a780eab5c38512e1d090cb19239f6409ee5704becbb0f43cebac6f55b', // published sdRoundCone (vertical): the second-cap branch
+    'a8f688c2c455bd5cb0f3da370ef82483b7c21363229191e5688a5f97e57d17e6', // published sdRoundCone (vertical): the side
+    '297757254a09e12614d8c093383c7e23d2109c7e7e19e317c64af5e1a1dd6945', // published opSmoothSubtraction
+    'd471b86b4426a474227165478ad49fd08d21678c9de5adf68262d931170dead1', // published opSmoothIntersection
+    'ea31549257a2207fc48c2a2aed1e563e54c6ead554a3e8cc761b9ffbccf0d9ef', // published opSmoothIntersection: the expanded blend
+    '392cc48d2d5102d9cd6b4d9bf2094876fbddd6f9cdd291671c8c3426759f29a8', // withdrawn draft (followed the vertical sdRoundCone): the foot
+    '6f8326780fdce9b58c39c27aef572ecae968e1ef9263de586944c8034eeac1e4', // withdrawn draft: the first-cap distance
+    '7f43626890e0d5bd6bd0c509596fe948a5ecc2ab685e1616977862f8f4068bec', // withdrawn draft: the second-cap distance
+    '2260572c8131179e04f7b26259b76ac07ccf7293c04ee18c62fc0591e806b149', // withdrawn draft: the side distance
+    '82084b4532931df61bf3bdb48a14bfb1eed24b20da937e64c3106a89283eb500', // withdrawn draft: the region selection
+    '83933721f0987980ba6e06e0bfe5c50b3bee1d6490c05b368749557d352f7863', // withdrawn draft (followed opSmoothUnion): the overlap
+    'e35cf9ed475dc23c6f5b955ee6e021dff81790641dce330ba0032ac7ef7ea2f5', // withdrawn draft: the smooth minimum
+    'a69006f00e135e4be4484d54fd87d80393fcea137d576b82c5eab3ade1ce813b', // withdrawn draft: the smooth maximum
+    ],
+  },
+]);
+
+/** The files the third-party code scan reads: source code in any language this repository could carry code in. */
+export const THIRD_PARTY_SCAN_EXTENSIONS = /\.(?:py|pyw|pyi|ts|tsx|mts|cts|js|jsx|mjs|cjs|rs|glsl|vert|frag|geom|comp|wgsl|hlsl|osl|c|h|cc|cpp|hpp|cs|go|java|kt|swift|lua|ipynb)$/i;

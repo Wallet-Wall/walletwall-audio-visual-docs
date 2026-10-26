@@ -19,7 +19,7 @@ import { rightsManifestSha256, validateManifest, type Asset, type Component, typ
 import type { RepoView } from './repo.ts';
 import { classifyPython, embeddedBlenderPython, hasPythonShebang, isPythonPath, scanPython, type PythonClassification } from './python-boundary.ts';
 import { parseSpdx, spdxIds } from './spdx.ts';
-import { BLENDER_COUPLED_LICENSE, CATEGORY_OF_COMPONENT_KIND, CATEGORY_OF_SPEC_ASSET_KIND, KNOWN_LICENSE_FILES, MEDIA_EXTENSIONS, OWNER_BASES, STATUSES_PERMITTED_IN, VOICE_SOURCE_PROVIDER, type AssetCategory } from './vocabulary.ts';
+import { BLENDER_COUPLED_LICENSE, CATEGORY_OF_COMPONENT_KIND, CATEGORY_OF_SPEC_ASSET_KIND, KNOWN_LICENSE_FILES, MEDIA_EXTENSIONS, OWNER_BASES, STATUSES_PERMITTED_IN, THIRD_PARTY_CODE_SIGNS, THIRD_PARTY_SCAN_EXTENSIONS, VOICE_SOURCE_PROVIDER, type AssetCategory } from './vocabulary.ts';
 
 export const MANIFEST_PATH = 'config/release-rights.json';
 export const REPORT_SCHEMA = 'walletwall.rights-check-report/v1';
@@ -144,6 +144,9 @@ export function checkRights(repo: RepoView, options: { mode: RightsMode }): Righ
     if (hit) add('BLENDER_PYTHON_IN_NON_PYTHON_FILE', p, `${p} contains Blender Python (${JSON.stringify(hit)}); a script handed to Blender is a Blender-API script and belongs in a classified Python file`);
   }
 
+  // 5b. Third-party code in the sources, recorded for as long as any of it remains.
+  checkThirdPartyCode(m, repo, add);
+
   // 6. Lockfiles: every locked package and crate accounted for, assessments pinned to versions.
   const locked = checkLockfiles(m, repo, add);
   counts.npmPackages = locked.length;
@@ -228,6 +231,36 @@ export function checkRights(repo: RepoView, options: { mode: RightsMode }): Righ
     for (const p of python.reviewRequired) add('PYTHON_REVIEW_REQUIRED', p, `${p} is REVIEW_REQUIRED: its Blender boundary is undecided, and a public release needs it decided`);
   }
   return finish(m);
+}
+
+/**
+ * Third-party code the policy knows (src/rights/vocabulary.ts THIRD_PARTY_CODE_SIGNS): a source file that credits it, or
+ * carries one of its known statements, must be cited by a third-party-derived-source component on the release path, so
+ * that component cannot be removed or retired while any of the code remains. Credits are read outside the tests and
+ * this checker, which name third parties on purpose (as for the Blender scan above); fingerprints are read in every
+ * source file, because a statement of the code is the code wherever it sits.
+ */
+function checkThirdPartyCode(m: RightsManifest, repo: RepoView, add: (code: string, path: string, message: string) => void): void {
+  const recorded = new Set<string>();
+  for (const c of m.components) {
+    if (c.layer !== 'SOURCE_CODE' || c.kind !== 'third-party-derived-source' || c.scope !== 'RELEASE_PATH') continue;
+    for (const e of c.evidence) if (e.type === 'FILE') recorded.add(e.ref);
+  }
+  for (const p of repo.files()) {
+    if (!THIRD_PARTY_SCAN_EXTENSIONS.test(p) || recorded.has(p)) continue;
+    const body = repo.read(p);
+    if (body === null) continue;
+    // Each line is read whole and without a trailing comment, so a comment appended to a statement does not hide it.
+    const lines = body.split('\n').map((l) => [...new Set([l, l.replace(/\s(?:#|\/\/).*$/, '')].map((v) => v.replace(/\s+/g, '')))]);
+    for (const sign of THIRD_PARTY_CODE_SIGNS) {
+      const credit = !EMBEDDED_SCAN_EXEMPT(p) && sign.credits.some((re) => re.test(body));
+      const known = new Set(sign.fingerprints);
+      const at = lines.findIndex((forms) => forms.some((l) => l.length >= 8 && known.has(sha256Hex(l))));
+      if (!credit && at < 0) continue;
+      const shows = [credit ? `credits ${sign.source}` : '', at >= 0 ? `carries a statement of ${sign.source}'s code (line ${at + 1})` : ''].filter(Boolean).join(' and ');
+      add('THIRD_PARTY_CODE_UNRECORDED', p, `${p} ${shows}, and no third-party-derived-source component cites it: record it (a SOURCE_CODE component citing ${p}), or replace it with code written here and remove what is left of it`);
+    }
+  }
 }
 
 function checkLicenseFiles(m: RightsManifest, repo: RepoView, add: (code: string, path: string, message: string) => void): void {

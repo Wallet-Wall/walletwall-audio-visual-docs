@@ -130,9 +130,9 @@ have been licensed under extremely permissive terms.
 Copyright notices are retained in src/* files where relevant.
 ```
 
-### `quilez-sdf-forms`
+### Signed-distance code (no third-party code)
 
-`blender/walletwallaby/geometry.py` credits **Inigo Quilez** for the forms of its signed-distance primitives (`sd_ellipsoid`, `sd_round_cone`), re-expressed in numpy. The article they come from, https://iquilezles.org/articles/distfunctions/, states no license; the attribution here and in the source is the only record. Status: `OWNER_CONFIRMATION_PENDING` (the owner decides whether that is enough, asks the author, or replaces the primitives).
+`blender/walletwallaby/geometry.py`'s signed-distance primitives and operators are written in this repository from their definitions. From 2026-10-18 to 2026-10-26 that file carried code translated from **Inigo Quilez**'s articles (https://iquilezles.org/articles/), recorded as `quilez-sdf-forms`; it was replaced and no longer ships, and the item is retired ([docs/LICENSING.md](docs/LICENSING.md), "Signed-distance code").
 
 ## Used by this repository, not distributed
 
