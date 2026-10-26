@@ -37,7 +37,18 @@ const clearRemotion = (x: Repo): void => {
   delete component(x.manifest, 'remotion').resolution;
 };
 
-/** Third-party-derived code inside a source file, as quilez-sdf-forms is inside geometry.py. */
+/**
+ * Each owner provenance record as attested: its attestation and its bound bytes, together, by content address. A new
+ * sha256 is recorded with a new attestation, so this changes only in an edit that also changes the record's attestation.
+ */
+const PINNED_OWNER_RECORDS: Record<string, string> = {
+  'brand-mark': '1e1b42b98edbf122d4a60178dbcacfbcbc328d6c3a166ada8791f8731b6bc9c3', // attested 2026-10-25
+  character: '1835672d1d7abb26c2b016d5c9cd7ad83ac2e580930e5fb45e8360beca7d166f', // attested 2026-10-26
+  'walletwallaby-character-model': '9e707196844b508583470e3b49062ce33e9bcb8ed2369ff7e7b294edc5b479e3', // attested 2026-10-26
+  'blender-render-output': 'd1a6bbd452c9c24c30516e43f200cd7fd361e1bae8e53f19203414a82a82f702', // attested 2026-10-26
+};
+
+/** Third-party-derived code inside a source file, as quilez-sdf-forms was inside geometry.py until 2026-10-26. */
 const sdfForms = (cites: string): Json => ({
   id: 'sdf-forms',
   layer: 'SOURCE_CODE',
@@ -328,14 +339,15 @@ describe('this repository: the owner-authored and owner-generated items', () => 
     return [...seen].sort();
   };
 
-  test('the four items are CLEARED, each on the owner\'s record of 2026-10-25 and nothing else', () => {
+  test('the four items are CLEARED, each on the owner\'s record and nothing else (the brand mark of 2026-10-25; the character, model, and frames re-established 2026-10-26, when their signed-distance code was replaced)', () => {
+    const attestedOn: Record<string, string> = { 'brand-mark': '2026-10-25', character: '2026-10-26', 'walletwallaby-character-model': '2026-10-26', 'blender-render-output': '2026-10-26' };
     for (const id of ['brand-mark', 'character', 'walletwallaby-character-model', 'blender-render-output']) {
       const i = item(id);
       assert.equal(i.status, 'CLEARED', id);
       assert.equal(i.resolution, undefined, id);
       assert.equal(i.clearance, undefined, `${id}: an owner item is not cleared by a vendor-style clearance record`);
       assert.deepEqual(Object.keys(i.provenance.attestation).sort(), ['attestedBy', 'attestedOn', 'basis'], id);
-      assert.deepEqual([i.provenance.attestation.attestedBy, i.provenance.attestation.attestedOn], ['OWNER', '2026-10-25'], id);
+      assert.deepEqual([i.provenance.attestation.attestedBy, i.provenance.attestation.attestedOn], ['OWNER', attestedOn[id]], id);
     }
     assert.deepEqual(['brand-mark', 'character', 'walletwallaby-character-model', 'blender-render-output'].map((id) => item(id).rightsBasis), ['OWNER_AUTHORED', 'OWNER_AUTHORED', 'GENERATED_FROM_OWNER_INPUTS', 'GENERATED_FROM_OWNER_INPUTS']);
   });
@@ -346,17 +358,17 @@ describe('this repository: the owner-authored and owner-generated items', () => 
     assert.equal(spec.assets.find((a: Json) => a.id === 'brand-mark').sha256, '91926a2eebc1777194ecf491049b8a7af3cf0892b09b363c5b2a17cd17d5dbad');
   });
 
-  test('the model binds every lane module its build loads and the pinned character, and names the Quilez-credited code as code it runs, not part of it', () => {
+  test('the model binds every lane module its build loads and the pinned character, and its sources carry no third-party code', () => {
     assert.deepEqual(closure('build.py'), [`${LANE}/build.py`, `${LANE}/common.py`, `${LANE}/geometry.py`, `${LANE}/materials.py`, `${LANE}/rig.py`]);
     assert.deepEqual(sources('walletwallaby-character-model'), [...closure('build.py'), 'src/character/walletwallaby/versions.ts'].sort());
-    assert.deepEqual(item('walletwallaby-character-model').provenance.thirdPartyCodeInSources, ['quilez-sdf-forms']);
+    assert.equal(item('walletwallaby-character-model').provenance.thirdPartyCodeInSources, undefined);
     assert.equal(item('walletwallaby-character-model').dependsOn, undefined, 'nothing third-party is inside the model');
     assert.deepEqual(item('walletwallaby-character-model').producedBy, ['blender-runtime']);
   });
 
   test('the character asset binds the rig contract, the body design, and the declared versions', () => {
     assert.deepEqual(sources('character'), [`${LANE}/geometry.py`, `${LANE}/materials.py`, 'src/character/walletwallaby/rig.ts', 'src/character/walletwallaby/rig/rig-source.ts', 'src/character/walletwallaby/versions.ts']);
-    assert.deepEqual(item('character').provenance.thirdPartyCodeInSources, ['quilez-sdf-forms']);
+    assert.equal(item('character').provenance.thirdPartyCodeInSources, undefined);
     assert.deepEqual(item('character').binding, { type: 'COMPONENT', componentId: 'walletwallaby-character-model' });
   });
 
@@ -384,7 +396,7 @@ describe('this repository: the owner-authored and owner-generated items', () => 
   test('development passes, and the strict check fails on exactly the items this lane does not clear', () => {
     const d = dev(repo);
     assert.deepEqual(d.findings, []);
-    const open = ['blender-depth-reveal-output', 'quilez-sdf-forms', 'remotion', 'remotion-render-output'];
+    const open = ['blender-depth-reveal-output', 'remotion', 'remotion-render-output'];
     assert.deepEqual(d.pending.map((p) => p.id).sort(), open);
     const s = strict(repo);
     assert.equal(s.result, 'FAIL');
@@ -397,19 +409,33 @@ describe('this repository: the owner-authored and owner-generated items', () => 
       'elevenlabs-service': 'a28343defd4fa0783d851599bb3b9dd35e2634cc77ce389327f8e004918389ca',
       'elevenlabs-narration-audio': 'e8fd3d5cfac21001b03cdb56fb2a539f86411246637105f22d0efe640351e717',
       narration: 'e27324c291de12333252407c98f65c5aec18c2f99d2b2fc4f7d9cb812ca7514e',
-      'quilez-sdf-forms': '399292530de971cb5ba67efd3a6ab1498909186339282771332788f2ebac2755',
-      remotion: 'cfe09d27ceac7101994c3cf18e075877fa7e236fe58ec2caf4aed50b03f93aa3',
+      remotion:'cfe09d27ceac7101994c3cf18e075877fa7e236fe58ec2caf4aed50b03f93aa3',
       'remotion-render-output': '7e37d1cc1601dc1cb9f3fd681a621279e9da5c0f9ba0522c4abc3e467b6a14ef',
       'blender-runtime': 'c0c694c2c243d35e95cb17e01d401a77f071f05620f6fdb358b9188d69244e32',
       'docs-page': 'd18ff46509e6efa74e57ee6c165ece57da948515d6d9e73c63cc268b1c1d92ad',
     };
     for (const [id, sha] of Object.entries(pinned)) assert.equal(contentAddress(item(id)), sha, id);
+    // quilez-sdf-forms (main d013c06: 39929253…) is retired: the code it recorded was replaced (docs/LICENSING.md).
+    assert.equal(item('quilez-sdf-forms'), undefined);
+  });
+
+  test('each owner record is pinned with its attestation and its bytes together, so new bytes need a new attestation', () => {
+    // The checker cannot tell a new sha256 recorded under the old attestation from a re-attestation; this pin can, in
+    // review: changing a record's files without its attestation, or the other way round, fails here.
+    const pinned: Record<string, string> = PINNED_OWNER_RECORDS;
+    const records: Record<string, Json> = {
+      'brand-mark': item('brand-mark').provenance,
+      character: item('character').provenance,
+      'walletwallaby-character-model': item('walletwallaby-character-model').provenance,
+      'blender-render-output': item('blender-render-output').provenance,
+    };
+    for (const [id, rec] of Object.entries(records)) assert.equal(contentAddress(rec), pinned[id], `${id} (attested ${rec.attestation.attestedOn})`);
   });
 
   test('no vendor, provider, or third-party item carries an owner provenance record', () => {
     const items: Json[] = [...manifest.components, ...manifest.videos.flatMap((v: Json) => v.assets)];
     for (const i of items.filter((x) => x.provenance !== undefined)) assert.ok(['OWNER_AUTHORED', 'GENERATED_FROM_OWNER_INPUTS'].includes(i.rightsBasis), i.id);
-    // The character frames' sources carry the Quilez-credited code as well, and say so.
-    assert.deepEqual(item('blender-render-output').provenance.thirdPartyCodeInSources, ['quilez-sdf-forms']);
+    // No owner record names third-party code: the lane's sources carry none since 2026-10-26.
+    for (const i of items.filter((x) => x.provenance !== undefined)) assert.equal(i.provenance.thirdPartyCodeInSources, undefined, i.id);
   });
 });

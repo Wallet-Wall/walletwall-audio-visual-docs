@@ -255,7 +255,7 @@ lowest vertex (winding kept) and sorted, weights (1/4096), attributes (1/256) an
 order, bones (1e-6 units) and pole angles (0.001°) quantized, and the materials (node graphs, quantized inputs, the
 mortar map's pixels). Every quantum is far coarser than the last-bit float noise that separates hosts (different libm
 and numpy builds) and far finer than anything a render shows. **Measured: Windows and Linux builds of the same source
-give the same canonical model (`f8124e59dab3…`) and materials (`852617c0edcd…`) hashes**, while their exact float
+give the same canonical model (`f8124e59dab3…`, model v1) and materials (`852617c0edcd…`) hashes**, while their exact float
 realizations differ (`ac81bb8e…` vs `30b5446b…`); `walletwallabyRealizationSha256` records the host's realization and
 is compared only within a host. The `.blend` file is a cache: its bytes differ per build (Blender writes memory
 addresses) and are recorded, never compared.
@@ -307,7 +307,7 @@ re-exported from the lesson without the ident (two fresh production-class runs, 
 | A, production class: proof set, two fresh runs (RTX) | 10 / 10 byte-identical (kept as the reference) |
 | A, proof class: proof set, two runs (WSL Ubuntu 26.04, Mesa 26.0.3 llvmpipe, CPU only) | 10 / 10 byte-identical |
 | B, software GL vs the RTX reference, same canonical model and plan | pass: character crops ≤ 17 levels on ≤ 0.0010% of channels; reveal frames ≤ 15 levels on ≤ 0.41% |
-| Canonical model hash, Windows build vs Linux build | identical (`f8124e59dab3…`, the pinned `BLENDER_CHARACTER`); realizations differ (`ac81bb8e…`, `30b5446b…`) |
+| Canonical model hash, Windows build vs Linux build | identical (`f8124e59dab3…`, model v1, then the pinned `BLENDER_CHARACTER`); realizations differ (`ac81bb8e…`, `30b5446b…`). Model v2 (`2c92f3c3…`): Windows and Linux (WSL, Blender 5.2.2) builds measured identical on 2026-10-26, realizations differ (`a081b5ca…`, `c6aec6cc…`); CI's Render determinism job builds it on Linux and refuses any build that is not the pinned model |
 | Review stills, two renders with every Blender frame rendered anew | 30 / 30 PNGs and `stills.json` byte-identical |
 | Crops vs the full-frame reference, whole lesson, final 1920x1080 composites | pass: every 10th frame (519) plus the layers' worst five (34, 692, 693, 725, 854): ≤ 25 levels on ≤ 0.0025% of channels, mean \|Δ\| ≤ 2.0e-4, 0 pixels appearing or vanishing, 4 of 519 identical |
 | Character layers alone, whole lesson, every visible frame (5,185 crops) | 0 of the reference's ink outside a crop; 21 frames identical; at most 208 channels per frame beyond ±2 (near-transparent edge pixels, where a straight-alpha colour difference vanishes once composited) |

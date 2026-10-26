@@ -113,7 +113,7 @@ describe('a status cannot claim more than its basis allows', () => {
   });
 
   test('an owner-authored or generated item needs no clearance record, and a stray one is refused', () => {
-    refuses((m) => (component(m, 'blender-render-output').clearance = { clearedBy: 'OWNER', clearedOn: '2026-11-01', basis: 'x' }), /clearance: only a VENDOR_LICENSE, PROVIDER_TERMS, or THIRD_PARTY_ATTRIBUTION_ONLY basis takes a clearance record/, 'stray');
+    refuses((m) => (component(m, 'blender-render-output').clearance = { clearedBy: 'OWNER', clearedOn: '2026-11-01', basis: 'x' }), /clearance: only a VENDOR_LICENSE, PROVIDER_TERMS, or THIRD_PARTY_ATTRIBUTION_ONLY basis, or third-party code carried in this repository's source files, takes a clearance record/, 'stray');
   });
 
   test('the license expression must agree with the basis', () => {

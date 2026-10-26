@@ -16,10 +16,10 @@
   },
   "environmentClass": "d9777826203659db",
   "approvedClass": "production-rtx5080",
-  "canonicalModelSha256": "f8124e59dab3bcf578f62db4cbe20fec12be7ee78e3a13701df45d6bc0118a1a",
-  "realizationSha256": "ac81bb8e27868cb5feb0dee2c9cf7e66b6a4b63d5df77dd242a33bab5273f18c",
+  "canonicalModelSha256": "2c92f3c32aa06f35ec6153010e6a8a5985a0a6f585a50a3119cbf655468797e1",
+  "realizationSha256": "a081b5ca6c328076b3693c7289c8e69274afb3fe2b62a09a3758f4ca9ff96cac",
   "blenderConfigSha256": "f89c3a8b238d23ae214a5abab381486cc2e629463bbdfdefea7216e9b310beeb",
-  "blenderSceneSourceSha256": "ad53c844d9ff5fbe85fe625c5ed8c591bb0a97ff6cfc23843ac370a544e1b39e",
+  "blenderSceneSourceSha256": "4e82d11b022201d8042381c228cb6fb96b4e2453afc90323c6a54ddebe0fd06e",
   "motionPlanSha256": "e46e3d0675e1fcd57db645e95c8f74b6ffd13464e9523e2e8646eeb928070237",
   "roles": [
     {

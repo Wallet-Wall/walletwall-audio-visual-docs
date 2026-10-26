@@ -118,6 +118,14 @@ jobs:
           tar -xJf "$RUNNER_TEMP/$file" -C "$RUNNER_TEMP/blender" --strip-components=1
           echo "WALLETWALL_BLENDER=$RUNNER_TEMP/blender/blender" >> "$GITHUB_ENV"
 
+      # The lane's signed-distance code held to its geometric properties, with the Python (and numpy) the pinned
+      # Blender ships. Here the test must run: without a Python with numpy it fails instead of skipping (elsewhere it
+      # skips).
+      - name: Signed-distance property tests (the pinned Blender's Python)
+        env:
+          WALLETWALL_REQUIRE_SDF_TESTS: '1'
+        run: node --test test/blender-sdf.test.ts
+
       # Lossless PNG stills are the determinism evidence; MP4 bytes are not run-to-run stable, so an MP4
       # hash is never used here. Each render runs in a fresh Node process, and only the generated stills
       # directory is moved between renders.
